@@ -591,7 +591,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string& value, const G
   const std::string encoded = hasGradient(options)
       ? base64Encode(encodePngRgba(imageSize, imageSize, renderGradientRgba(indices, imageSize, options)))
       : base64Encode(encodePngIndexed1(imageSize, imageSize, indices, options.foreground, options.background));
-  cache_[key] = encoded;
+  storeCacheEntry(key, encoded);
   return encoded;
 }
 
@@ -627,7 +627,7 @@ std::string QRCodeGenerator::generateSvgString(const std::string& value, const G
   svg << "</svg>";
 
   const std::string output = svg.str();
-  cache_[key] = output;
+  storeCacheEntry(key, output);
   return output;
 }
 
@@ -648,6 +648,7 @@ int QRCodeGenerator::getMatrixSize(const std::string& value, const GenerateOptio
 
 void QRCodeGenerator::clearCache() {
   cache_.clear();
+  cacheOrder_.clear();
 }
 
 size_t QRCodeGenerator::getCacheSize() const {
@@ -682,6 +683,17 @@ std::string QRCodeGenerator::cacheKey(
          options.gradient.type + "|" + gradientColors + "|" + gradientLocations + "|" +
          std::to_string(options.gradient.startX) + "|" + std::to_string(options.gradient.startY) + "|" +
          std::to_string(options.gradient.endX) + "|" + std::to_string(options.gradient.endY);
+}
+
+void QRCodeGenerator::storeCacheEntry(const std::string& key, const std::string& value) {
+  if (cache_.find(key) == cache_.end()) {
+    cacheOrder_.push_back(key);
+    while (cacheOrder_.size() > MaxCacheEntries) {
+      cache_.erase(cacheOrder_.front());
+      cacheOrder_.pop_front();
+    }
+  }
+  cache_[key] = value;
 }
 
 }  // namespace NitroQRCode

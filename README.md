@@ -4,6 +4,10 @@
 
 Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.
 
+<p align="center">
+  <img src="./docs/assets/demo.gif" alt="Nitro QRCode example app showing QR style and gradient presets" width="360" />
+</p>
+
 ## Why this package
 
 - No `react-native-svg`

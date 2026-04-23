@@ -72,6 +72,9 @@ export type QRCodeProps = QRCodeOptions & {
   testID?: string;
 };
 
+const COMPONENT_RASTER_MULTIPLIER = 2;
+const MIN_COMPONENT_RASTER_SIZE = 96;
+
 type QRCodeModuleData = {
   size: number;
   data: ArrayLike<boolean | number>;
@@ -128,6 +131,7 @@ const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
 const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
 const DEFAULT_RADIAL_START: QRCodeGradientPoint = { x: 0.5, y: 0.5 };
 const DEFAULT_RADIAL_END: QRCodeGradientPoint = { x: 1, y: 1 };
+const MAX_CACHE_ENTRIES = 128;
 const webCache = new Map<string, string>();
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
 
@@ -202,8 +206,20 @@ export function toPngDataUri(options: QRCodeOptions): string {
   clearLogoArea(context, normalized, foregroundFill);
 
   const output = canvas.toDataURL("image/png");
-  webCache.set(key, output);
+  setCacheEntry(key, output);
   return output;
+}
+
+export async function toPngBase64Async(
+  options: QRCodeOptions,
+): Promise<string> {
+  return toPngBase64(options);
+}
+
+export async function toPngDataUriAsync(
+  options: QRCodeOptions,
+): Promise<string> {
+  return toPngDataUri(options);
 }
 
 export function toSvgString(options: QRCodeOptions): string {
@@ -231,7 +247,7 @@ export function toSvgString(options: QRCodeOptions): string {
       ? normalized.foregroundColor
       : "url(#nitro-qrcode-gradient)";
   const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
-  webCache.set(key, output);
+  setCacheEntry(key, output);
   return output;
 }
 
@@ -285,7 +301,10 @@ export function QRCode({
   logo,
   testID,
 }: QRCodeProps) {
-  const rasterSize = Math.max(size * 3, DEFAULT_SIZE);
+  const rasterSize = Math.max(
+    Math.ceil(size * COMPONENT_RASTER_MULTIPLIER),
+    MIN_COMPONENT_RASTER_SIZE,
+  );
   const rasterScale = rasterSize / size;
   const resolvedLogoAreaSize =
     logoAreaSize ?? (logo !== undefined ? Math.round(size * 0.28) : 0);
@@ -365,6 +384,8 @@ export function QRCode({
 export const NitroQRCode = {
   toPngBase64,
   toPngDataUri,
+  toPngBase64Async,
+  toPngDataUriAsync,
   toSvgString,
   getMatrix,
   clearCache: clearQRCodeCache,
@@ -376,9 +397,26 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     throw new Error("QRCode value must not be empty.");
   }
 
+  const size = sanitizeInteger(options.size, DEFAULT_SIZE, "size", 1, 4096);
+  const logoAreaSize = sanitizeInteger(
+    options.logoAreaSize,
+    DEFAULT_LOGO_AREA_SIZE,
+    "logoAreaSize",
+    0,
+    4096,
+  );
+  const logoAreaBorderRadius = sanitizeInteger(
+    options.logoAreaBorderRadius,
+    DEFAULT_LOGO_AREA_BORDER_RADIUS,
+    "logoAreaBorderRadius",
+    0,
+    2048,
+  );
+  validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
+
   return {
     value: options.value,
-    size: sanitizeInteger(options.size, DEFAULT_SIZE, "size", 1, 4096),
+    size,
     quietZone: sanitizeInteger(
       options.quietZone,
       DEFAULT_QUIET_ZONE,
@@ -415,20 +453,8 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
     shapeOptions: normalizeShapeOptions(options.shapeOptions),
-    logoAreaSize: sanitizeInteger(
-      options.logoAreaSize,
-      DEFAULT_LOGO_AREA_SIZE,
-      "logoAreaSize",
-      0,
-      4096,
-    ),
-    logoAreaBorderRadius: sanitizeInteger(
-      options.logoAreaBorderRadius,
-      DEFAULT_LOGO_AREA_BORDER_RADIUS,
-      "logoAreaBorderRadius",
-      0,
-      2048,
-    ),
+    logoAreaSize,
+    logoAreaBorderRadius,
   };
 }
 
@@ -574,6 +600,29 @@ function sanitizeColor(value: string, name: string): string {
     throw new Error(`${name} must be #RRGGBB or #RRGGBBAA.`);
   }
   return value.toUpperCase();
+}
+
+function setCacheEntry(key: string, value: string): void {
+  webCache.set(key, value);
+  if (webCache.size > MAX_CACHE_ENTRIES) {
+    const firstKey = webCache.keys().next().value as string;
+    webCache.delete(firstKey);
+  }
+}
+
+function validateLogoDimensions(
+  logoAreaSize: number,
+  logoAreaBorderRadius: number,
+  size: number,
+): void {
+  if (logoAreaSize > size) {
+    throw new Error("logoAreaSize must be between 0 and size.");
+  }
+  if (logoAreaBorderRadius > size / 2) {
+    throw new Error(
+      "logoAreaBorderRadius must be between 0 and half the size.",
+    );
+  }
 }
 
 function scaleShapeOptions(

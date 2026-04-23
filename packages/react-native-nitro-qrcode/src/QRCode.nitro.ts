@@ -27,6 +27,32 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): string;
 
+  generatePngBase64Async(
+    value: string,
+    size: number,
+    quietZone: number,
+    errorCorrectionLevel: string,
+    foregroundColor: string,
+    backgroundColor: string,
+    minVersion: number,
+    maxVersion: number,
+    mask: number,
+    boostEcl: boolean,
+    moduleShape: string,
+    eyePatternShape: string,
+    gap: number,
+    eyePatternGap: number,
+    logoAreaSize: number,
+    logoAreaBorderRadius: number,
+    gradientType: string,
+    gradientColors: string[],
+    gradientLocations: number[],
+    gradientStartX: number,
+    gradientStartY: number,
+    gradientEndX: number,
+    gradientEndY: number,
+  ): Promise<string>;
+
   generatePngDataUri(
     value: string,
     size: number,
@@ -52,6 +78,32 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndX: number,
     gradientEndY: number,
   ): string;
+
+  generatePngDataUriAsync(
+    value: string,
+    size: number,
+    quietZone: number,
+    errorCorrectionLevel: string,
+    foregroundColor: string,
+    backgroundColor: string,
+    minVersion: number,
+    maxVersion: number,
+    mask: number,
+    boostEcl: boolean,
+    moduleShape: string,
+    eyePatternShape: string,
+    gap: number,
+    eyePatternGap: number,
+    logoAreaSize: number,
+    logoAreaBorderRadius: number,
+    gradientType: string,
+    gradientColors: string[],
+    gradientLocations: number[],
+    gradientStartX: number,
+    gradientStartY: number,
+    gradientEndX: number,
+    gradientEndY: number,
+  ): Promise<string>;
 
   generateSvgString(
     value: string,

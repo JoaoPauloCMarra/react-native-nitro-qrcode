@@ -52,6 +52,15 @@ void testDataUriAndCache() {
   assert(generator.getCacheSize() == 1);
   generator.clearCache();
   assert(generator.getCacheSize() == 0);
+
+  options.size = 32;
+  options.quietZone = 0;
+  for (int index = 0; index < 140; index++) {
+    generator.generatePngBase64("cache-entry-" + std::to_string(index), options);
+  }
+  assert(generator.getCacheSize() == 128);
+  generator.clearCache();
+  assert(generator.getCacheSize() == 0);
 }
 
 void testStyledPngGeneration() {

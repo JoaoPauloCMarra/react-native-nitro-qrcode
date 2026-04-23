@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -61,10 +62,13 @@ class QRCodeGenerator {
   size_t getCacheSize() const;
 
  private:
+  static constexpr size_t MaxCacheEntries = 128;
   mutable std::unordered_map<std::string, std::string> cache_;
+  mutable std::deque<std::string> cacheOrder_;
 
   Matrix createMatrix(const std::string& value, const GenerateOptions& options) const;
   std::string cacheKey(const std::string& value, const GenerateOptions& options, const std::string& output) const;
+  void storeCacheEntry(const std::string& key, const std::string& value);
 };
 
 Color parseColor(const std::string& value);

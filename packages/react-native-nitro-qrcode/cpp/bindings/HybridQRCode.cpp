@@ -1,6 +1,7 @@
 #include "HybridQRCode.hpp"
 
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace margelo::nitro::NitroQRCode {
@@ -109,6 +110,116 @@ std::string HybridQRCode::generatePngDataUri(
           gradientStartY,
           gradientEndX,
           gradientEndY));
+}
+
+std::shared_ptr<Promise<std::string>> HybridQRCode::generatePngBase64Async(
+    const std::string& value,
+    double size,
+    double quietZone,
+    const std::string& errorCorrectionLevel,
+    const std::string& foregroundColor,
+    const std::string& backgroundColor,
+    double minVersion,
+    double maxVersion,
+    double mask,
+    bool boostEcl,
+    const std::string& moduleShape,
+    const std::string& eyePatternShape,
+    double gap,
+    double eyePatternGap,
+    double logoAreaSize,
+    double logoAreaBorderRadius,
+    const std::string& gradientType,
+    const std::vector<std::string>& gradientColors,
+    const std::vector<double>& gradientLocations,
+    double gradientStartX,
+    double gradientStartY,
+    double gradientEndX,
+    double gradientEndY) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::string>::async([self,
+                                      value,
+                                      options = makeOptions(
+                                          size,
+                                          quietZone,
+                                          errorCorrectionLevel,
+                                          foregroundColor,
+                                          backgroundColor,
+                                          minVersion,
+                                          maxVersion,
+                                          mask,
+                                          boostEcl,
+                                          moduleShape,
+                                          eyePatternShape,
+                                          gap,
+                                          eyePatternGap,
+                                          logoAreaSize,
+                                          logoAreaBorderRadius,
+                                          gradientType,
+                                          gradientColors,
+                                          gradientLocations,
+                                          gradientStartX,
+                                          gradientStartY,
+                                          gradientEndX,
+                                          gradientEndY)]() mutable {
+    std::lock_guard<std::mutex> lock(self->mutex_);
+    return self->generator_.generatePngBase64(value, options);
+  });
+}
+
+std::shared_ptr<Promise<std::string>> HybridQRCode::generatePngDataUriAsync(
+    const std::string& value,
+    double size,
+    double quietZone,
+    const std::string& errorCorrectionLevel,
+    const std::string& foregroundColor,
+    const std::string& backgroundColor,
+    double minVersion,
+    double maxVersion,
+    double mask,
+    bool boostEcl,
+    const std::string& moduleShape,
+    const std::string& eyePatternShape,
+    double gap,
+    double eyePatternGap,
+    double logoAreaSize,
+    double logoAreaBorderRadius,
+    const std::string& gradientType,
+    const std::vector<std::string>& gradientColors,
+    const std::vector<double>& gradientLocations,
+    double gradientStartX,
+    double gradientStartY,
+    double gradientEndX,
+    double gradientEndY) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::string>::async([self,
+                                      value,
+                                      options = makeOptions(
+                                          size,
+                                          quietZone,
+                                          errorCorrectionLevel,
+                                          foregroundColor,
+                                          backgroundColor,
+                                          minVersion,
+                                          maxVersion,
+                                          mask,
+                                          boostEcl,
+                                          moduleShape,
+                                          eyePatternShape,
+                                          gap,
+                                          eyePatternGap,
+                                          logoAreaSize,
+                                          logoAreaBorderRadius,
+                                          gradientType,
+                                          gradientColors,
+                                          gradientLocations,
+                                          gradientStartX,
+                                          gradientStartY,
+                                          gradientEndX,
+                                          gradientEndY)]() mutable {
+    std::lock_guard<std::mutex> lock(self->mutex_);
+    return self->generator_.generatePngDataUri(value, options);
+  });
 }
 
 std::string HybridQRCode::generateSvgString(
@@ -252,7 +363,9 @@ double HybridQRCode::getCacheSize() {
 }
 
 int HybridQRCode::toInt(double value, const char* name) const {
-  if (!std::isfinite(value) || std::floor(value) != value) {
+  if (!std::isfinite(value) || std::floor(value) != value ||
+      value < static_cast<double>(std::numeric_limits<int>::min()) ||
+      value > static_cast<double>(std::numeric_limits<int>::max())) {
     throw std::invalid_argument(std::string(name) + " must be a finite integer.");
   }
   return static_cast<int>(value);

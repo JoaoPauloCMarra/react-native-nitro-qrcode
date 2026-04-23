@@ -3,7 +3,11 @@ import TestRenderer, { act } from "react-test-renderer";
 
 const mockHybridObject = {
   generatePngBase64: jest.fn(() => "png-base64"),
+  generatePngBase64Async: jest.fn(async () => "png-base64"),
   generatePngDataUri: jest.fn(() => "data:image/png;base64,png-base64"),
+  generatePngDataUriAsync: jest.fn(
+    async () => "data:image/png;base64,png-base64",
+  ),
   generateSvgString: jest.fn(() => "<svg />"),
   getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
   getMatrixSize: jest.fn(() => 21),
@@ -17,6 +21,42 @@ jest.mock("react-native-nitro-modules", () => ({
   },
 }));
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+class ErrorBoundary extends React.Component<
+  React.PropsWithChildren,
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  override render() {
+    if (this.state.error !== null) {
+      return React.createElement("error-boundary", {
+        message: this.state.error.message,
+      });
+    }
+    return this.props.children;
+  }
+}
+
 import {
   clearQRCodeCache,
   getMatrix,
@@ -24,7 +64,9 @@ import {
   NitroQRCode,
   QRCode,
   toPngBase64,
+  toPngBase64Async,
   toPngDataUri,
+  toPngDataUriAsync,
   toSvgString,
 } from "../index";
 import * as Web from "../index.web";
@@ -32,6 +74,12 @@ import * as Web from "../index.web";
 describe("native QRCode API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHybridObject.generatePngBase64Async.mockImplementation(
+      async () => "png-base64",
+    );
+    mockHybridObject.generatePngDataUriAsync.mockImplementation(
+      async () => "data:image/png;base64,png-base64",
+    );
   });
 
   it("generates PNG base64 with normalized defaults", () => {
@@ -153,6 +201,17 @@ describe("native QRCode API", () => {
     );
   });
 
+  it("exposes async PNG helpers through the native bridge", async () => {
+    await expect(toPngBase64Async({ value: "async" })).resolves.toBe(
+      "png-base64",
+    );
+    await expect(toPngDataUriAsync({ value: "async" })).resolves.toBe(
+      "data:image/png;base64,png-base64",
+    );
+    expect(mockHybridObject.generatePngBase64Async).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalled();
+  });
+
   it("uses radial gradient defaults on the native bridge", () => {
     expect(
       toPngBase64({
@@ -236,6 +295,12 @@ describe("native QRCode API", () => {
       "logoAreaSize must be",
     );
     expect(() =>
+      toPngBase64({ value: "x", size: 128, logoAreaSize: 129 }),
+    ).toThrow("logoAreaSize must be between 0 and size");
+    expect(() =>
+      toPngBase64({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
+    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
+    expect(() =>
       toPngBase64({
         value: "x",
         gradient: {
@@ -308,9 +373,9 @@ describe("native QRCode API", () => {
     ).toThrow("gradient.colors[1] must be");
   });
 
-  it("renders an Image-backed QR component", () => {
+  it("renders an Image-backed QR component", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
-    act(() => {
+    await act(async () => {
       tree = TestRenderer.create(
         React.createElement(QRCode, {
           value: "https://example.com",
@@ -324,6 +389,7 @@ describe("native QRCode API", () => {
     if (tree === undefined) {
       throw new Error("Expected QRCode test renderer to be created.");
     }
+    const currentTree = tree;
     const qrView = tree.root.findAll(
       (node) => node.props.testID === "qr" && Array.isArray(node.props.style),
     )[0];
@@ -332,8 +398,12 @@ describe("native QRCode API", () => {
         expect.objectContaining({ width: 144, height: 144 }),
       ]),
     );
-    const currentTree = tree;
-    act(() => {
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,png-base64",
+      ),
+    ).not.toHaveLength(0);
+    await act(async () => {
       currentTree.update(
         React.createElement(QRCode, {
           value: "https://example.com",
@@ -343,9 +413,149 @@ describe("native QRCode API", () => {
     });
   });
 
-  it("uses the default component size", () => {
+  it("keeps the previous image while the next async QR is pending", async () => {
+    const first = createDeferred<string>();
+    const second = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsync
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
     let tree: TestRenderer.ReactTestRenderer | undefined;
-    act(() => {
+    await act(async () => {
+      tree = TestRenderer.create(React.createElement(QRCode, { value: "one" }));
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    await act(async () => {
+      first.resolve("data:image/png;base64,first");
+      await Promise.resolve();
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,first",
+      ),
+    ).not.toHaveLength(0);
+
+    await act(async () => {
+      currentTree.update(React.createElement(QRCode, { value: "two" }));
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,first",
+      ),
+    ).not.toHaveLength(0);
+
+    await act(async () => {
+      second.resolve("data:image/png;base64,second");
+      await Promise.resolve();
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,second",
+      ),
+    ).not.toHaveLength(0);
+  });
+
+  it("ignores async completions after the component unmounts", async () => {
+    const success = createDeferred<string>();
+    const failure = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsync
+      .mockImplementationOnce(() => success.promise)
+      .mockImplementationOnce(() => failure.promise);
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(React.createElement(QRCode, { value: "one" }));
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    await act(async () => {
+      currentTree.update(React.createElement(QRCode, { value: "two" }));
+    });
+    await act(async () => {
+      currentTree.unmount();
+    });
+
+    await act(async () => {
+      success.resolve("data:image/png;base64,late-success");
+      failure.reject(new Error("late-error"));
+      await Promise.resolve();
+    });
+
+    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces async QR generation errors", async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(() =>
+      Promise.reject("boom"),
+    );
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(
+          ErrorBoundary,
+          undefined,
+          React.createElement(QRCode, { value: "broken" }),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    const fallback = tree.root.findAll(
+      (node) => node.props.message === "boom",
+    )[0];
+    expect(fallback.props.message).toBe("boom");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("surfaces native Error instances from async QR generation", async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(() =>
+      Promise.reject(new Error("native-boom")),
+    );
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(
+          ErrorBoundary,
+          undefined,
+          React.createElement(QRCode, { value: "broken-native" }),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    const fallback = tree.root.findAll(
+      (node) => node.props.message === "native-boom",
+    )[0];
+    expect(fallback.props.message).toBe("native-boom");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("uses the default component size", async () => {
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
       tree = TestRenderer.create(
         React.createElement(QRCode, { value: "https://example.com" }),
       );
@@ -533,12 +743,27 @@ describe("web QRCode API", () => {
     expect(Web.getQRCodeCacheSize()).toBeGreaterThan(0);
     Web.clearQRCodeCache();
     expect(Web.getQRCodeCacheSize()).toBe(0);
+    for (let index = 0; index < 140; index++) {
+      Web.toSvgString({ value: `cache-entry-${index}` });
+    }
+    expect(Web.getQRCodeCacheSize()).toBe(128);
+    Web.clearQRCodeCache();
 
     const matrix = Web.getMatrix({ value: "Hello" });
     expect(matrix.size).toBeGreaterThan(0);
     expect(matrix.packedBase64.length).toBeGreaterThan(0);
     expect(Web.NitroQRCode.getMatrix({ value: "Hello" }).size).toBe(
       matrix.size,
+    );
+  });
+
+  it("exposes async web PNG helpers", async () => {
+    installCanvas();
+    await expect(Web.toPngBase64Async({ value: "Hello" })).resolves.toBe(
+      "web-png",
+    );
+    await expect(Web.toPngDataUriAsync({ value: "Hello" })).resolves.toBe(
+      "data:image/png;base64,web-png",
     );
   });
 
@@ -601,6 +826,12 @@ describe("web QRCode API", () => {
     expect(() => Web.toSvgString({ value: "x", logoAreaSize: 4097 })).toThrow(
       "logoAreaSize must be",
     );
+    expect(() =>
+      Web.toSvgString({ value: "x", size: 128, logoAreaSize: 129 }),
+    ).toThrow("logoAreaSize must be between 0 and size");
+    expect(() =>
+      Web.toSvgString({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
+    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
     expect(() =>
       Web.toSvgString({
         value: "x",

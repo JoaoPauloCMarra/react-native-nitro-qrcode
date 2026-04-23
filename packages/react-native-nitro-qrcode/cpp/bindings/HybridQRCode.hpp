@@ -3,6 +3,7 @@
 #include "HybridQRCodeSpec.hpp"
 #include "../core/QRCodeGenerator.hpp"
 
+#include <NitroModules/Promise.hpp>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -40,6 +41,56 @@ class HybridQRCode : public HybridQRCodeSpec {
       double gradientEndY) override;
 
   std::string generatePngDataUri(
+      const std::string& value,
+      double size,
+      double quietZone,
+      const std::string& errorCorrectionLevel,
+      const std::string& foregroundColor,
+      const std::string& backgroundColor,
+      double minVersion,
+      double maxVersion,
+      double mask,
+      bool boostEcl,
+      const std::string& moduleShape,
+      const std::string& eyePatternShape,
+      double gap,
+      double eyePatternGap,
+      double logoAreaSize,
+      double logoAreaBorderRadius,
+      const std::string& gradientType,
+      const std::vector<std::string>& gradientColors,
+      const std::vector<double>& gradientLocations,
+      double gradientStartX,
+      double gradientStartY,
+      double gradientEndX,
+      double gradientEndY) override;
+
+  std::shared_ptr<Promise<std::string>> generatePngBase64Async(
+      const std::string& value,
+      double size,
+      double quietZone,
+      const std::string& errorCorrectionLevel,
+      const std::string& foregroundColor,
+      const std::string& backgroundColor,
+      double minVersion,
+      double maxVersion,
+      double mask,
+      bool boostEcl,
+      const std::string& moduleShape,
+      const std::string& eyePatternShape,
+      double gap,
+      double eyePatternGap,
+      double logoAreaSize,
+      double logoAreaBorderRadius,
+      const std::string& gradientType,
+      const std::vector<std::string>& gradientColors,
+      const std::vector<double>& gradientLocations,
+      double gradientStartX,
+      double gradientStartY,
+      double gradientEndX,
+      double gradientEndY) override;
+
+  std::shared_ptr<Promise<std::string>> generatePngDataUriAsync(
       const std::string& value,
       double size,
       double quietZone,

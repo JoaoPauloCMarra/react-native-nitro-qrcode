@@ -23,7 +23,7 @@ const INITIAL_URL =
 const PRESET_PREVIEW_VALUE = "https://nitro.margelo.com/demo";
 const PREVIEW_SIZE = 244;
 const PRESET_PREVIEW_SIZE = 26;
-const METRIC_RASTER_SIZE = Math.max(PREVIEW_SIZE * 3, 512);
+const METRIC_RASTER_SIZE = Math.max(Math.ceil(PREVIEW_SIZE * 2), 96);
 const APP_ICON = require("../assets/icon.png");
 const COLOR_PRESETS = ["mono", "blue", "sunset", "radial"] as const;
 const STYLE_PRESET_IDS = ["classic", "soft", "dots", "badge"] as const;
@@ -52,6 +52,13 @@ type DensityConfig = {
   label: string;
   gapOffset: number;
   eyeGapOffset: number;
+};
+
+type DemoMetrics = {
+  elapsed: number;
+  bytes: number;
+  matrixSize: number;
+  cacheSize: number;
 };
 
 const COLOR_STYLES: Record<ColorPreset, ColorStyle> = {
@@ -175,6 +182,13 @@ export default function DemoScreen() {
   const [fps, setFps] = useState(60);
   const frameCount = useRef(0);
   const lastFpsTick = useRef(0);
+  const [metrics, setMetrics] = useState<DemoMetrics>({
+    elapsed: 0,
+    bytes: 0,
+    matrixSize: 0,
+    cacheSize: 0,
+  });
+  const [metricsError, setMetricsError] = useState<Error | null>(null);
 
   useEffect(() => {
     let frameId = 0;
@@ -214,33 +228,55 @@ export default function DemoScreen() {
   const logoAreaSize = showLogo ? 66 : 0;
   const logoAreaBorderRadius = showLogo ? 14 : 0;
 
-  const metrics = useMemo(() => {
-    const startedAt = now();
-    const png = NitroQRCode.toPngBase64({
-      value,
-      size: METRIC_RASTER_SIZE,
-      errorCorrectionLevel: showLogo ? "H" : "M",
-      foregroundColor: colorStyle.foregroundColor,
-      gradient: colorStyle.gradient,
-      shapeOptions: scaleShapeOptions(
-        shapeOptions,
-        METRIC_RASTER_SIZE / PREVIEW_SIZE,
-      ),
-      logoAreaSize: Math.round(
-        logoAreaSize * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
-      ),
-      logoAreaBorderRadius: Math.round(
-        logoAreaBorderRadius * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
-      ),
-    });
-    const elapsed = now() - startedAt;
-    const matrix = getMatrix({ value });
+  useEffect(() => {
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      const startedAt = now();
+      void NitroQRCode.toPngBase64Async({
+        value,
+        size: METRIC_RASTER_SIZE,
+        errorCorrectionLevel: showLogo ? "H" : "M",
+        foregroundColor: colorStyle.foregroundColor,
+        gradient: colorStyle.gradient,
+        shapeOptions: scaleShapeOptions(
+          shapeOptions,
+          METRIC_RASTER_SIZE / PREVIEW_SIZE,
+        ),
+        logoAreaSize: Math.round(
+          logoAreaSize * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
+        ),
+        logoAreaBorderRadius: Math.round(
+          logoAreaBorderRadius * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
+        ),
+      }).then(
+        (png) => {
+          if (!isMounted) {
+            return;
+          }
 
-    return {
-      elapsed,
-      bytes: Math.ceil((png.length * 3) / 4),
-      matrixSize: matrix.size,
-      cacheSize: getQRCodeCacheSize(),
+          const matrix = getMatrix({ value });
+          setMetricsError(null);
+          setMetrics({
+            elapsed: now() - startedAt,
+            bytes: Math.ceil((png.length * 3) / 4),
+            matrixSize: matrix.size,
+            cacheSize: getQRCodeCacheSize(),
+          });
+        },
+        (error: unknown) => {
+          if (!isMounted) {
+            return;
+          }
+          setMetricsError(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        },
+      );
+    }, 120);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
     };
   }, [
     colorStyle.foregroundColor,
@@ -251,6 +287,10 @@ export default function DemoScreen() {
     showLogo,
     value,
   ]);
+
+  if (metricsError !== null) {
+    throw metricsError;
+  }
 
   return (
     <ScrollView

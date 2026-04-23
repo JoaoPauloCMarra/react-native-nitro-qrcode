@@ -15,7 +15,9 @@ namespace margelo::nitro::NitroQRCode {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("generatePngBase64", &HybridQRCodeSpec::generatePngBase64);
+      prototype.registerHybridMethod("generatePngBase64Async", &HybridQRCodeSpec::generatePngBase64Async);
       prototype.registerHybridMethod("generatePngDataUri", &HybridQRCodeSpec::generatePngDataUri);
+      prototype.registerHybridMethod("generatePngDataUriAsync", &HybridQRCodeSpec::generatePngDataUriAsync);
       prototype.registerHybridMethod("generateSvgString", &HybridQRCodeSpec::generateSvgString);
       prototype.registerHybridMethod("getMatrixPackedBase64", &HybridQRCodeSpec::getMatrixPackedBase64);
       prototype.registerHybridMethod("getMatrixSize", &HybridQRCodeSpec::getMatrixSize);

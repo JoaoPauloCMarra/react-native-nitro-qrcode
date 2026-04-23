@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Nitro QRCode Example",
+    "name": "Nitro QRCode",
     "slug": "nitro-qrcode-example",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     "android": {
       "package": "com.qrcode.example",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0F10"
       }
     },

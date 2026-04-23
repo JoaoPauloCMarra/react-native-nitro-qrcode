@@ -1,4 +1,4 @@
-import React, { type ReactNode, useMemo } from "react";
+import React, { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   Image,
   type ImageStyle,
@@ -86,6 +86,8 @@ const DEFAULT_BOOST_ECL = true;
 const DEFAULT_SHAPE: QRCodeShape = "square";
 const DEFAULT_LOGO_AREA_SIZE = 0;
 const DEFAULT_LOGO_AREA_BORDER_RADIUS = 0;
+const COMPONENT_RASTER_MULTIPLIER = 2;
+const MIN_COMPONENT_RASTER_SIZE = 96;
 const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
 const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
 const DEFAULT_RADIAL_START: QRCodeGradientPoint = { x: 0.5, y: 0.5 };
@@ -125,6 +127,64 @@ export function toPngBase64(options: QRCodeOptions): string {
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   return NativeQRCode.generatePngDataUri(
+    normalized.value,
+    normalized.size,
+    normalized.quietZone,
+    normalized.errorCorrectionLevel,
+    normalized.foregroundColor,
+    normalized.backgroundColor,
+    normalized.minVersion,
+    normalized.maxVersion,
+    normalized.mask,
+    normalized.boostEcl,
+    normalized.shapeOptions.shape,
+    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.gap,
+    normalized.shapeOptions.eyePatternGap,
+    normalized.logoAreaSize,
+    normalized.logoAreaBorderRadius,
+    normalized.gradient.type,
+    normalized.gradient.colors,
+    normalized.gradient.locations,
+    normalized.gradient.startX,
+    normalized.gradient.startY,
+    normalized.gradient.endX,
+    normalized.gradient.endY,
+  );
+}
+
+export function toPngBase64Async(options: QRCodeOptions): Promise<string> {
+  const normalized = normalizeOptions(options);
+  return NativeQRCode.generatePngBase64Async(
+    normalized.value,
+    normalized.size,
+    normalized.quietZone,
+    normalized.errorCorrectionLevel,
+    normalized.foregroundColor,
+    normalized.backgroundColor,
+    normalized.minVersion,
+    normalized.maxVersion,
+    normalized.mask,
+    normalized.boostEcl,
+    normalized.shapeOptions.shape,
+    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.gap,
+    normalized.shapeOptions.eyePatternGap,
+    normalized.logoAreaSize,
+    normalized.logoAreaBorderRadius,
+    normalized.gradient.type,
+    normalized.gradient.colors,
+    normalized.gradient.locations,
+    normalized.gradient.startX,
+    normalized.gradient.startY,
+    normalized.gradient.endX,
+    normalized.gradient.endY,
+  );
+}
+
+export function toPngDataUriAsync(options: QRCodeOptions): Promise<string> {
+  const normalized = normalizeOptions(options);
+  return NativeQRCode.generatePngDataUriAsync(
     normalized.value,
     normalized.size,
     normalized.quietZone,
@@ -222,7 +282,12 @@ export function QRCode({
   logo,
   testID,
 }: QRCodeProps) {
-  const rasterSize = Math.max(size * 3, DEFAULT_SIZE);
+  const [uri, setUri] = useState<string>();
+  const [generationError, setGenerationError] = useState<Error>();
+  const rasterSize = Math.max(
+    Math.ceil(size * COMPONENT_RASTER_MULTIPLIER),
+    MIN_COMPONENT_RASTER_SIZE,
+  );
   const rasterScale = rasterSize / size;
   const resolvedLogoAreaSize =
     logoAreaSize ?? (logo !== undefined ? Math.round(size * 0.28) : 0);
@@ -265,7 +330,33 @@ export function QRCode({
     ],
   );
 
-  const uri = useMemo(() => toPngDataUri(options), [options]);
+  useEffect(() => {
+    let isMounted = true;
+
+    void toPngDataUriAsync(options).then(
+      (nextUri) => {
+        if (!isMounted) {
+          return;
+        }
+        setGenerationError(undefined);
+        setUri(nextUri);
+      },
+      (error: unknown) => {
+        if (!isMounted) {
+          return;
+        }
+        setGenerationError(toError(error));
+      },
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, [options]);
+
+  if (generationError !== undefined) {
+    throw generationError;
+  }
 
   return React.createElement(
     View,
@@ -273,12 +364,13 @@ export function QRCode({
       style: [styles.frame, { width: size, height: size }, style],
       testID,
     },
-    React.createElement(Image, {
-      source: { uri },
-      resizeMode: "contain",
-      style: [styles.image, imageStyle],
-      accessibilityIgnoresInvertColors: Platform.OS !== "web",
-    }),
+    uri !== undefined &&
+      React.createElement(Image, {
+        source: { uri },
+        resizeMode: "contain",
+        style: [styles.image, imageStyle],
+        accessibilityIgnoresInvertColors: Platform.OS !== "web",
+      }),
     logo !== undefined &&
       React.createElement(
         View,
@@ -304,6 +396,8 @@ export function QRCode({
 export const NitroQRCode = {
   toPngBase64,
   toPngDataUri,
+  toPngBase64Async,
+  toPngDataUriAsync,
   toSvgString,
   getMatrix,
   clearCache: clearQRCodeCache,
@@ -333,9 +427,26 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     throw new Error("QRCode value must not be empty.");
   }
 
+  const size = sanitizeInteger(options.size, DEFAULT_SIZE, "size", 1, 4096);
+  const logoAreaSize = sanitizeInteger(
+    options.logoAreaSize,
+    DEFAULT_LOGO_AREA_SIZE,
+    "logoAreaSize",
+    0,
+    4096,
+  );
+  const logoAreaBorderRadius = sanitizeInteger(
+    options.logoAreaBorderRadius,
+    DEFAULT_LOGO_AREA_BORDER_RADIUS,
+    "logoAreaBorderRadius",
+    0,
+    2048,
+  );
+  validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
+
   return {
     value: options.value,
-    size: sanitizeInteger(options.size, DEFAULT_SIZE, "size", 1, 4096),
+    size,
     quietZone: sanitizeInteger(
       options.quietZone,
       DEFAULT_QUIET_ZONE,
@@ -364,20 +475,8 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
     shapeOptions: normalizeShapeOptions(options.shapeOptions),
-    logoAreaSize: sanitizeInteger(
-      options.logoAreaSize,
-      DEFAULT_LOGO_AREA_SIZE,
-      "logoAreaSize",
-      0,
-      4096,
-    ),
-    logoAreaBorderRadius: sanitizeInteger(
-      options.logoAreaBorderRadius,
-      DEFAULT_LOGO_AREA_BORDER_RADIUS,
-      "logoAreaBorderRadius",
-      0,
-      2048,
-    ),
+    logoAreaSize,
+    logoAreaBorderRadius,
   };
 }
 
@@ -523,6 +622,25 @@ function sanitizeColor(value: string, name: string): string {
     throw new Error(`${name} must be #RRGGBB or #RRGGBBAA.`);
   }
   return value.toUpperCase();
+}
+
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+function validateLogoDimensions(
+  logoAreaSize: number,
+  logoAreaBorderRadius: number,
+  size: number,
+): void {
+  if (logoAreaSize > size) {
+    throw new Error("logoAreaSize must be between 0 and size.");
+  }
+  if (logoAreaBorderRadius > size / 2) {
+    throw new Error(
+      "logoAreaBorderRadius must be between 0 and half the size.",
+    );
+  }
 }
 
 function scaleShapeOptions(
