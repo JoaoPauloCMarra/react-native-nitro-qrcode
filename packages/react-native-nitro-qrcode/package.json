@@ -1,0 +1,157 @@
+{
+  "name": "react-native-nitro-qrcode",
+  "version": "0.0.1",
+  "description": "Fast QR code generator for React Native and Expo with Nitro, native C++, PNG export, gradients, and no react-native-svg or Skia.",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/commonjs/index.d.ts",
+  "react-native": "src/index.ts",
+  "browser": "src/index.web.ts",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "react-native": "./src/index.ts",
+      "browser": "./src/index.web.ts",
+      "import": {
+        "types": "./lib/typescript/module/index.d.ts",
+        "default": "./lib/module/index.js"
+      },
+      "require": {
+        "types": "./lib/typescript/commonjs/index.d.ts",
+        "default": "./lib/commonjs/index.js"
+      }
+    },
+    "./app.plugin": "./app.plugin.js",
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json"
+  },
+  "app": "app.plugin.js",
+  "files": [
+    "src",
+    "lib",
+    "cpp",
+    "android",
+    "ios",
+    "nitrogen",
+    "nitro.json",
+    "*.podspec",
+    "app.plugin.js",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!cpp/core/*Test.cpp",
+    "!cpp/build",
+    "!android/build",
+    "!android/.cxx",
+    "!scripts"
+  ],
+  "scripts": {
+    "prebuild": "bun run codegen",
+    "build": "bob build",
+    "clean": "rimraf lib nitrogen/generated",
+    "codegen": "nitrogen --logLevel=\"debug\"",
+    "lint": "bunx eslint src --max-warnings=0 --ignore-pattern 'src/**/*.nitro.ts'",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:cpp": "node ../../scripts/test-cpp.js",
+    "verify": "bun run lint && bun run typecheck && bun run test:coverage && bun run test:cpp && bun run build",
+    "prepublishOnly": "bun run clean && bun run codegen && bun run verify",
+    "prepack": "node -e \"const fs=require('fs'); fs.copyFileSync('../../README.md','./README.md'); try{fs.copyFileSync('../../LICENSE','./LICENSE')}catch(e){}\"",
+    "postpack": "node -e \"const fs=require('fs'); ['./README.md','./LICENSE'].forEach(f=>fs.existsSync(f)&&fs.unlinkSync(f))\""
+  },
+  "keywords": [
+    "react-native",
+    "qrcode",
+    "qr-code",
+    "react-native-qrcode",
+    "react-native-qrcode-svg",
+    "react-native-qr-code",
+    "expo-qrcode",
+    "expo-qr-code",
+    "nitro",
+    "nitro-modules",
+    "jsi",
+    "native-module",
+    "performance",
+    "fast-qrcode",
+    "qr-code-generator",
+    "react-native-web",
+    "ios",
+    "android",
+    "web",
+    "png",
+    "no-svg",
+    "expo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode.git"
+  },
+  "author": "JoaoPauloCMarra",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/issues"
+  },
+  "homepage": "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "~19.2.0",
+    "@types/react-test-renderer": "^19.1.0",
+    "jest": "^30.3.0",
+    "nitrogen": "0.35.4",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-builder-bob": "^0.40.18",
+    "react-native-nitro-modules": "0.35.4",
+    "react-test-renderer": "19.2.0",
+    "rimraf": "^6.0.1",
+    "ts-jest": "^29.4.9",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0 <20.0.0",
+    "react-dom": ">=18.2.0 <20.0.0",
+    "react-native": ">=0.75.0 <1.0.0",
+    "react-native-nitro-modules": ">=0.35.4 <0.36.0",
+    "react-native-web": ">=0.19.0 <1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    },
+    "react-native-web": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "commonjs",
+        {
+          "esm": true
+        }
+      ],
+      [
+        "module",
+        {
+          "esm": true
+        }
+      ],
+      "typescript"
+    ]
+  }
+}

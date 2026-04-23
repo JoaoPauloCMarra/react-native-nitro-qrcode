@@ -1,0 +1,86 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGlow" x1="176" y1="148" x2="860" y2="860" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1A1E1C"/>
+      <stop offset="1" stop-color="#0F1111"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="248" y1="220" x2="776" y2="804" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#77C9FF"/>
+      <stop offset="0.52" stop-color="#47A8FF"/>
+      <stop offset="1" stop-color="#2A7BFF"/>
+    </linearGradient>
+    <linearGradient id="accentSoft" x1="304" y1="280" x2="720" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#DFF3FF"/>
+      <stop offset="1" stop-color="#F7FBFF"/>
+    </linearGradient>
+    <filter id="shadow" x="124" y="124" width="776" height="776" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="20"/>
+      <feGaussianBlur stdDeviation="28"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.0627451 0 0 0 0 0.109804 0 0 0 0.34 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="#0D0F10"/>
+  <g filter="url(#shadow)">
+    <rect x="164" y="164" width="696" height="696" rx="168" fill="url(#bgGlow)"/>
+    <rect x="164" y="164" width="696" height="696" rx="168" stroke="#242B28" stroke-width="4"/>
+  </g>
+
+  <g stroke="url(#accent)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="256" y="256" width="164" height="164" rx="44"/>
+    <rect x="304" y="304" width="68" height="68" rx="20" fill="url(#accent)"/>
+    <rect x="604" y="256" width="164" height="164" rx="44"/>
+    <rect x="652" y="304" width="68" height="68" rx="20" fill="url(#accent)"/>
+    <rect x="256" y="604" width="164" height="164" rx="44"/>
+    <rect x="304" y="652" width="68" height="68" rx="20" fill="url(#accent)"/>
+  </g>
+
+  <g fill="url(#accent)">
+    <rect x="500" y="278" width="26" height="26" rx="13"/>
+    <rect x="544" y="278" width="26" height="26" rx="13"/>
+    <rect x="588" y="278" width="26" height="26" rx="13"/>
+    <rect x="456" y="330" width="26" height="26" rx="13"/>
+    <rect x="544" y="330" width="26" height="26" rx="13"/>
+    <rect x="632" y="330" width="26" height="26" rx="13"/>
+    <rect x="456" y="382" width="26" height="26" rx="13"/>
+    <rect x="500" y="382" width="26" height="26" rx="13"/>
+    <rect x="588" y="382" width="26" height="26" rx="13"/>
+    <rect x="632" y="382" width="26" height="26" rx="13"/>
+
+    <rect x="278" y="470" width="26" height="26" rx="13"/>
+    <rect x="330" y="470" width="26" height="26" rx="13"/>
+    <rect x="382" y="470" width="26" height="26" rx="13"/>
+    <rect x="616" y="470" width="26" height="26" rx="13"/>
+    <rect x="668" y="470" width="26" height="26" rx="13"/>
+    <rect x="720" y="470" width="26" height="26" rx="13"/>
+
+    <rect x="278" y="522" width="26" height="26" rx="13"/>
+    <rect x="382" y="522" width="26" height="26" rx="13"/>
+    <rect x="616" y="522" width="26" height="26" rx="13"/>
+    <rect x="720" y="522" width="26" height="26" rx="13"/>
+
+    <rect x="278" y="574" width="26" height="26" rx="13"/>
+    <rect x="330" y="574" width="26" height="26" rx="13"/>
+    <rect x="382" y="574" width="26" height="26" rx="13"/>
+    <rect x="616" y="574" width="26" height="26" rx="13"/>
+    <rect x="668" y="574" width="26" height="26" rx="13"/>
+    <rect x="720" y="574" width="26" height="26" rx="13"/>
+
+    <rect x="470" y="616" width="26" height="26" rx="13"/>
+    <rect x="522" y="616" width="26" height="26" rx="13"/>
+    <rect x="574" y="616" width="26" height="26" rx="13"/>
+    <rect x="470" y="668" width="26" height="26" rx="13"/>
+    <rect x="574" y="668" width="26" height="26" rx="13"/>
+    <rect x="470" y="720" width="26" height="26" rx="13"/>
+    <rect x="522" y="720" width="26" height="26" rx="13"/>
+    <rect x="574" y="720" width="26" height="26" rx="13"/>
+  </g>
+
+  <rect x="418" y="418" width="188" height="188" rx="58" fill="url(#accentSoft)"/>
+  <path d="M466 556V468H508L558 530V468H606V556H565L514 492V556H466Z" fill="url(#accent)"/>
+</svg>

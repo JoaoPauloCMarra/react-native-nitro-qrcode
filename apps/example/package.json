@@ -1,0 +1,41 @@
+{
+  "name": "example",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "prebuild": "expo prebuild",
+    "prebuild:clean": "expo prebuild --clean",
+    "lint": "bunx eslint app --max-warnings=0",
+    "doctor": "bunx expo-doctor",
+    "check": "bun run lint && bun run doctor"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.6",
+    "expo": "~55.0.17",
+    "expo-asset": "~55.0.16",
+    "expo-build-properties": "~55.0.13",
+    "expo-constants": "~55.0.15",
+    "expo-linking": "~55.0.14",
+    "expo-router": "~55.0.13",
+    "expo-status-bar": "~55.0.5",
+    "expo-system-ui": "~55.0.16",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-nitro-modules": "0.35.4",
+    "react-native-nitro-qrcode": "*",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@types/react": "~19.2.14",
+    "babel-preset-expo": "~55.0.10"
+  }
+}
