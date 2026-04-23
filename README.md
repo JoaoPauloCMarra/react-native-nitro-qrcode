@@ -1,5 +1,10 @@
 # react-native-nitro-qrcode
 
+[![npm](https://img.shields.io/badge/npm-v0.0.1-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
+![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
+
 `react-native-nitro-qrcode` is a fast QR code generator for React Native and Expo built with Nitro and native C++.
 
 Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.

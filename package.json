@@ -7,7 +7,8 @@
   ],
   "scripts": {
     "setup": "node scripts/setup.js",
-    "publish-package": "node scripts/publish.js",
+    "publish-package": "bun scripts/publish.js",
+    "publish-package:dry-run": "bun scripts/publish.js --dry-run",
     "build": "turbo run build",
     "dev": "bun run example:start",
     "check": "bun run lint && bun run typecheck && bun run test:coverage && bun run test:cpp && bun run build && bun run example:check",

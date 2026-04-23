@@ -58,7 +58,9 @@
     "verify": "bun run lint && bun run typecheck && bun run test:coverage && bun run test:cpp && bun run build",
     "prepublishOnly": "bun run clean && bun run codegen && bun run verify",
     "prepack": "node -e \"const fs=require('fs'); fs.copyFileSync('../../README.md','./README.md'); try{fs.copyFileSync('../../LICENSE','./LICENSE')}catch(e){}\"",
-    "postpack": "node -e \"const fs=require('fs'); ['./README.md','./LICENSE'].forEach(f=>fs.existsSync(f)&&fs.unlinkSync(f))\""
+    "postpack": "node -e \"const fs=require('fs'); ['./README.md','./LICENSE'].forEach(f=>fs.existsSync(f)&&fs.unlinkSync(f))\"",
+    "pack:dry-run": "bun pm pack --dry-run",
+    "publish:dry-run": "bun publish --dry-run --access public"
   },
   "keywords": [
     "react-native",
@@ -95,7 +97,8 @@
   },
   "homepage": "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode#readme",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   },
   "engines": {
     "node": ">=18.0.0"
