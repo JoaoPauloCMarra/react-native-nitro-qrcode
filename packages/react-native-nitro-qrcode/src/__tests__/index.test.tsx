@@ -59,6 +59,7 @@ class ErrorBoundary extends React.Component<
 
 import {
   clearQRCodeCache,
+  type ErrorCorrectionLevel,
   getMatrix,
   getQRCodeCacheSize,
   NitroQRCode,
@@ -138,7 +139,7 @@ describe("native QRCode API", () => {
       "Hello",
       256,
       2,
-      "high",
+      "H",
       "#111111",
       "#EEEEEE",
       2,
@@ -258,6 +259,20 @@ describe("native QRCode API", () => {
     });
   });
 
+  it("normalizes native error-correction aliases and colors", () => {
+    toPngBase64({
+      value: "low",
+      errorCorrectionLevel: "low",
+      foregroundColor: "#abcdef",
+    });
+    toPngBase64({ value: "medium", errorCorrectionLevel: "medium" });
+    toPngBase64({ value: "quartile", errorCorrectionLevel: "quartile" });
+
+    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
+    expect(calls.map((call) => call[3])).toEqual(["L", "M", "Q"]);
+    expect(calls[0][4]).toBe("#ABCDEF");
+  });
+
   it("exposes cache helpers and grouped API", () => {
     clearQRCodeCache();
     expect(mockHybridObject.clearCache).toHaveBeenCalled();
@@ -278,7 +293,16 @@ describe("native QRCode API", () => {
     expect(() => toPngBase64({ value: "x", maxVersion: 41 })).toThrow(
       "maxVersion must be",
     );
+    expect(() =>
+      toPngBase64({ value: "x", minVersion: 3, maxVersion: 2 }),
+    ).toThrow("minVersion and maxVersion");
     expect(() => toPngBase64({ value: "x", mask: 8 })).toThrow("mask must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        errorCorrectionLevel: "bad" as ErrorCorrectionLevel,
+      }),
+    ).toThrow("errorCorrectionLevel must be");
     expect(() => toPngBase64({ value: "x", size: 1.5 })).toThrow(
       "size must be",
     );
@@ -811,9 +835,18 @@ describe("web QRCode API", () => {
     expect(() => Web.toSvgString({ value: "x", maxVersion: 41 })).toThrow(
       "maxVersion must be",
     );
+    expect(() =>
+      Web.toSvgString({ value: "x", minVersion: 3, maxVersion: 2 }),
+    ).toThrow("minVersion and maxVersion");
     expect(() => Web.toSvgString({ value: "x", mask: 8 })).toThrow(
       "mask must be",
     );
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        errorCorrectionLevel: "bad" as Web.ErrorCorrectionLevel,
+      }),
+    ).toThrow("errorCorrectionLevel must be");
     expect(() =>
       Web.toSvgString({
         value: "x",
