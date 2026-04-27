@@ -413,6 +413,21 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     2048,
   );
   validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
+  const minVersion = sanitizeInteger(
+    options.minVersion,
+    DEFAULT_MIN_VERSION,
+    "minVersion",
+    1,
+    40,
+  );
+  const maxVersion = sanitizeInteger(
+    options.maxVersion,
+    DEFAULT_MAX_VERSION,
+    "maxVersion",
+    1,
+    40,
+  );
+  validateVersionRange(minVersion, maxVersion);
 
   return {
     value: options.value,
@@ -436,20 +451,8 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
       "backgroundColor",
     ),
     gradient: normalizeGradient(options.gradient),
-    minVersion: sanitizeInteger(
-      options.minVersion,
-      DEFAULT_MIN_VERSION,
-      "minVersion",
-      1,
-      40,
-    ),
-    maxVersion: sanitizeInteger(
-      options.maxVersion,
-      DEFAULT_MAX_VERSION,
-      "maxVersion",
-      1,
-      40,
-    ),
+    minVersion,
+    maxVersion,
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
     shapeOptions: normalizeShapeOptions(options.shapeOptions),
@@ -625,6 +628,14 @@ function validateLogoDimensions(
   }
 }
 
+function validateVersionRange(minVersion: number, maxVersion: number): void {
+  if (minVersion > maxVersion) {
+    throw new Error(
+      "minVersion and maxVersion must be between 1 and 40, with minVersion <= maxVersion.",
+    );
+  }
+}
+
 function scaleShapeOptions(
   options: QRCodeShapeOptions | undefined,
   scale: number,
@@ -646,11 +657,16 @@ function scaleShapeOptions(
 }
 
 function normalizeEcl(value: ErrorCorrectionLevel): "L" | "M" | "Q" | "H" {
+  if (value === "L" || value === "M" || value === "Q" || value === "H") {
+    return value;
+  }
   if (value === "low") return "L";
   if (value === "medium") return "M";
   if (value === "quartile") return "Q";
   if (value === "high") return "H";
-  return value;
+  throw new Error(
+    "errorCorrectionLevel must be L, M, Q, H, low, medium, quartile, or high.",
+  );
 }
 
 function sanitizeInteger(

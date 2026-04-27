@@ -407,7 +407,7 @@ export const NitroQRCode = {
 type NormalizedOptions = Required<
   Omit<QRCodeOptions, "errorCorrectionLevel" | "shapeOptions" | "gradient">
 > & {
-  errorCorrectionLevel: string;
+  errorCorrectionLevel: "L" | "M" | "Q" | "H";
   shapeOptions: Required<QRCodeShapeOptions>;
   gradient: NormalizedGradient;
 };
@@ -443,6 +443,21 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     2048,
   );
   validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
+  const minVersion = sanitizeInteger(
+    options.minVersion,
+    DEFAULT_MIN_VERSION,
+    "minVersion",
+    1,
+    40,
+  );
+  const maxVersion = sanitizeInteger(
+    options.maxVersion,
+    DEFAULT_MAX_VERSION,
+    "maxVersion",
+    1,
+    40,
+  );
+  validateVersionRange(minVersion, maxVersion);
 
   return {
     value: options.value,
@@ -454,24 +469,20 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
       0,
       32,
     ),
-    errorCorrectionLevel: options.errorCorrectionLevel ?? DEFAULT_ECL,
-    foregroundColor: options.foregroundColor ?? DEFAULT_FOREGROUND,
-    backgroundColor: options.backgroundColor ?? DEFAULT_BACKGROUND,
+    errorCorrectionLevel: normalizeEcl(
+      options.errorCorrectionLevel ?? DEFAULT_ECL,
+    ),
+    foregroundColor: sanitizeColor(
+      options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "foregroundColor",
+    ),
+    backgroundColor: sanitizeColor(
+      options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "backgroundColor",
+    ),
     gradient: normalizeGradient(options.gradient),
-    minVersion: sanitizeInteger(
-      options.minVersion,
-      DEFAULT_MIN_VERSION,
-      "minVersion",
-      1,
-      40,
-    ),
-    maxVersion: sanitizeInteger(
-      options.maxVersion,
-      DEFAULT_MAX_VERSION,
-      "maxVersion",
-      1,
-      40,
-    ),
+    minVersion,
+    maxVersion,
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
     shapeOptions: normalizeShapeOptions(options.shapeOptions),
@@ -643,6 +654,14 @@ function validateLogoDimensions(
   }
 }
 
+function validateVersionRange(minVersion: number, maxVersion: number): void {
+  if (minVersion > maxVersion) {
+    throw new Error(
+      "minVersion and maxVersion must be between 1 and 40, with minVersion <= maxVersion.",
+    );
+  }
+}
+
 function scaleShapeOptions(
   options: QRCodeShapeOptions | undefined,
   scale: number,
@@ -661,6 +680,19 @@ function scaleShapeOptions(
         ? undefined
         : Math.round(options.eyePatternGap * scale),
   };
+}
+
+function normalizeEcl(value: ErrorCorrectionLevel): "L" | "M" | "Q" | "H" {
+  if (value === "L" || value === "M" || value === "Q" || value === "H") {
+    return value;
+  }
+  if (value === "low") return "L";
+  if (value === "medium") return "M";
+  if (value === "quartile") return "Q";
+  if (value === "high") return "H";
+  throw new Error(
+    "errorCorrectionLevel must be L, M, Q, H, low, medium, quartile, or high.",
+  );
 }
 
 function sanitizeInteger(

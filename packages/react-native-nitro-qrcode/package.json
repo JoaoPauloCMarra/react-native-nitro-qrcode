@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-qrcode",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Fast QR code generator for React Native and Expo with Nitro, native C++, PNG export, gradients, and no react-native-svg or Skia.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",

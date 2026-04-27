@@ -1,6 +1,6 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.0.1-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.0.2-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
 ![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
