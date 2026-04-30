@@ -21,13 +21,24 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeShape = "square" | "circle" | "rounded";
+export type QRCodeBodyShape = "square" | "circle";
+export type QRCodeShape = QRCodeBodyShape | "rounded";
+export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
+export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
+export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
+export type QRCodeLayout = "matrix";
 
 export type QRCodeShapeOptions = {
-  shape?: QRCodeShape;
-  eyePatternShape?: QRCodeShape;
+  layout?: QRCodeLayout;
+  shape?: QRCodeBodyShape;
+  eyeFrameShape?: QRCodeEyeFrameShape;
+  eyeballShape?: QRCodeEyeBallShape;
+  /** @deprecated Use eyeFrameShape. */
+  eyePatternShape?: QRCodeEyePatternShape;
   gap?: number;
   eyePatternGap?: number;
+  cornerRadius?: number;
+  eyePatternCornerRadius?: number;
 };
 
 export type QRCodeGradientType = "linear" | "radial";
@@ -52,11 +63,16 @@ export type QRCodeOptions = {
   errorCorrectionLevel?: ErrorCorrectionLevel;
   foregroundColor?: string;
   backgroundColor?: string;
+  strokeColor?: string;
+  eyeColor?: string;
+  eyeStrokeColor?: string;
+  eyeballColor?: string;
   gradient?: QRCodeGradient;
   minVersion?: number;
   maxVersion?: number;
   mask?: number;
   boostEcl?: boolean;
+  orbit?: boolean;
   shapeOptions?: QRCodeShapeOptions;
   logoAreaSize?: number;
   logoAreaBorderRadius?: number;
@@ -71,6 +87,7 @@ export type QRCodeProps = QRCodeOptions & {
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
+  logoPadding?: number;
   testID?: string;
 };
 
@@ -79,14 +96,21 @@ const DEFAULT_QUIET_ZONE = 4;
 const DEFAULT_ECL: ErrorCorrectionLevel = "M";
 const DEFAULT_FOREGROUND = "#000000";
 const DEFAULT_BACKGROUND = "#FFFFFF";
+const DEFAULT_STROKE = "#000000";
+const DEFAULT_EYE = "#000000";
+const DEFAULT_EYE_STROKE = "#000000";
+const DEFAULT_EYEBALL = "#000000";
 const DEFAULT_MIN_VERSION = 1;
 const DEFAULT_MAX_VERSION = 40;
 const DEFAULT_MASK = -1;
 const DEFAULT_BOOST_ECL = true;
-const DEFAULT_SHAPE: QRCodeShape = "square";
+const DEFAULT_SHAPE: QRCodeBodyShape = "square";
+const DEFAULT_EYE_FRAME_SHAPE: QRCodeEyeFrameShape = "square";
+const DEFAULT_EYEBALL_SHAPE: QRCodeEyeBallShape = "square";
+const DEFAULT_LAYOUT: QRCodeLayout = "matrix";
 const DEFAULT_LOGO_AREA_SIZE = 0;
 const DEFAULT_LOGO_AREA_BORDER_RADIUS = 0;
-const COMPONENT_RASTER_MULTIPLIER = 2;
+const COMPONENT_RASTER_MULTIPLIER = 3;
 const MIN_COMPONENT_RASTER_SIZE = 96;
 const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
 const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
@@ -104,14 +128,22 @@ export function toPngBase64(options: QRCodeOptions): string {
     normalized.errorCorrectionLevel,
     normalized.foregroundColor,
     normalized.backgroundColor,
+    normalized.strokeColor,
+    normalized.eyeColor,
+    normalized.eyeStrokeColor,
+    normalized.eyeballColor,
     normalized.minVersion,
     normalized.maxVersion,
     normalized.mask,
     normalized.boostEcl,
     normalized.shapeOptions.shape,
-    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.eyeFrameShape,
+    normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.cornerRadius,
+    normalized.shapeOptions.eyePatternCornerRadius,
+    normalized.shapeOptions.layout,
     normalized.logoAreaSize,
     normalized.logoAreaBorderRadius,
     normalized.gradient.type,
@@ -133,14 +165,22 @@ export function toPngDataUri(options: QRCodeOptions): string {
     normalized.errorCorrectionLevel,
     normalized.foregroundColor,
     normalized.backgroundColor,
+    normalized.strokeColor,
+    normalized.eyeColor,
+    normalized.eyeStrokeColor,
+    normalized.eyeballColor,
     normalized.minVersion,
     normalized.maxVersion,
     normalized.mask,
     normalized.boostEcl,
     normalized.shapeOptions.shape,
-    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.eyeFrameShape,
+    normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.cornerRadius,
+    normalized.shapeOptions.eyePatternCornerRadius,
+    normalized.shapeOptions.layout,
     normalized.logoAreaSize,
     normalized.logoAreaBorderRadius,
     normalized.gradient.type,
@@ -162,14 +202,22 @@ export function toPngBase64Async(options: QRCodeOptions): Promise<string> {
     normalized.errorCorrectionLevel,
     normalized.foregroundColor,
     normalized.backgroundColor,
+    normalized.strokeColor,
+    normalized.eyeColor,
+    normalized.eyeStrokeColor,
+    normalized.eyeballColor,
     normalized.minVersion,
     normalized.maxVersion,
     normalized.mask,
     normalized.boostEcl,
     normalized.shapeOptions.shape,
-    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.eyeFrameShape,
+    normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.cornerRadius,
+    normalized.shapeOptions.eyePatternCornerRadius,
+    normalized.shapeOptions.layout,
     normalized.logoAreaSize,
     normalized.logoAreaBorderRadius,
     normalized.gradient.type,
@@ -191,14 +239,22 @@ export function toPngDataUriAsync(options: QRCodeOptions): Promise<string> {
     normalized.errorCorrectionLevel,
     normalized.foregroundColor,
     normalized.backgroundColor,
+    normalized.strokeColor,
+    normalized.eyeColor,
+    normalized.eyeStrokeColor,
+    normalized.eyeballColor,
     normalized.minVersion,
     normalized.maxVersion,
     normalized.mask,
     normalized.boostEcl,
     normalized.shapeOptions.shape,
-    normalized.shapeOptions.eyePatternShape,
+    normalized.shapeOptions.eyeFrameShape,
+    normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.cornerRadius,
+    normalized.shapeOptions.eyePatternCornerRadius,
+    normalized.shapeOptions.layout,
     normalized.logoAreaSize,
     normalized.logoAreaBorderRadius,
     normalized.gradient.type,
@@ -269,17 +325,23 @@ export function QRCode({
   errorCorrectionLevel,
   foregroundColor,
   backgroundColor,
+  strokeColor,
+  eyeColor,
+  eyeStrokeColor,
+  eyeballColor,
   gradient,
   minVersion,
   maxVersion,
   mask,
   boostEcl,
+  orbit,
   shapeOptions,
   logoAreaSize,
   logoAreaBorderRadius,
   style,
   imageStyle,
   logo,
+  logoPadding,
   testID,
 }: QRCodeProps) {
   const [uri, setUri] = useState<string>();
@@ -300,11 +362,16 @@ export function QRCode({
       errorCorrectionLevel,
       foregroundColor,
       backgroundColor,
+      strokeColor,
+      eyeColor,
+      eyeStrokeColor,
+      eyeballColor,
       gradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
+      orbit,
       shapeOptions: scaleShapeOptions(shapeOptions, rasterScale),
       logoAreaSize: Math.round(resolvedLogoAreaSize * rasterScale),
       logoAreaBorderRadius: Math.round(
@@ -318,11 +385,16 @@ export function QRCode({
       errorCorrectionLevel,
       foregroundColor,
       backgroundColor,
+      strokeColor,
+      eyeColor,
+      eyeStrokeColor,
+      eyeballColor,
       gradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
+      orbit,
       shapeOptions,
       rasterScale,
       resolvedLogoAreaSize,
@@ -385,6 +457,7 @@ export function QRCode({
               top: (size - resolvedLogoAreaSize) / 2,
               borderRadius:
                 logoAreaBorderRadius ?? DEFAULT_LOGO_AREA_BORDER_RADIUS,
+              padding: Math.max(0, logoPadding ?? 0),
             },
           ],
         },
@@ -405,7 +478,10 @@ export const NitroQRCode = {
 };
 
 type NormalizedOptions = Required<
-  Omit<QRCodeOptions, "errorCorrectionLevel" | "shapeOptions" | "gradient">
+  Omit<
+    QRCodeOptions,
+    "errorCorrectionLevel" | "shapeOptions" | "gradient" | "orbit"
+  >
 > & {
   errorCorrectionLevel: "L" | "M" | "Q" | "H";
   shapeOptions: Required<QRCodeShapeOptions>;
@@ -480,12 +556,25 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
       options.backgroundColor ?? DEFAULT_BACKGROUND,
       "backgroundColor",
     ),
+    strokeColor: sanitizeColor(
+      options.strokeColor ?? DEFAULT_STROKE,
+      "strokeColor",
+    ),
+    eyeColor: sanitizeColor(options.eyeColor ?? DEFAULT_EYE, "eyeColor"),
+    eyeStrokeColor: sanitizeColor(
+      options.eyeStrokeColor ?? DEFAULT_EYE_STROKE,
+      "eyeStrokeColor",
+    ),
+    eyeballColor: sanitizeColor(
+      options.eyeballColor ?? DEFAULT_EYEBALL,
+      "eyeballColor",
+    ),
     gradient: normalizeGradient(options.gradient),
     minVersion,
     maxVersion,
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
-    shapeOptions: normalizeShapeOptions(options.shapeOptions),
+    shapeOptions: normalizeShapeOptions(options.shapeOptions, options.orbit),
     logoAreaSize,
     logoAreaBorderRadius,
   };
@@ -542,10 +631,18 @@ function normalizeGradient(
 
 function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
+  _orbit: boolean | undefined,
 ): Required<QRCodeShapeOptions> {
   return {
+    layout: sanitizeLayout(options?.layout),
     shape: sanitizeShape(options?.shape, "shape"),
-    eyePatternShape: sanitizeShape(options?.eyePatternShape, "eyePatternShape"),
+    eyeFrameShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
+    eyeballShape: sanitizeEyeballShape(options?.eyeballShape),
+    eyePatternShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
     gap: sanitizeInteger(options?.gap, 0, "gap", 0, 256),
     eyePatternGap: sanitizeInteger(
       options?.eyePatternGap,
@@ -554,20 +651,64 @@ function normalizeShapeOptions(
       0,
       256,
     ),
+    cornerRadius: sanitizeOptionalInteger(
+      options?.cornerRadius,
+      "cornerRadius",
+      0,
+      256,
+    ),
+    eyePatternCornerRadius: sanitizeOptionalInteger(
+      options?.eyePatternCornerRadius,
+      "eyePatternCornerRadius",
+      0,
+      256,
+    ),
   };
 }
 
+function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
+  const resolved = value ?? DEFAULT_LAYOUT;
+  if (resolved !== "matrix") {
+    throw new Error("layout must be matrix; radial layouts are not scan-safe.");
+  }
+  return resolved;
+}
+
 function sanitizeShape(
-  value: QRCodeShape | undefined,
+  value: QRCodeBodyShape | undefined,
   name: string,
-): QRCodeShape {
+): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
+  if (resolved !== "square" && resolved !== "circle") {
+    throw new Error(`${name} must be square or circle.`);
+  }
+  return resolved;
+}
+
+function sanitizeEyeFrameShape(
+  value: QRCodeEyeFrameShape | undefined,
+): QRCodeEyeFrameShape {
+  const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
   if (
     resolved !== "square" &&
     resolved !== "circle" &&
     resolved !== "rounded"
   ) {
-    throw new Error(`${name} must be square, circle, or rounded.`);
+    throw new Error("eyeFrameShape must be square, circle, or rounded.");
+  }
+  return resolved;
+}
+
+function sanitizeEyeballShape(
+  value: QRCodeEyeBallShape | undefined,
+): QRCodeEyeBallShape {
+  const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error("eyeballShape must be square, circle, or rounded.");
   }
   return resolved;
 }
@@ -671,7 +812,10 @@ function scaleShapeOptions(
   }
 
   return {
+    layout: options.layout,
     shape: options.shape,
+    eyeFrameShape: options.eyeFrameShape,
+    eyeballShape: options.eyeballShape,
     eyePatternShape: options.eyePatternShape,
     gap:
       options.gap === undefined ? undefined : Math.round(options.gap * scale),
@@ -679,6 +823,14 @@ function scaleShapeOptions(
       options.eyePatternGap === undefined
         ? undefined
         : Math.round(options.eyePatternGap * scale),
+    cornerRadius:
+      options.cornerRadius === undefined
+        ? undefined
+        : Math.round(options.cornerRadius * scale),
+    eyePatternCornerRadius:
+      options.eyePatternCornerRadius === undefined
+        ? undefined
+        : Math.round(options.eyePatternCornerRadius * scale),
   };
 }
 
@@ -707,6 +859,18 @@ function sanitizeInteger(
     throw new Error(`${name} must be an integer between ${min} and ${max}.`);
   }
   return resolved;
+}
+
+function sanitizeOptionalInteger(
+  value: number | undefined,
+  name: string,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined) {
+    return -1;
+  }
+  return sanitizeInteger(value, -1, name, min, max);
 }
 
 const styles = StyleSheet.create({

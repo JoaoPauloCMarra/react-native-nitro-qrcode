@@ -6,15 +6,15 @@
 #include <string>
 #include <vector>
 
-using NitroQRCode::GenerateOptions;
-using NitroQRCode::QRCodeGenerator;
 using NitroQRCode::base64Encode;
 using NitroQRCode::encodePngRgba;
+using NitroQRCode::GenerateOptions;
 using NitroQRCode::parseColor;
+using NitroQRCode::QRCodeGenerator;
 
 namespace {
 
-void assertPngHeader(const std::string& encoded) {
+void assertPngHeader(const std::string &encoded) {
   assert(encoded.rfind("iVBORw0KGgo", 0) == 0);
 }
 
@@ -22,11 +22,13 @@ void testPngGeneration() {
   QRCodeGenerator generator;
   GenerateOptions options;
   options.size = 128;
-  const std::string base64 = generator.generatePngBase64("https://example.com", options);
+  const std::string base64 =
+      generator.generatePngBase64("https://example.com", options);
   assert(!base64.empty());
   assertPngHeader(base64);
 
-  const std::string cached = generator.generatePngBase64("https://example.com", options);
+  const std::string cached =
+      generator.generatePngBase64("https://example.com", options);
   assert(cached == base64);
 
   options.size = 1;
@@ -45,8 +47,10 @@ void testDataUriAndCache() {
   QRCodeGenerator generator;
   GenerateOptions options;
   options.size = 96;
-  const std::string first = generator.generatePngDataUri("https://example.com", options);
-  const std::string second = generator.generatePngDataUri("https://example.com", options);
+  const std::string first =
+      generator.generatePngDataUri("https://example.com", options);
+  const std::string second =
+      generator.generatePngDataUri("https://example.com", options);
   assert(first == second);
   assert(first.rfind("data:image/png;base64,", 0) == 0);
   assert(generator.getCacheSize() == 1);
@@ -56,7 +60,8 @@ void testDataUriAndCache() {
   options.size = 32;
   options.quietZone = 0;
   for (int index = 0; index < 140; index++) {
-    generator.generatePngBase64("cache-entry-" + std::to_string(index), options);
+    generator.generatePngBase64("cache-entry-" + std::to_string(index),
+                                options);
   }
   assert(generator.getCacheSize() == 128);
   generator.clearCache();
@@ -71,23 +76,92 @@ void testStyledPngGeneration() {
   options.eyePatternShape = "rounded";
   options.gap = 2;
   options.eyePatternGap = 1;
+  options.cornerRadius = 4;
+  options.eyePatternCornerRadius = 6;
   options.logoAreaSize = 42;
   options.logoAreaBorderRadius = 8;
-  assertPngHeader(generator.generatePngBase64("https://example.com/styled", options));
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/styled", options));
 
   options.moduleShape = "rounded";
   options.eyePatternShape = "circle";
   options.gap = 128;
   options.eyePatternGap = 0;
+  options.cornerRadius = 0;
   options.logoAreaSize = 40;
   options.logoAreaBorderRadius = 0;
-  assertPngHeader(generator.generatePngBase64("https://example.com/styled-2", options));
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/styled-2", options));
 
   options.moduleShape = "square";
   options.eyePatternShape = "square";
   options.gap = 0;
   options.logoAreaSize = 0;
-  assertPngHeader(generator.generatePngBase64("https://example.com/styled-3", options));
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/styled-3", options));
+
+  options.moduleShape = "circle";
+  options.eyePatternShape = "circle-border";
+  options.gap = 1;
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/circle-border-eyes", options));
+
+  options = GenerateOptions{};
+  options.size = 160;
+  options.moduleShape = "circle";
+  options.eyePatternShape = "square";
+  options.eyeballShape = "circle";
+  options.eyeStrokeColor = "#222222";
+  options.eyeStroke = parseColor(options.eyeStrokeColor);
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/circle-body-square-frame-circle-eye", options));
+
+  const std::vector<std::string> decorativeShapes = {
+      "diamond", "hexagon", "octagon", "star",
+      "heart",   "scallop", "leaf",    "clover"};
+  for (const auto &shape : decorativeShapes) {
+    options = GenerateOptions{};
+    options.size = 160;
+    options.moduleShape = shape;
+    options.eyePatternShape = "rounded";
+    options.eyeballShape = shape;
+    options.gap = 1;
+    assertPngHeader(generator.generatePngBase64(
+        "https://example.com/shape-" + shape, options));
+  }
+
+  options = GenerateOptions{};
+  options.size = 160;
+  options.layout = "radial";
+  options.moduleShape = "rounded";
+  options.gap = 2;
+  options.logoAreaSize = 32;
+  options.logoAreaBorderRadius = 16;
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-layout", options));
+
+  options.logoAreaSize = options.size;
+  options.logoAreaBorderRadius = options.size / 2;
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-logo-only", options));
+
+  options = GenerateOptions{};
+  options.size = 96;
+  options.layout = "radial";
+  options.moduleShape = "rounded";
+  options.eyePatternShape = "circle-border";
+  options.gap = 3;
+  options.cornerRadius = 8;
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-small-rounded-modules", options));
+
+  options.moduleShape = "circle";
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-dot-modules", options));
+
+  options.moduleShape = "square";
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-arc-modules", options));
 
   options = GenerateOptions{};
   options.size = 160;
@@ -98,10 +172,12 @@ void testStyledPngGeneration() {
   options.gradient.startY = 0.2;
   options.gradient.endX = 0.9;
   options.gradient.endY = 0.8;
-  assertPngHeader(generator.generatePngBase64("https://example.com/gradient", options));
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/gradient", options));
 
   options.gradient.locations = {0.0, 0.5};
-  assertPngHeader(generator.generatePngBase64("https://example.com/gradient-tail", options));
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/gradient-tail", options));
 
   options.gradient.type = "radial";
   options.gradient.locations = {0.0, 1.0};
@@ -109,20 +185,59 @@ void testStyledPngGeneration() {
   options.gradient.startY = 0.5;
   options.gradient.endX = 1.0;
   options.gradient.endY = 0.5;
-  assertPngHeader(generator.generatePngBase64("https://example.com/radial-gradient", options));
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-gradient", options));
 
   options.gradient.startX = 0.5;
   options.gradient.startY = 0.5;
   options.gradient.endX = 0.5;
   options.gradient.endY = 0.5;
-  assertPngHeader(generator.generatePngBase64("https://example.com/radial-zero-radius", options));
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/radial-zero-radius", options));
 
   options.gradient.type = "linear";
   options.gradient.startX = 0.4;
   options.gradient.startY = 0.4;
   options.gradient.endX = 0.4;
   options.gradient.endY = 0.4;
-  assertPngHeader(generator.generatePngBase64("https://example.com/linear-zero-length", options));
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/linear-zero-length", options));
+
+  options = GenerateOptions{};
+  options.size = 160;
+  options.moduleShape = "rounded";
+  options.eyePatternShape = "rounded";
+  options.gap = 1;
+  options.cornerRadius = 4;
+  options.strokeColor = "#FF0000FF";
+  options.eyeColor = "#111111";
+  options.eyeStrokeColor = "#333333";
+  options.eyeballColor = "#555555";
+  options.stroke = parseColor(options.strokeColor);
+  options.eye = parseColor(options.eyeColor);
+  options.eyeStroke = parseColor(options.eyeStrokeColor);
+  options.eyeball = parseColor(options.eyeballColor);
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/layer-colors", options));
+
+  options.eyePatternShape = "square";
+  options.eyeballShape = "square";
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/layer-square-eye-stroke", options));
+
+  options.eyePatternShape = "circle-border";
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/layer-circle-border", options));
+
+  options.layout = "radial";
+  options.moduleShape = "rounded";
+  options.gap = 2;
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/layer-radial", options));
+
+  options.eyePatternShape = "rounded";
+  assertPngHeader(generator.generatePngBase64(
+      "https://example.com/layer-radial-eyes", options));
 }
 
 void testSvgGeneration() {
@@ -137,13 +252,15 @@ void testSvgGeneration() {
 
   options.gradient.type = "radial";
   options.gradient.colors = {parseColor("#4AA8FF"), parseColor("#28D17C")};
-  const std::string gradientSvg = generator.generateSvgString("Hello-gradient", options);
+  const std::string gradientSvg =
+      generator.generateSvgString("Hello-gradient", options);
   assert(gradientSvg.find("radialGradient") != std::string::npos);
   assert(gradientSvg.find("url(#nitro-qrcode-gradient)") != std::string::npos);
 
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#4AA8FFAA"), parseColor("#28D17C")};
-  const std::string linearGradientSvg = generator.generateSvgString("Hello-gradient-linear", options);
+  const std::string linearGradientSvg =
+      generator.generateSvgString("Hello-gradient-linear", options);
   assert(linearGradientSvg.find("linearGradient") != std::string::npos);
   assert(linearGradientSvg.find("stop-opacity=") != std::string::npos);
 }
@@ -192,10 +309,7 @@ void testColorAndBase64Helpers() {
   assert(base64Encode({'f', 'o', 'o'}) == "Zm9v");
 
   const std::vector<uint8_t> rgba = {
-      0, 0, 0, 255,
-      255, 255, 255, 255,
-      255, 0, 0, 255,
-      0, 255, 0, 255,
+      0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 0, 255, 0, 255,
   };
   const std::vector<uint8_t> png = encodePngRgba(2, 2, rgba);
   assert(png.size() > 8);
@@ -205,11 +319,11 @@ void testColorAndBase64Helpers() {
 void testValidation() {
   QRCodeGenerator generator;
   GenerateOptions options;
-  const auto assertThrows = [](const auto& callback) {
+  const auto assertThrows = [](const auto &callback) {
     bool didThrow = false;
     try {
       callback();
-    } catch (const std::invalid_argument&) {
+    } catch (const std::invalid_argument &) {
       didThrow = true;
     }
     assert(didThrow);
@@ -261,11 +375,19 @@ void testValidation() {
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options = GenerateOptions{};
+  options.layout = "spiral";
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options = GenerateOptions{};
   options.moduleShape = "triangle";
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.eyePatternShape = "triangle";
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options = GenerateOptions{};
+  options.eyeballShape = "triangle";
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options = GenerateOptions{};
@@ -280,6 +402,20 @@ void testValidation() {
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options.eyePatternGap = 257;
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options = GenerateOptions{};
+  options.cornerRadius = -2;
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options.cornerRadius = 257;
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options = GenerateOptions{};
+  options.eyePatternCornerRadius = -2;
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options.eyePatternCornerRadius = 257;
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options = GenerateOptions{};
@@ -340,7 +476,7 @@ void testValidation() {
   assertThrows([&]() { encodePngRgba(1, 1, {0, 0, 0}); });
 }
 
-}  // namespace
+} // namespace
 
 int main() {
   testPngGeneration();

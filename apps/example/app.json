@@ -10,7 +10,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.qrcode.example"
+      "bundleIdentifier": "com.qrcode.example",
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "en"
+      }
     },
     "android": {
       "package": "com.qrcode.example",

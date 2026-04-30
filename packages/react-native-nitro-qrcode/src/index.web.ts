@@ -19,13 +19,24 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeShape = "square" | "circle" | "rounded";
+export type QRCodeBodyShape = "square" | "circle";
+export type QRCodeShape = QRCodeBodyShape | "rounded";
+export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
+export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
+export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
+export type QRCodeLayout = "matrix";
 
 export type QRCodeShapeOptions = {
-  shape?: QRCodeShape;
-  eyePatternShape?: QRCodeShape;
+  layout?: QRCodeLayout;
+  shape?: QRCodeBodyShape;
+  eyeFrameShape?: QRCodeEyeFrameShape;
+  eyeballShape?: QRCodeEyeBallShape;
+  /** @deprecated Use eyeFrameShape. */
+  eyePatternShape?: QRCodeEyePatternShape;
   gap?: number;
   eyePatternGap?: number;
+  cornerRadius?: number;
+  eyePatternCornerRadius?: number;
 };
 
 export type QRCodeGradientType = "linear" | "radial";
@@ -50,11 +61,16 @@ export type QRCodeOptions = {
   errorCorrectionLevel?: ErrorCorrectionLevel;
   foregroundColor?: string;
   backgroundColor?: string;
+  strokeColor?: string;
+  eyeColor?: string;
+  eyeStrokeColor?: string;
+  eyeballColor?: string;
   gradient?: QRCodeGradient;
   minVersion?: number;
   maxVersion?: number;
   mask?: number;
   boostEcl?: boolean;
+  orbit?: boolean;
   shapeOptions?: QRCodeShapeOptions;
   logoAreaSize?: number;
   logoAreaBorderRadius?: number;
@@ -69,10 +85,11 @@ export type QRCodeProps = QRCodeOptions & {
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
+  logoPadding?: number;
   testID?: string;
 };
 
-const COMPONENT_RASTER_MULTIPLIER = 2;
+const COMPONENT_RASTER_MULTIPLIER = 3;
 const MIN_COMPONENT_RASTER_SIZE = 96;
 
 type QRCodeModuleData = {
@@ -96,7 +113,10 @@ type QRCodeFactory = {
 };
 
 type NormalizedOptions = Required<
-  Omit<QRCodeOptions, "errorCorrectionLevel" | "shapeOptions" | "gradient">
+  Omit<
+    QRCodeOptions,
+    "errorCorrectionLevel" | "shapeOptions" | "gradient" | "orbit"
+  >
 > & {
   errorCorrectionLevel: "L" | "M" | "Q" | "H";
   shapeOptions: Required<QRCodeShapeOptions>;
@@ -120,11 +140,18 @@ const DEFAULT_QUIET_ZONE = 4;
 const DEFAULT_ECL: ErrorCorrectionLevel = "M";
 const DEFAULT_FOREGROUND = "#000000";
 const DEFAULT_BACKGROUND = "#FFFFFF";
+const DEFAULT_STROKE = "#000000";
+const DEFAULT_EYE = "#000000";
+const DEFAULT_EYE_STROKE = "#000000";
+const DEFAULT_EYEBALL = "#000000";
 const DEFAULT_MIN_VERSION = 1;
 const DEFAULT_MAX_VERSION = 40;
 const DEFAULT_MASK = -1;
 const DEFAULT_BOOST_ECL = true;
-const DEFAULT_SHAPE: QRCodeShape = "square";
+const DEFAULT_SHAPE: QRCodeBodyShape = "square";
+const DEFAULT_EYE_FRAME_SHAPE: QRCodeEyeFrameShape = "square";
+const DEFAULT_EYEBALL_SHAPE: QRCodeEyeBallShape = "square";
+const DEFAULT_LAYOUT: QRCodeLayout = "matrix";
 const DEFAULT_LOGO_AREA_SIZE = 0;
 const DEFAULT_LOGO_AREA_BORDER_RADIUS = 0;
 const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
@@ -160,9 +187,10 @@ export function toPngDataUri(options: QRCodeOptions): string {
   context.fillStyle = normalized.backgroundColor;
   context.fillRect(0, 0, pixelSize, pixelSize);
   const foregroundFill = createForegroundFill(context, normalized);
+  const useLayerColors = hasCustomLayerColors(normalized);
   context.fillStyle = foregroundFill;
 
-  if (canDrawSquareRuns(normalized.shapeOptions)) {
+  if (canDrawSquareRuns(normalized.shapeOptions) && !useLayerColors) {
     drawSquareRuns(
       context,
       model,
@@ -176,32 +204,86 @@ export function toPngDataUri(options: QRCodeOptions): string {
     return output;
   }
 
+  const drawGroupedFinderEyes = shouldDrawGroupedFinderEyes(
+    normalized.shapeOptions,
+    normalized,
+  );
+
   for (let moduleY = 0; moduleY < model.modules.size; moduleY++) {
-    const y0 = ((moduleY + normalized.quietZone) * pixelSize) / totalModules;
-    const y1 =
-      ((moduleY + normalized.quietZone + 1) * pixelSize) / totalModules;
+    const y0 = modulePixel(
+      moduleY + normalized.quietZone,
+      pixelSize,
+      totalModules,
+    );
+    const y1 = modulePixel(
+      moduleY + normalized.quietZone + 1,
+      pixelSize,
+      totalModules,
+    );
     for (let moduleX = 0; moduleX < model.modules.size; moduleX++) {
       if (isDark(model, moduleX, moduleY)) {
-        const x0 =
-          ((moduleX + normalized.quietZone) * pixelSize) / totalModules;
-        const x1 =
-          ((moduleX + normalized.quietZone + 1) * pixelSize) / totalModules;
         const eyeModule = isEyeModule(moduleX, moduleY, model.modules.size);
-        drawModule(
-          context,
-          x0,
-          y0,
-          x1,
-          y1,
-          eyeModule
-            ? normalized.shapeOptions.eyePatternShape
-            : normalized.shapeOptions.shape,
-          eyeModule
-            ? normalized.shapeOptions.eyePatternGap
-            : normalized.shapeOptions.gap,
+        if (drawGroupedFinderEyes && eyeModule) {
+          continue;
+        }
+        const x0 = modulePixel(
+          moduleX + normalized.quietZone,
+          pixelSize,
+          totalModules,
         );
+        const x1 = modulePixel(
+          moduleX + normalized.quietZone + 1,
+          pixelSize,
+          totalModules,
+        );
+        const shape: QRCodeShape = isEyeBallModule(
+          moduleX,
+          moduleY,
+          model.modules.size,
+        )
+          ? normalized.shapeOptions.eyeballShape
+          : eyeModule
+            ? normalized.shapeOptions.eyeFrameShape
+            : normalized.shapeOptions.shape;
+        const gap = eyeModule
+          ? normalized.shapeOptions.eyePatternGap
+          : normalized.shapeOptions.gap;
+        const moduleFill = getModuleFill(
+          normalized,
+          foregroundFill,
+          moduleX,
+          moduleY,
+          model.modules.size,
+        );
+        if (!eyeModule && normalized.strokeColor !== DEFAULT_STROKE) {
+          context.fillStyle = normalized.strokeColor;
+          drawModule(context, x0, y0, x1, y1, shape, gap);
+          context.fillStyle = moduleFill;
+          drawModule(
+            context,
+            x0,
+            y0,
+            x1,
+            y1,
+            shape,
+            gap + Math.max(1, (x1 - x0) * 0.18),
+          );
+          continue;
+        }
+        context.fillStyle = moduleFill;
+        drawModule(context, x0, y0, x1, y1, shape, gap);
       }
     }
+  }
+  if (drawGroupedFinderEyes) {
+    drawGroupedFinders(
+      context,
+      model.modules.size,
+      normalized.quietZone,
+      totalModules,
+      pixelSize,
+      normalized,
+    );
   }
   clearLogoArea(context, normalized, foregroundFill);
 
@@ -288,17 +370,23 @@ export function QRCode({
   errorCorrectionLevel,
   foregroundColor,
   backgroundColor,
+  strokeColor,
+  eyeColor,
+  eyeStrokeColor,
+  eyeballColor,
   gradient,
   minVersion,
   maxVersion,
   mask,
   boostEcl,
+  orbit,
   shapeOptions,
   logoAreaSize,
   logoAreaBorderRadius,
   style,
   imageStyle,
   logo,
+  logoPadding,
   testID,
 }: QRCodeProps) {
   const rasterSize = Math.max(
@@ -317,11 +405,16 @@ export function QRCode({
       errorCorrectionLevel,
       foregroundColor,
       backgroundColor,
+      strokeColor,
+      eyeColor,
+      eyeStrokeColor,
+      eyeballColor,
       gradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
+      orbit,
       shapeOptions: scaleShapeOptions(shapeOptions, rasterScale),
       logoAreaSize: Math.round(resolvedLogoAreaSize * rasterScale),
       logoAreaBorderRadius: Math.round(
@@ -335,11 +428,16 @@ export function QRCode({
       errorCorrectionLevel,
       foregroundColor,
       backgroundColor,
+      strokeColor,
+      eyeColor,
+      eyeStrokeColor,
+      eyeballColor,
       gradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
+      orbit,
       shapeOptions,
       rasterScale,
       resolvedLogoAreaSize,
@@ -373,6 +471,7 @@ export function QRCode({
               top: (size - resolvedLogoAreaSize) / 2,
               borderRadius:
                 logoAreaBorderRadius ?? DEFAULT_LOGO_AREA_BORDER_RADIUS,
+              padding: Math.max(0, logoPadding ?? 0),
             },
           ],
         },
@@ -450,12 +549,25 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
       options.backgroundColor ?? DEFAULT_BACKGROUND,
       "backgroundColor",
     ),
+    strokeColor: sanitizeColor(
+      options.strokeColor ?? DEFAULT_STROKE,
+      "strokeColor",
+    ),
+    eyeColor: sanitizeColor(options.eyeColor ?? DEFAULT_EYE, "eyeColor"),
+    eyeStrokeColor: sanitizeColor(
+      options.eyeStrokeColor ?? DEFAULT_EYE_STROKE,
+      "eyeStrokeColor",
+    ),
+    eyeballColor: sanitizeColor(
+      options.eyeballColor ?? DEFAULT_EYEBALL,
+      "eyeballColor",
+    ),
     gradient: normalizeGradient(options.gradient),
     minVersion,
     maxVersion,
     mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
-    shapeOptions: normalizeShapeOptions(options.shapeOptions),
+    shapeOptions: normalizeShapeOptions(options.shapeOptions, options.orbit),
     logoAreaSize,
     logoAreaBorderRadius,
   };
@@ -512,10 +624,18 @@ function normalizeGradient(
 
 function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
+  _orbit: boolean | undefined,
 ): Required<QRCodeShapeOptions> {
   return {
+    layout: sanitizeLayout(options?.layout),
     shape: sanitizeShape(options?.shape, "shape"),
-    eyePatternShape: sanitizeShape(options?.eyePatternShape, "eyePatternShape"),
+    eyeFrameShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
+    eyeballShape: sanitizeEyeballShape(options?.eyeballShape),
+    eyePatternShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
     gap: sanitizeInteger(options?.gap, 0, "gap", 0, 256),
     eyePatternGap: sanitizeInteger(
       options?.eyePatternGap,
@@ -524,20 +644,64 @@ function normalizeShapeOptions(
       0,
       256,
     ),
+    cornerRadius: sanitizeOptionalInteger(
+      options?.cornerRadius,
+      "cornerRadius",
+      0,
+      256,
+    ),
+    eyePatternCornerRadius: sanitizeOptionalInteger(
+      options?.eyePatternCornerRadius,
+      "eyePatternCornerRadius",
+      0,
+      256,
+    ),
   };
 }
 
+function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
+  const resolved = value ?? DEFAULT_LAYOUT;
+  if (resolved !== "matrix") {
+    throw new Error("layout must be matrix; radial layouts are not scan-safe.");
+  }
+  return resolved;
+}
+
 function sanitizeShape(
-  value: QRCodeShape | undefined,
+  value: QRCodeBodyShape | undefined,
   name: string,
-): QRCodeShape {
+): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
+  if (resolved !== "square" && resolved !== "circle") {
+    throw new Error(`${name} must be square or circle.`);
+  }
+  return resolved;
+}
+
+function sanitizeEyeFrameShape(
+  value: QRCodeEyeFrameShape | undefined,
+): QRCodeEyeFrameShape {
+  const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
   if (
     resolved !== "square" &&
     resolved !== "circle" &&
     resolved !== "rounded"
   ) {
-    throw new Error(`${name} must be square, circle, or rounded.`);
+    throw new Error("eyeFrameShape must be square, circle, or rounded.");
+  }
+  return resolved;
+}
+
+function sanitizeEyeballShape(
+  value: QRCodeEyeBallShape | undefined,
+): QRCodeEyeBallShape {
+  const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error("eyeballShape must be square, circle, or rounded.");
   }
   return resolved;
 }
@@ -645,7 +809,10 @@ function scaleShapeOptions(
   }
 
   return {
+    layout: options.layout,
     shape: options.shape,
+    eyeFrameShape: options.eyeFrameShape,
+    eyeballShape: options.eyeballShape,
     eyePatternShape: options.eyePatternShape,
     gap:
       options.gap === undefined ? undefined : Math.round(options.gap * scale),
@@ -653,6 +820,14 @@ function scaleShapeOptions(
       options.eyePatternGap === undefined
         ? undefined
         : Math.round(options.eyePatternGap * scale),
+    cornerRadius:
+      options.cornerRadius === undefined
+        ? undefined
+        : Math.round(options.cornerRadius * scale),
+    eyePatternCornerRadius:
+      options.eyePatternCornerRadius === undefined
+        ? undefined
+        : Math.round(options.eyePatternCornerRadius * scale),
   };
 }
 
@@ -681,6 +856,18 @@ function sanitizeInteger(
     throw new Error(`${name} must be an integer between ${min} and ${max}.`);
   }
   return resolved;
+}
+
+function sanitizeOptionalInteger(
+  value: number | undefined,
+  name: string,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined) {
+    return -1;
+  }
+  return sanitizeInteger(value, -1, name, min, max);
 }
 
 function createModel(options: NormalizedOptions): QRCodeModel {
@@ -736,6 +923,31 @@ function createForegroundFill(
   return gradient;
 }
 
+function hasCustomLayerColors(options: NormalizedOptions): boolean {
+  return (
+    options.strokeColor !== DEFAULT_STROKE ||
+    options.eyeColor !== DEFAULT_EYE ||
+    options.eyeStrokeColor !== DEFAULT_EYE_STROKE ||
+    options.eyeballColor !== DEFAULT_EYEBALL
+  );
+}
+
+function getModuleFill(
+  options: NormalizedOptions,
+  foregroundFill: CanvasFill,
+  moduleX: number,
+  moduleY: number,
+  matrixSize: number,
+): CanvasFill {
+  if (!isEyeModule(moduleX, moduleY, matrixSize)) {
+    return foregroundFill;
+  }
+  if (isEyeBallModule(moduleX, moduleY, matrixSize)) {
+    return options.eyeballColor;
+  }
+  return options.eyeColor;
+}
+
 function createCanvas(size: number): HTMLCanvasElement {
   if (typeof document === "undefined") {
     throw new Error("QRCode PNG generation on web requires a browser canvas.");
@@ -750,6 +962,14 @@ function isDark(model: QRCodeModel, x: number, y: number): boolean {
   return Boolean(model.modules.data[y * model.modules.size + x]);
 }
 
+function modulePixel(
+  moduleIndex: number,
+  pixelSize: number,
+  totalModules: number,
+): number {
+  return Math.round((moduleIndex * pixelSize) / totalModules);
+}
+
 function isEyeModule(x: number, y: number, matrixSize: number): boolean {
   const top = y >= 0 && y < 7;
   const left = x >= 0 && x < 7;
@@ -758,12 +978,47 @@ function isEyeModule(x: number, y: number, matrixSize: number): boolean {
   return (top && left) || (top && right) || (bottom && left);
 }
 
+function getEyeOrigin(
+  x: number,
+  y: number,
+  matrixSize: number,
+): { x: number; y: number } {
+  if (x < 7 && y < 7) {
+    return { x: 0, y: 0 };
+  }
+  if (x >= matrixSize - 7 && y < 7) {
+    return { x: matrixSize - 7, y: 0 };
+  }
+  return { x: 0, y: matrixSize - 7 };
+}
+
+function isEyeBallModule(x: number, y: number, matrixSize: number): boolean {
+  const origin = getEyeOrigin(x, y, matrixSize);
+  const localX = x - origin.x;
+  const localY = y - origin.y;
+  return localX >= 2 && localX <= 4 && localY >= 2 && localY <= 4;
+}
+
 function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
   return (
     options.shape === "square" &&
-    options.eyePatternShape === "square" &&
+    options.eyeFrameShape === "square" &&
+    options.eyeballShape === "square" &&
     options.gap === 0 &&
     options.eyePatternGap === 0
+  );
+}
+
+function shouldDrawGroupedFinderEyes(
+  options: Required<QRCodeShapeOptions>,
+  normalized: NormalizedOptions,
+): boolean {
+  return (
+    options.eyeFrameShape !== "square" ||
+    options.eyeballShape !== "square" ||
+    normalized.eyeColor !== DEFAULT_EYE ||
+    normalized.eyeStrokeColor !== DEFAULT_EYE_STROKE ||
+    normalized.eyeballColor !== DEFAULT_EYEBALL
   );
 }
 
@@ -777,21 +1032,143 @@ function drawSquareRuns(
   const matrixSize = model.modules.size;
   for (let moduleY = 0; moduleY < matrixSize; moduleY++) {
     let runStart = -1;
-    const y0 = ((moduleY + quietZone) * pixelSize) / totalModules;
-    const y1 = ((moduleY + quietZone + 1) * pixelSize) / totalModules;
+    const y0 = modulePixel(moduleY + quietZone, pixelSize, totalModules);
+    const y1 = modulePixel(moduleY + quietZone + 1, pixelSize, totalModules);
     for (let moduleX = 0; moduleX <= matrixSize; moduleX++) {
       const dark = moduleX < matrixSize && isDark(model, moduleX, moduleY);
       if (dark && runStart < 0) {
         runStart = moduleX;
       }
       if ((!dark || moduleX === matrixSize) && runStart >= 0) {
-        const x0 = ((runStart + quietZone) * pixelSize) / totalModules;
-        const x1 = ((moduleX + quietZone) * pixelSize) / totalModules;
+        const x0 = modulePixel(runStart + quietZone, pixelSize, totalModules);
+        const x1 = modulePixel(moduleX + quietZone, pixelSize, totalModules);
         context.fillRect(x0, y0, x1 - x0, y1 - y0);
         runStart = -1;
       }
     }
   }
+}
+
+function drawGroupedFinders(
+  context: CanvasRenderingContext2D,
+  matrixSize: number,
+  quietZone: number,
+  totalModules: number,
+  pixelSize: number,
+  options: NormalizedOptions,
+): void {
+  drawGroupedFinder(context, 0, 0, quietZone, totalModules, pixelSize, options);
+  drawGroupedFinder(
+    context,
+    matrixSize - 7,
+    0,
+    quietZone,
+    totalModules,
+    pixelSize,
+    options,
+  );
+  drawGroupedFinder(
+    context,
+    0,
+    matrixSize - 7,
+    quietZone,
+    totalModules,
+    pixelSize,
+    options,
+  );
+}
+
+function drawGroupedFinder(
+  context: CanvasRenderingContext2D,
+  moduleX: number,
+  moduleY: number,
+  quietZone: number,
+  totalModules: number,
+  pixelSize: number,
+  options: NormalizedOptions,
+): void {
+  const rect = (offset: number, span: number) => {
+    const x = Math.round(
+      ((moduleX + quietZone + offset) * pixelSize) / totalModules,
+    );
+    const y = Math.round(
+      ((moduleY + quietZone + offset) * pixelSize) / totalModules,
+    );
+    const end = Math.round(
+      ((moduleX + quietZone + offset + span) * pixelSize) / totalModules,
+    );
+    return { x, y, size: end - x };
+  };
+  const frameShape = options.shapeOptions.eyeFrameShape;
+  const strokeInset = frameShape === "square" ? 0.3 : 0.65;
+  const outerColor =
+    options.eyeStrokeColor === DEFAULT_EYE_STROKE
+      ? options.eyeColor
+      : options.eyeStrokeColor;
+
+  drawFinderShape(context, rect(0, 7), frameShape, outerColor);
+  if (options.eyeStrokeColor !== DEFAULT_EYE_STROKE) {
+    drawFinderShape(
+      context,
+      rect(strokeInset, 7 - strokeInset * 2),
+      frameShape,
+      options.eyeColor,
+    );
+  }
+  drawFinderShape(context, rect(1, 5), frameShape, options.backgroundColor);
+  const useCircleFrameSquareEyeball =
+    frameShape === "circle" && options.shapeOptions.eyeballShape === "square";
+  const eyeballOffset =
+    options.shapeOptions.eyeballShape === "circle"
+      ? 1.75
+      : useCircleFrameSquareEyeball
+        ? 2.25
+        : 2;
+  const eyeballSpan =
+    options.shapeOptions.eyeballShape === "circle"
+      ? 3.5
+      : useCircleFrameSquareEyeball
+        ? 2.5
+        : 3;
+  drawFinderShape(
+    context,
+    rect(eyeballOffset, eyeballSpan),
+    options.shapeOptions.eyeballShape,
+    options.eyeballColor,
+  );
+}
+
+function drawFinderShape(
+  context: CanvasRenderingContext2D,
+  rect: { x: number; y: number; size: number },
+  shape: QRCodeShape,
+  fill: CanvasFill,
+): void {
+  context.fillStyle = fill;
+  if (shape === "circle") {
+    context.beginPath();
+    context.arc(
+      rect.x + rect.size / 2,
+      rect.y + rect.size / 2,
+      rect.size / 2,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+    return;
+  }
+  if (shape === "rounded") {
+    drawRoundedRect(
+      context,
+      rect.x,
+      rect.y,
+      rect.size,
+      rect.size,
+      rect.size * 0.22,
+    );
+    return;
+  }
+  context.fillRect(rect.x, rect.y, rect.size, rect.size);
 }
 
 function drawModule(
@@ -810,29 +1187,7 @@ function drawModule(
   const width = Math.max(0, x1 - x0 - inset * 2);
   const height = Math.max(0, y1 - y0 - inset * 2);
   if (shape === "circle") {
-    context.beginPath();
-    context.ellipse(
-      left + width / 2,
-      top + height / 2,
-      width / 2,
-      height / 2,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-    return;
-  }
-
-  if (shape === "rounded") {
-    drawRoundedRect(
-      context,
-      left,
-      top,
-      width,
-      height,
-      Math.min(width, height) / 3,
-    );
+    drawRoundedRect(context, left, top, width, height, width * 0.36);
     return;
   }
 
@@ -968,14 +1323,22 @@ function cacheKey(options: NormalizedOptions, output: string): string {
     options.errorCorrectionLevel,
     options.foregroundColor,
     options.backgroundColor,
+    options.strokeColor,
+    options.eyeColor,
+    options.eyeStrokeColor,
+    options.eyeballColor,
     options.minVersion,
     options.maxVersion,
     options.mask,
     options.boostEcl,
     options.shapeOptions.shape,
-    options.shapeOptions.eyePatternShape,
+    options.shapeOptions.eyeFrameShape,
+    options.shapeOptions.eyeballShape,
     options.shapeOptions.gap,
     options.shapeOptions.eyePatternGap,
+    options.shapeOptions.cornerRadius,
+    options.shapeOptions.eyePatternCornerRadius,
+    options.shapeOptions.layout,
     options.logoAreaSize,
     options.logoAreaBorderRadius,
     options.gradient.type,

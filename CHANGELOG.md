@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0
+
+- Added branded QR styling with foreground gradients, custom eye colors, module gaps, and centered logo safe areas.
+- Added async PNG export helpers for non-blocking QR generation in React Native UI flows.
+- Added an upgraded Expo example app with color, shape, logo, performance, matrix, and cache controls.
+- Kept the public QR layout scan-safe by validating output through the matrix layout boundary.
+- Removed package test sources from Android and iOS app builds.
+- Updated the package build target, generated Nitro bindings, README screenshots, and release metadata.
+
 ## 0.0.2
 
 - Normalize JS-side QR options consistently across native and web before generation.
