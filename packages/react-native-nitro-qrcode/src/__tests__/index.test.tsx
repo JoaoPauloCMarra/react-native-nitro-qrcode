@@ -92,14 +92,22 @@ describe("native QRCode API", () => {
       "M",
       "#000000",
       "#FFFFFF",
+      "#000000",
+      "#000000",
+      "#000000",
+      "#000000",
       1,
       40,
       -1,
       true,
       "square",
       "square",
+      "square",
       0,
       0,
+      -1,
+      -1,
+      "matrix",
       0,
       0,
       "none",
@@ -126,10 +134,14 @@ describe("native QRCode API", () => {
         mask: 3,
         boostEcl: false,
         shapeOptions: {
+          layout: "matrix",
           shape: "circle",
-          eyePatternShape: "rounded",
+          eyeFrameShape: "rounded",
+          eyeballShape: "rounded",
           gap: 2,
           eyePatternGap: 1,
+          cornerRadius: 3,
+          eyePatternCornerRadius: 4,
         },
         logoAreaSize: 48,
         logoAreaBorderRadius: 8,
@@ -142,14 +154,22 @@ describe("native QRCode API", () => {
       "H",
       "#111111",
       "#EEEEEE",
+      "#000000",
+      "#000000",
+      "#000000",
+      "#000000",
       2,
       8,
       3,
       false,
       "circle",
       "rounded",
+      "rounded",
       2,
       1,
+      3,
+      4,
+      "matrix",
       48,
       8,
       "none",
@@ -182,14 +202,22 @@ describe("native QRCode API", () => {
       "M",
       "#000000",
       "#FFFFFF",
+      "#000000",
+      "#000000",
+      "#000000",
+      "#000000",
       1,
       40,
       -1,
       true,
       "square",
       "square",
+      "square",
       0,
       0,
+      -1,
+      -1,
+      "matrix",
       0,
       0,
       "linear",
@@ -199,6 +227,52 @@ describe("native QRCode API", () => {
       0.2,
       0.9,
       0.8,
+    );
+  });
+
+  it("passes custom layer colors through the native bridge", () => {
+    expect(
+      toPngBase64({
+        value: "layers",
+        strokeColor: "#FF0000FF",
+        eyeColor: "#111111",
+        eyeStrokeColor: "#333333",
+        eyeballColor: "#555555",
+      }),
+    ).toBe("png-base64");
+
+    expect(mockHybridObject.generatePngBase64).toHaveBeenLastCalledWith(
+      "layers",
+      512,
+      4,
+      "M",
+      "#000000",
+      "#FFFFFF",
+      "#FF0000FF",
+      "#111111",
+      "#333333",
+      "#555555",
+      1,
+      40,
+      -1,
+      true,
+      "square",
+      "square",
+      "square",
+      0,
+      0,
+      -1,
+      -1,
+      "matrix",
+      0,
+      0,
+      "none",
+      [],
+      [],
+      0,
+      0,
+      1,
+      1,
     );
   });
 
@@ -231,14 +305,22 @@ describe("native QRCode API", () => {
       "M",
       "#000000",
       "#FFFFFF",
+      "#000000",
+      "#000000",
+      "#000000",
+      "#000000",
       1,
       40,
       -1,
       true,
       "square",
       "square",
+      "square",
       0,
       0,
+      -1,
+      -1,
+      "matrix",
       0,
       0,
       "radial",
@@ -249,6 +331,12 @@ describe("native QRCode API", () => {
       1,
       1,
     );
+  });
+
+  it("keeps the orbit prop on the scan-safe native matrix layout", () => {
+    toPngBase64({ value: "orbit", orbit: true });
+    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
+    expect(calls.at(-1)?.[21]).toBe("matrix");
   });
 
   it("generates SVG and matrix output", () => {
@@ -315,6 +403,27 @@ describe("native QRCode API", () => {
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
+    expect(() =>
+      toPngBase64({ value: "x", shapeOptions: { cornerRadius: 257 } }),
+    ).toThrow("cornerRadius must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { layout: "spiral" as "matrix" },
+      }),
+    ).toThrow("layout must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { eyePatternShape: "triangle" as "square" },
+      }),
+    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { eyeballShape: "triangle" as "square" },
+      }),
+    ).toThrow("eyeballShape must be square, circle, or rounded");
     expect(() => toPngBase64({ value: "x", logoAreaSize: 4097 })).toThrow(
       "logoAreaSize must be",
     );
@@ -404,7 +513,13 @@ describe("native QRCode API", () => {
         React.createElement(QRCode, {
           value: "https://example.com",
           size: 144,
-          shapeOptions: { shape: "rounded", gap: 1, eyePatternGap: 2 },
+          shapeOptions: {
+            shape: "square",
+            gap: 1,
+            eyePatternGap: 2,
+            cornerRadius: 3,
+            eyePatternCornerRadius: 4,
+          },
           logo: React.createElement("logo"),
           testID: "qr",
         }),
@@ -604,8 +719,17 @@ describe("web QRCode API", () => {
   };
 
   type MockContext = {
+    arc: jest.Mock<void, [number, number, number, number, number]>;
     fillStyle: string | MockGradient;
+    lineCap: CanvasLineCap;
+    lineWidth: number;
+    strokeStyle: string | MockGradient;
     beginPath: jest.Mock<void, []>;
+    bezierCurveTo: jest.Mock<
+      void,
+      [number, number, number, number, number, number]
+    >;
+    closePath: jest.Mock<void, []>;
     createLinearGradient: jest.Mock<
       MockGradient,
       [number, number, number, number]
@@ -623,6 +747,11 @@ describe("web QRCode API", () => {
     lineTo: jest.Mock<void, [number, number]>;
     moveTo: jest.Mock<void, [number, number]>;
     quadraticCurveTo: jest.Mock<void, [number, number, number, number]>;
+    restore: jest.Mock<void, []>;
+    rotate: jest.Mock<void, [number]>;
+    save: jest.Mock<void, []>;
+    stroke: jest.Mock<void, []>;
+    translate: jest.Mock<void, [number, number]>;
   };
 
   const originalDocument = globalThis.document;
@@ -636,8 +765,14 @@ describe("web QRCode API", () => {
 
   function createMockContext(): MockContext {
     return {
+      arc: jest.fn(),
       fillStyle: "",
+      lineCap: "butt",
+      lineWidth: 1,
+      strokeStyle: "",
       beginPath: jest.fn(),
+      bezierCurveTo: jest.fn(),
+      closePath: jest.fn(),
       createLinearGradient: jest
         .fn<MockGradient, [number, number, number, number]>()
         .mockImplementation(() => createMockGradient()),
@@ -650,6 +785,11 @@ describe("web QRCode API", () => {
       lineTo: jest.fn(),
       moveTo: jest.fn(),
       quadraticCurveTo: jest.fn(),
+      restore: jest.fn(),
+      rotate: jest.fn(),
+      save: jest.fn(),
+      stroke: jest.fn(),
+      translate: jest.fn(),
     };
   }
 
@@ -742,8 +882,11 @@ describe("web QRCode API", () => {
       shapeOptions: {
         shape: "circle",
         eyePatternShape: "rounded",
+        eyeballShape: "rounded",
         gap: 1,
         eyePatternGap: 0,
+        cornerRadius: 2,
+        eyePatternCornerRadius: 3,
       },
       logoAreaSize: 12,
       logoAreaBorderRadius: 3,
@@ -757,12 +900,87 @@ describe("web QRCode API", () => {
         size: 64,
         quietZone: 1,
         shapeOptions: {
-          shape: "rounded",
+          shape: "square",
           eyePatternShape: "circle",
           gap: 0,
         },
       }),
     ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
+        value: "Hello rounded eyes",
+        size: 64,
+        quietZone: 1,
+        shapeOptions: {
+          shape: "square",
+          eyePatternShape: "rounded",
+          cornerRadius: 2,
+        },
+      }),
+    ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
+        value: "Hello custom layer colors",
+        size: 96,
+        strokeColor: "#FF0000FF",
+        eyeColor: "#111111",
+        eyeStrokeColor: "#333333",
+        eyeballColor: "#555555",
+        shapeOptions: {
+          shape: "square",
+          eyePatternShape: "rounded",
+          gap: 1,
+          cornerRadius: 2,
+          eyePatternCornerRadius: 2,
+        },
+      }),
+    ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
+        value: "Hello custom eye color",
+        size: 96,
+        eyeColor: "#224466",
+        shapeOptions: {
+          shape: "square",
+          eyePatternShape: "rounded",
+        },
+      }),
+    ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
+        value: "Hello custom square eye stroke",
+        size: 96,
+        eyeStrokeColor: "#884422",
+        shapeOptions: {
+          shape: "square",
+          eyeFrameShape: "square",
+          eyeballShape: "square",
+        },
+      }),
+    ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
+        value: "Hello full logo area",
+        size: 64,
+        shapeOptions: { shape: "square" },
+        logoAreaSize: 64,
+        logoAreaBorderRadius: 32,
+      }),
+    ).toBe("web-png");
+    (["square", "circle", "rounded"] as const).forEach((eyeballShape) => {
+      expect(
+        Web.toPngBase64({
+          value: `Hello ${eyeballShape}`,
+          size: 96,
+          shapeOptions: {
+            eyeballShape,
+          },
+        }),
+      ).toBe("web-png");
+    });
+    expect(Web.toPngBase64({ value: "Hello orbit prop", orbit: true })).toBe(
+      "web-png",
+    );
     expect(canvas.getContext).toHaveBeenCalledWith("2d");
     expect(Web.getQRCodeCacheSize()).toBeGreaterThan(0);
     Web.clearQRCodeCache();
@@ -850,12 +1068,36 @@ describe("web QRCode API", () => {
     expect(() =>
       Web.toSvgString({
         value: "x",
+        shapeOptions: { layout: "spiral" as "matrix" },
+      }),
+    ).toThrow("layout must be");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { shape: "triangle" as "square" },
+      }),
+    ).toThrow("shape must be square or circle");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
         shapeOptions: { eyePatternShape: "triangle" as "square" },
       }),
-    ).toThrow("eyePatternShape must be");
+    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { eyeballShape: "triangle" as "square" },
+      }),
+    ).toThrow("eyeballShape must be square, circle, or rounded");
     expect(() =>
       Web.toSvgString({ value: "x", shapeOptions: { eyePatternGap: 257 } }),
     ).toThrow("eyePatternGap must be");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { eyePatternCornerRadius: 257 },
+      }),
+    ).toThrow("eyePatternCornerRadius must be");
     expect(() => Web.toSvgString({ value: "x", logoAreaSize: 4097 })).toThrow(
       "logoAreaSize must be",
     );
@@ -1013,7 +1255,14 @@ describe("web QRCode API", () => {
           value: "Hello",
           size: 128,
           logo: React.createElement("logo"),
-          shapeOptions: { shape: "circle", gap: 1 },
+          shapeOptions: {
+            shape: "circle",
+            eyePatternShape: "rounded",
+            eyeballShape: "rounded",
+            gap: 1,
+            cornerRadius: 2,
+            eyePatternCornerRadius: 3,
+          },
           testID: "web-qr",
         }),
       );
@@ -1037,7 +1286,7 @@ describe("web QRCode API", () => {
       tree?.update(
         React.createElement(Web.QRCode, {
           value: "Hello",
-          shapeOptions: { shape: "rounded", eyePatternGap: 1 },
+          shapeOptions: { shape: "square", eyePatternGap: 1 },
         }),
       );
     });

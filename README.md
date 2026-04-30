@@ -1,6 +1,6 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.0.2-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.1.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
 ![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
@@ -10,7 +10,9 @@
 Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.
 
 <p align="center">
-  <img src="./docs/assets/demo.gif" alt="Nitro QRCode example app showing QR style and gradient presets" width="360" />
+  <img src="./docs/assets/screenshots/example-color.png" alt="Nitro QRCode example app Color tab" width="260" />
+  <img src="./docs/assets/screenshots/example-shapes.png" alt="Nitro QRCode example app Shapes tab" width="260" />
+  <img src="./docs/assets/screenshots/example-logo-on.png" alt="Nitro QRCode example app Logo tab with logo enabled" width="260" />
 </p>
 
 ## Why this package
@@ -20,7 +22,7 @@ Use it when you want a QR code package that works on iOS, Android, and web witho
 - Native mobile QR generation through Nitro Modules and shared C++
 - Works with React Native, Expo development builds, and React Native Web
 - Supports PNG export, SVG export, and matrix access
-- Supports square, rounded, and circular modules
+- Supports square and circular modules with rounded finder eyes
 - Supports eye styling, module gaps, logo safe areas, and linear or radial gradients
 - Includes deterministic caching for repeated QR generation
 
@@ -31,7 +33,7 @@ Use it when you want a QR code package that works on iOS, Android, and web witho
 - PNG base64 and `data:image/png` output for rendering, sharing, and export
 - Compact SVG string generation for advanced workflows
 - Packed matrix export for custom rendering or scanability tooling
-- Native styling for square, rounded, and circular modules
+- Native styling for square and circular modules
 - Finder-eye styling, module gaps, and centered logo clear areas
 - Solid colors and opt-in linear or radial foreground gradients
 - Web fallback for Expo web demos and documentation environments
@@ -58,7 +60,7 @@ bun add react-native-nitro-qrcode react-native-nitro-modules
 - React `>=18.2.0 <20.0.0`.
 - React Native `>=0.75.0 <1.0.0`.
 - `react-native-nitro-modules >=0.35.4 <0.36.0`.
-- iOS 13+ and Android API 23+.
+- iOS 13+ and Android API 24+.
 - Web support requires the app's normal React Native Web setup: `react-dom >=18.2.0 <20.0.0` and `react-native-web >=0.19.0 <1.0.0`. These peers are optional so native-only apps are not forced to install them.
 
 `qrcode` is bundled as an internal runtime dependency for the web fallback. Consumers do not need `react-native-svg`, Skia, canvas packages, or a separate QR package.
@@ -95,7 +97,7 @@ export function CheckoutCode() {
 }
 ```
 
-`QRCode` returns an `Image`-backed view. The QR image is generated synchronously through Nitro on mobile and through the web fallback on web.
+`QRCode` returns an `Image`-backed view. The QR image is generated asynchronously through Nitro on mobile and through the web fallback on web.
 
 ## Supported Platforms
 
@@ -128,9 +130,11 @@ export function BrandedCode() {
         end: { x: 1, y: 1 },
       }}
       shapeOptions={{
-        shape: "rounded",
-        eyePatternShape: "square",
+        shape: "circle",
+        eyeFrameShape: "rounded",
+        eyeballShape: "circle",
         gap: 1,
+        eyePatternGap: 1,
       }}
       logoAreaSize={64}
       logoAreaBorderRadius={12}
@@ -153,9 +157,7 @@ export function BrandedCode() {
 }
 ```
 
-The native renderer supports module shapes, finder-eye shapes, gaps, a centered logo safe area, and foreground gradients. Solid colors stay on the fastest indexed PNG path. Gradients are opt-in and switch to RGBA PNG encoding only for that render.
-
-## QR Code Export API
+The native renderer keeps the public layout scan-safe with matrix output, then layers module shapes, finder-eye shapes, gaps, a centered logo safe area, and foreground gradients on top. Solid colors stay on the fastest indexed PNG path. Gradients are opt-in and switch to RGBA PNG encoding only for that render.
 
 ## Generate Assets
 
@@ -173,6 +175,11 @@ const base64 = NitroQRCode.toPngBase64({
   errorCorrectionLevel: "H",
 });
 
+const asyncDataUri = await NitroQRCode.toPngDataUriAsync({
+  value: "https://example.com",
+  size: 512,
+});
+
 const matrix = NitroQRCode.getMatrix({
   value: "https://example.com",
 });
@@ -182,6 +189,8 @@ Available helpers:
 
 - `NitroQRCode.toPngDataUri(options)` returns a `data:image/png;base64,...` URI.
 - `NitroQRCode.toPngBase64(options)` returns PNG bytes encoded as base64.
+- `NitroQRCode.toPngDataUriAsync(options)` returns a data URI without blocking the JS caller.
+- `NitroQRCode.toPngBase64Async(options)` returns base64 without blocking the JS caller.
 - `NitroQRCode.toSvgString(options)` returns a compact SVG string.
 - `NitroQRCode.getMatrix(options)` returns `{ size, packedBase64 }`.
 - `NitroQRCode.clearCache()` clears generated-output cache.
@@ -197,6 +206,8 @@ Helpers:
 
 - `NitroQRCode.toPngDataUri`
 - `NitroQRCode.toPngBase64`
+- `NitroQRCode.toPngDataUriAsync`
+- `NitroQRCode.toPngBase64Async`
 - `NitroQRCode.toSvgString`
 - `NitroQRCode.getMatrix`
 - `NitroQRCode.clearCache`
@@ -212,15 +223,22 @@ Helpers:
 | `errorCorrectionLevel`         | `"L"` \| `"M"` \| `"Q"` \| `"H"`        | `"M"`                                              |
 | `foregroundColor`              | `#RRGGBB` or `#RRGGBBAA`                | `#000000`                                          |
 | `backgroundColor`              | `#RRGGBB` or `#RRGGBBAA`                | `#FFFFFF`                                          |
+| `strokeColor`                  | `#RRGGBB` or `#RRGGBBAA`                | `#000000`                                          |
+| `eyeColor`                     | `#RRGGBB` or `#RRGGBBAA`                | `#000000`                                          |
+| `eyeStrokeColor`               | `#RRGGBB` or `#RRGGBBAA`                | `#000000`                                          |
+| `eyeballColor`                 | `#RRGGBB` or `#RRGGBBAA`                | `#000000`                                          |
 | `gradient.type`                | `"linear"` \| `"radial"`                | `"linear"`                                         |
 | `gradient.colors`              | `string[]`                              | `undefined`                                        |
 | `gradient.locations`           | `number[]` in `0...1`                   | evenly spaced                                      |
 | `gradient.start`               | `{ x: number, y: number }`              | `{0,0}` for linear, `{0.5,0.5}` for radial         |
 | `gradient.end`                 | `{ x: number, y: number }`              | `{1,1}`                                            |
-| `shapeOptions.shape`           | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
-| `shapeOptions.eyePatternShape` | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
+| `shapeOptions.layout`          | `"matrix"`                              | `"matrix"`                                         |
+| `shapeOptions.shape`           | `"square"` \| `"circle"`                | `"square"`                                         |
+| `shapeOptions.eyeFrameShape`   | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
+| `shapeOptions.eyeballShape`    | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
 | `shapeOptions.gap`             | `number`                                | `0`                                                |
 | `shapeOptions.eyePatternGap`   | `number`                                | `shapeOptions.gap`                                 |
+| `shapeOptions.eyePatternCornerRadius` | `number`                         | automatic for rounded finder eyes                  |
 | `logo`                         | `ReactNode` for `<QRCode />`            | `undefined`                                        |
 | `logoAreaSize`                 | `number`                                | `0`, or `28%` of component size when `logo` is set |
 | `logoAreaBorderRadius`         | `number`                                | `0`                                                |
@@ -232,6 +250,8 @@ Helpers:
 `errorCorrectionLevel` also accepts `"low"`, `"medium"`, `"quartile"`, and `"high"`.
 
 `gradient.colors` must contain between 2 and 8 colors. When `gradient` is provided, it overrides the solid `foregroundColor` for PNG and SVG output while keeping the no-gradient path fast.
+
+`shapeOptions.eyePatternShape` is still accepted as a deprecated alias for `shapeOptions.eyeFrameShape`.
 
 ## Performance Notes
 

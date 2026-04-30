@@ -15,7 +15,9 @@ Pod::Spec.new do |s|
 
   s.source_files = [
     "ios/**/*.{h,m,mm,swift}",
-    "cpp/**/*.{h,hpp,c,cpp}"
+    "cpp/bindings/*.{h,hpp,c,cpp}",
+    "cpp/core/QRCodeGenerator.{h,hpp,c,cpp}",
+    "cpp/qrcodegen/*.{h,hpp,c,cpp}"
   ]
 
   s.pod_target_xcconfig = {
