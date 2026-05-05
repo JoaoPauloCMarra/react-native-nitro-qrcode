@@ -568,6 +568,10 @@ void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
     fillRoundedRect(indices, imageSize, x0, y0, x1, y1, resolvedRadius, value);
     return;
   }
+  if (shape == ModuleShape::Square && cornerRadius >= 0) {
+    fillRoundedRect(indices, imageSize, x0, y0, x1, y1, cornerRadius, value);
+    return;
+  }
   const double left = static_cast<double>(x0);
   const double top = static_cast<double>(y0);
   const double width = static_cast<double>(x1 - x0);
@@ -656,14 +660,16 @@ void drawFinderCircleBorders(std::vector<uint8_t> &indices, int imageSize,
 
 void fillFinderShape(std::vector<uint8_t> &indices, int imageSize, int x0,
                      int y0, int x1, int y1, ModuleShape shape,
-                     uint8_t value) {
+                     int cornerRadius, uint8_t value) {
   if (shape == ModuleShape::Circle) {
     fillCircle(indices, imageSize, x0, y0, x1, y1, value);
     return;
   }
-  if (shape == ModuleShape::Rounded) {
+  if (shape == ModuleShape::Rounded || cornerRadius >= 0) {
     fillRoundedRect(indices, imageSize, x0, y0, x1, y1,
-                    std::max(1, (x1 - x0) / 5), value);
+                    cornerRadius >= 0 ? cornerRadius
+                                      : std::max(1, (x1 - x0) / 5),
+                    value);
     return;
   }
   fillRect(indices, imageSize, x0, y0, x1, y1, value);
@@ -672,7 +678,8 @@ void fillFinderShape(std::vector<uint8_t> &indices, int imageSize, int x0,
 void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
                        int moduleX, int moduleY, int quietZone,
                        int totalModules, ModuleShape frameShape,
-                       ModuleShape eyeballShape, bool useEyeStrokeLayer) {
+                       ModuleShape eyeballShape, int cornerRadius,
+                       bool useEyeStrokeLayer) {
   const auto modulePosition = [imageSize, quietZone,
                                totalModules](int module, double offset) {
     return static_cast<int>(
@@ -685,7 +692,8 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
     fillFinderShape(indices, imageSize, modulePosition(moduleX, offset),
                     modulePosition(moduleY, offset),
                     modulePosition(moduleX, offset + span),
-                    modulePosition(moduleY, offset + span), shape, value);
+                    modulePosition(moduleY, offset + span), shape,
+                    cornerRadius, value);
   };
 
   const double strokeInset =
@@ -711,13 +719,15 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
 void drawGroupedFinders(std::vector<uint8_t> &indices, int imageSize,
                         int matrixSize, int quietZone, int totalModules,
                         ModuleShape frameShape, ModuleShape eyeballShape,
-                        bool useEyeStrokeLayer) {
+                        int cornerRadius, bool useEyeStrokeLayer) {
   drawGroupedFinder(indices, imageSize, 0, 0, quietZone, totalModules,
-                    frameShape, eyeballShape, useEyeStrokeLayer);
+                    frameShape, eyeballShape, cornerRadius, useEyeStrokeLayer);
   drawGroupedFinder(indices, imageSize, matrixSize - 7, 0, quietZone,
-                    totalModules, frameShape, eyeballShape, useEyeStrokeLayer);
+                    totalModules, frameShape, eyeballShape, cornerRadius,
+                    useEyeStrokeLayer);
   drawGroupedFinder(indices, imageSize, 0, matrixSize - 7, quietZone,
-                    totalModules, frameShape, eyeballShape, useEyeStrokeLayer);
+                    totalModules, frameShape, eyeballShape, cornerRadius,
+                    useEyeStrokeLayer);
 }
 
 void drawRadialDot(std::vector<uint8_t> &indices, int imageSize, double center,
@@ -1246,6 +1256,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
   } else if (drawGroupedFinderEyes) {
     drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
                        totalModules, eyePatternShape, eyeballShape,
+                       options.eyePatternCornerRadius,
                        options.eyeStrokeColor != "#000000");
   }
   clearLogoArea(indices, imageSize, options.logoAreaSize,

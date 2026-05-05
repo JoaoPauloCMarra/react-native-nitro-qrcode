@@ -1,6 +1,6 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.1.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.2.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
 ![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
@@ -138,6 +138,7 @@ export function BrandedCode() {
       }}
       logoAreaSize={64}
       logoAreaBorderRadius={12}
+      logoBackgroundColor="#101112"
       logo={
         <View
           style={{
@@ -233,13 +234,15 @@ Helpers:
 | `gradient.start`               | `{ x: number, y: number }`              | `{0,0}` for linear, `{0.5,0.5}` for radial         |
 | `gradient.end`                 | `{ x: number, y: number }`              | `{1,1}`                                            |
 | `shapeOptions.layout`          | `"matrix"`                              | `"matrix"`                                         |
-| `shapeOptions.shape`           | `"square"` \| `"circle"`                | `"square"`                                         |
+| `shapeOptions.shape`           | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
 | `shapeOptions.eyeFrameShape`   | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
 | `shapeOptions.eyeballShape`    | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
 | `shapeOptions.gap`             | `number`                                | `0`                                                |
 | `shapeOptions.eyePatternGap`   | `number`                                | `shapeOptions.gap`                                 |
+| `shapeOptions.cornerRadius`    | `number`                                | automatic for rounded modules                      |
 | `shapeOptions.eyePatternCornerRadius` | `number`                         | automatic for rounded finder eyes                  |
 | `logo`                         | `ReactNode` for `<QRCode />`            | `undefined`                                        |
+| `logoBackgroundColor`          | React Native color string for `<QRCode />` | `backgroundColor`, then `#FFFFFF`               |
 | `logoAreaSize`                 | `number`                                | `0`, or `28%` of component size when `logo` is set |
 | `logoAreaBorderRadius`         | `number`                                | `0`                                                |
 | `minVersion`                   | `1...40`                                | `1`                                                |
@@ -305,8 +308,22 @@ Useful repo scripts:
 - `bun run check` runs the full library and example verification pass.
 - `bun run example:check` runs example lint plus `expo-doctor`.
 - `bun run --cwd packages/react-native-nitro-qrcode verify` runs the package-only gate.
+- `bun run publish-package:dry-run` runs the release publish path without uploading to npm.
 
 `bun run test:coverage` enforces 100% TypeScript coverage. `bun run test:cpp` compiles the C++ core and checks 100% LLVM line coverage for `QRCodeGenerator.cpp`.
+
+## Release Checklist
+
+Use a patch version for backward-compatible fixes and additive props. Use a minor version when changing defaults, generated output semantics, or public types in a way consumers may need to adapt to.
+
+Before creating a GitHub release:
+
+- Confirm `packages/react-native-nitro-qrcode/package.json` matches the release tag without the `v` prefix.
+- Run `bun run check`.
+- Run `bun run publish-package:dry-run`.
+- Create the GitHub release from the same ref as `.github/workflows/npm-publish.yml`.
+
+The GitHub release workflow runs `npm pack --dry-run` before `npm publish` and publishes through npm Trusted Publishing.
 
 ## Roadmap
 

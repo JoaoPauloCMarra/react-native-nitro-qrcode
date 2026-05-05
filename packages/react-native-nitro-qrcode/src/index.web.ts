@@ -19,8 +19,8 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeBodyShape = "square" | "circle";
-export type QRCodeShape = QRCodeBodyShape | "rounded";
+export type QRCodeBodyShape = "square" | "circle" | "rounded";
+export type QRCodeShape = QRCodeBodyShape;
 export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
 export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
 export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
@@ -86,6 +86,7 @@ export type QRCodeProps = QRCodeOptions & {
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
   logoPadding?: number;
+  logoBackgroundColor?: string;
   testID?: string;
 };
 
@@ -248,6 +249,9 @@ export function toPngDataUri(options: QRCodeOptions): string {
         const gap = eyeModule
           ? normalized.shapeOptions.eyePatternGap
           : normalized.shapeOptions.gap;
+        const cornerRadius = eyeModule
+          ? normalized.shapeOptions.eyePatternCornerRadius
+          : normalized.shapeOptions.cornerRadius;
         const moduleFill = getModuleFill(
           normalized,
           foregroundFill,
@@ -257,7 +261,7 @@ export function toPngDataUri(options: QRCodeOptions): string {
         );
         if (!eyeModule && normalized.strokeColor !== DEFAULT_STROKE) {
           context.fillStyle = normalized.strokeColor;
-          drawModule(context, x0, y0, x1, y1, shape, gap);
+          drawModule(context, x0, y0, x1, y1, shape, gap, cornerRadius);
           context.fillStyle = moduleFill;
           drawModule(
             context,
@@ -267,11 +271,12 @@ export function toPngDataUri(options: QRCodeOptions): string {
             y1,
             shape,
             gap + Math.max(1, (x1 - x0) * 0.18),
+            cornerRadius,
           );
           continue;
         }
         context.fillStyle = moduleFill;
-        drawModule(context, x0, y0, x1, y1, shape, gap);
+        drawModule(context, x0, y0, x1, y1, shape, gap, cornerRadius);
       }
     }
   }
@@ -387,6 +392,7 @@ export function QRCode({
   imageStyle,
   logo,
   logoPadding,
+  logoBackgroundColor,
   testID,
 }: QRCodeProps) {
   const rasterSize = Math.max(
@@ -471,6 +477,8 @@ export function QRCode({
               top: (size - resolvedLogoAreaSize) / 2,
               borderRadius:
                 logoAreaBorderRadius ?? DEFAULT_LOGO_AREA_BORDER_RADIUS,
+              backgroundColor:
+                logoBackgroundColor ?? backgroundColor ?? DEFAULT_BACKGROUND,
               padding: Math.max(0, logoPadding ?? 0),
             },
           ],
@@ -672,8 +680,12 @@ function sanitizeShape(
   name: string,
 ): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
-  if (resolved !== "square" && resolved !== "circle") {
-    throw new Error(`${name} must be square or circle.`);
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error(`${name} must be square, circle, or rounded.`);
   }
   return resolved;
 }
@@ -1106,16 +1118,29 @@ function drawGroupedFinder(
       ? options.eyeColor
       : options.eyeStrokeColor;
 
-  drawFinderShape(context, rect(0, 7), frameShape, outerColor);
+  drawFinderShape(
+    context,
+    rect(0, 7),
+    frameShape,
+    outerColor,
+    options.shapeOptions.eyePatternCornerRadius,
+  );
   if (options.eyeStrokeColor !== DEFAULT_EYE_STROKE) {
     drawFinderShape(
       context,
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
       options.eyeColor,
+      options.shapeOptions.eyePatternCornerRadius,
     );
   }
-  drawFinderShape(context, rect(1, 5), frameShape, options.backgroundColor);
+  drawFinderShape(
+    context,
+    rect(1, 5),
+    frameShape,
+    options.backgroundColor,
+    options.shapeOptions.eyePatternCornerRadius,
+  );
   const useCircleFrameSquareEyeball =
     frameShape === "circle" && options.shapeOptions.eyeballShape === "square";
   const eyeballOffset =
@@ -1135,6 +1160,7 @@ function drawGroupedFinder(
     rect(eyeballOffset, eyeballSpan),
     options.shapeOptions.eyeballShape,
     options.eyeballColor,
+    options.shapeOptions.eyePatternCornerRadius,
   );
 }
 
@@ -1143,6 +1169,7 @@ function drawFinderShape(
   rect: { x: number; y: number; size: number },
   shape: QRCodeShape,
   fill: CanvasFill,
+  cornerRadius: number,
 ): void {
   context.fillStyle = fill;
   if (shape === "circle") {
@@ -1157,14 +1184,14 @@ function drawFinderShape(
     context.fill();
     return;
   }
-  if (shape === "rounded") {
+  if (shape === "rounded" || cornerRadius >= 0) {
     drawRoundedRect(
       context,
       rect.x,
       rect.y,
       rect.size,
       rect.size,
-      rect.size * 0.22,
+      cornerRadius >= 0 ? cornerRadius : rect.size * 0.22,
     );
     return;
   }
@@ -1179,6 +1206,7 @@ function drawModule(
   y1: number,
   shape: QRCodeShape,
   gap: number,
+  cornerRadius: number,
 ): void {
   const maxGap = Math.max(0, (Math.min(x1 - x0, y1 - y0) - 1) / 2);
   const inset = Math.min(gap, maxGap);
@@ -1188,6 +1216,17 @@ function drawModule(
   const height = Math.max(0, y1 - y0 - inset * 2);
   if (shape === "circle") {
     drawRoundedRect(context, left, top, width, height, width * 0.36);
+    return;
+  }
+  if (shape === "rounded" || cornerRadius >= 0) {
+    drawRoundedRect(
+      context,
+      left,
+      top,
+      width,
+      height,
+      cornerRadius >= 0 ? cornerRadius : Math.min(width, height) / 3,
+    );
     return;
   }
 
@@ -1361,7 +1400,6 @@ const styles = StyleSheet.create({
   },
   logo: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     overflow: "hidden",
     position: "absolute",

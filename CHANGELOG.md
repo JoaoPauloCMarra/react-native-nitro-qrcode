@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Added rounded body modules with `shapeOptions.shape: "rounded"` on native and web.
+- Added `shapeOptions.cornerRadius` for square module rounding and `shapeOptions.eyePatternCornerRadius` support for finder eyes.
+- Added `logoBackgroundColor` so logo safe areas can differ from the QR background color.
+- Updated the Expo example to the current Expo SDK 55 patch recommendation.
+
 ## 0.1.0
 
 - Added branded QR styling with foreground gradients, custom eye colors, module gaps, and centered logo safe areas.

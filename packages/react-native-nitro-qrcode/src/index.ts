@@ -21,8 +21,8 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeBodyShape = "square" | "circle";
-export type QRCodeShape = QRCodeBodyShape | "rounded";
+export type QRCodeBodyShape = "square" | "circle" | "rounded";
+export type QRCodeShape = QRCodeBodyShape;
 export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
 export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
 export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
@@ -88,6 +88,7 @@ export type QRCodeProps = QRCodeOptions & {
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
   logoPadding?: number;
+  logoBackgroundColor?: string;
   testID?: string;
 };
 
@@ -342,6 +343,7 @@ export function QRCode({
   imageStyle,
   logo,
   logoPadding,
+  logoBackgroundColor,
   testID,
 }: QRCodeProps) {
   const [uri, setUri] = useState<string>();
@@ -457,6 +459,8 @@ export function QRCode({
               top: (size - resolvedLogoAreaSize) / 2,
               borderRadius:
                 logoAreaBorderRadius ?? DEFAULT_LOGO_AREA_BORDER_RADIUS,
+              backgroundColor:
+                logoBackgroundColor ?? backgroundColor ?? DEFAULT_BACKGROUND,
               padding: Math.max(0, logoPadding ?? 0),
             },
           ],
@@ -679,8 +683,12 @@ function sanitizeShape(
   name: string,
 ): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
-  if (resolved !== "square" && resolved !== "circle") {
-    throw new Error(`${name} must be square or circle.`);
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error(`${name} must be square, circle, or rounded.`);
   }
   return resolved;
 }
@@ -883,7 +891,6 @@ const styles = StyleSheet.create({
   },
   logo: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     overflow: "hidden",
     position: "absolute",
