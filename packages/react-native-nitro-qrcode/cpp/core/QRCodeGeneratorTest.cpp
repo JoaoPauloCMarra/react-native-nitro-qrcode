@@ -229,9 +229,31 @@ void testStyledPngGeneration() {
   assertPngHeader(generator.generatePngBase64(
       "https://example.com/layer-circle-border", options));
 
+  options = GenerateOptions{};
+  options.size = 160;
+  const std::string squareModules =
+      generator.generatePngBase64("https://example.com/square-radius", options);
+  options.cornerRadius = 4;
+  const std::string roundedSquareModules =
+      generator.generatePngBase64("https://example.com/square-radius", options);
+  assert(squareModules != roundedSquareModules);
+
+  options = GenerateOptions{};
+  options.size = 160;
+  const std::string squareEyes =
+      generator.generatePngBase64("https://example.com/eye-radius", options);
+  options.eyePatternCornerRadius = 4;
+  const std::string roundedSquareEyes =
+      generator.generatePngBase64("https://example.com/eye-radius", options);
+  assert(squareEyes != roundedSquareEyes);
+
   options.layout = "radial";
   options.moduleShape = "rounded";
   options.gap = 2;
+  options.strokeColor = "#FF0000FF";
+  options.eyeStrokeColor = "#333333";
+  options.stroke = parseColor(options.strokeColor);
+  options.eyeStroke = parseColor(options.eyeStrokeColor);
   assertPngHeader(
       generator.generatePngBase64("https://example.com/layer-radial", options));
 

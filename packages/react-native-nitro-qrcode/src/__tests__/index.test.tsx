@@ -135,7 +135,7 @@ describe("native QRCode API", () => {
         boostEcl: false,
         shapeOptions: {
           layout: "matrix",
-          shape: "circle",
+          shape: "rounded",
           eyeFrameShape: "rounded",
           eyeballShape: "rounded",
           gap: 2,
@@ -162,7 +162,7 @@ describe("native QRCode API", () => {
       8,
       3,
       false,
-      "circle",
+      "rounded",
       "rounded",
       "rounded",
       2,
@@ -399,7 +399,7 @@ describe("native QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be");
+    ).toThrow("shape must be square, circle, or rounded");
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
@@ -521,6 +521,7 @@ describe("native QRCode API", () => {
             eyePatternCornerRadius: 4,
           },
           logo: React.createElement("logo"),
+          logoBackgroundColor: "#101112",
           testID: "qr",
         }),
       );
@@ -542,6 +543,47 @@ describe("native QRCode API", () => {
         (node) => node.props.source?.uri === "data:image/png;base64,png-base64",
       ),
     ).not.toHaveLength(0);
+    const logoView = currentTree.root.findAll(
+      (node) => node.props.pointerEvents === "none",
+    )[0];
+    expect(logoView.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ backgroundColor: "#101112" }),
+      ]),
+    );
+    await act(async () => {
+      currentTree.update(
+        React.createElement(QRCode, {
+          value: "https://example.com",
+          backgroundColor: "#ABCDEF",
+          logo: React.createElement("logo"),
+        }),
+      );
+    });
+    const backgroundLogoView = currentTree.root.findAll(
+      (node) => node.props.pointerEvents === "none",
+    )[0];
+    expect(backgroundLogoView.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ backgroundColor: "#ABCDEF" }),
+      ]),
+    );
+    await act(async () => {
+      currentTree.update(
+        React.createElement(QRCode, {
+          value: "https://example.com",
+          logo: React.createElement("logo"),
+        }),
+      );
+    });
+    const defaultLogoView = currentTree.root.findAll(
+      (node) => node.props.pointerEvents === "none",
+    )[0];
+    expect(defaultLogoView.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ backgroundColor: "#FFFFFF" }),
+      ]),
+    );
     await act(async () => {
       currentTree.update(
         React.createElement(QRCode, {
@@ -920,6 +962,15 @@ describe("web QRCode API", () => {
     ).toBe("web-png");
     expect(
       Web.toPngBase64({
+        value: "Hello rounded modules",
+        size: 96,
+        shapeOptions: {
+          shape: "rounded",
+        },
+      }),
+    ).toBe("web-png");
+    expect(
+      Web.toPngBase64({
         value: "Hello custom layer colors",
         size: 96,
         strokeColor: "#FF0000FF",
@@ -1076,7 +1127,7 @@ describe("web QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be square or circle");
+    ).toThrow("shape must be square, circle, or rounded");
     expect(() =>
       Web.toSvgString({
         value: "x",
