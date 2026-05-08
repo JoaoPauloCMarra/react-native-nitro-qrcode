@@ -21,3 +21,9 @@ add_executable(QRCodeGeneratorTest
 )
 
 target_link_libraries(QRCodeGeneratorTest PRIVATE QRCodeCore)
+
+add_executable(QRCodeGeneratorBenchmark
+  core/QRCodeGeneratorBenchmark.cpp
+)
+
+target_link_libraries(QRCodeGeneratorBenchmark PRIVATE QRCodeCore)

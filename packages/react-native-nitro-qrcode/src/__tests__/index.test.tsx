@@ -64,6 +64,7 @@ import {
   getQRCodeCacheSize,
   NitroQRCode,
   QRCode,
+  type QRCodeRef,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -594,6 +595,52 @@ describe("native QRCode API", () => {
     });
   });
 
+  it("renders a placeholder instead of the logo while the async QR is pending", async () => {
+    const pending = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+      () => pending.promise,
+    );
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "pending",
+          logo: React.createElement("logo"),
+          placeholder: React.createElement("placeholder"),
+        }),
+      );
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    expect(
+      currentTree.root.findAll((node) => String(node.type) === "placeholder"),
+    ).toHaveLength(1);
+    expect(
+      currentTree.root.findAll((node) => String(node.type) === "logo"),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      pending.resolve("data:image/png;base64,pending");
+      await Promise.resolve();
+    });
+
+    expect(
+      currentTree.root.findAll((node) => String(node.type) === "placeholder"),
+    ).toHaveLength(0);
+    expect(
+      currentTree.root.findAll((node) => String(node.type) === "logo"),
+    ).toHaveLength(1);
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,pending",
+      ),
+    ).not.toHaveLength(0);
+  });
+
   it("keeps the previous image while the next async QR is pending", async () => {
     const first = createDeferred<string>();
     const second = createDeferred<string>();
@@ -638,6 +685,215 @@ describe("native QRCode API", () => {
         (node) => node.props.source?.uri === "data:image/png;base64,second",
       ),
     ).not.toHaveLength(0);
+  });
+
+  it("clears the QR image when keepPreviousImage is false", async () => {
+    const first = createDeferred<string>();
+    const second = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsync
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "one",
+          keepPreviousImage: false,
+        }),
+      );
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    await act(async () => {
+      first.resolve("data:image/png;base64,one");
+      await Promise.resolve();
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,one",
+      ),
+    ).not.toHaveLength(0);
+
+    await act(async () => {
+      currentTree.update(
+        React.createElement(QRCode, {
+          value: "two",
+          keepPreviousImage: false,
+        }),
+      );
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,one",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      second.resolve("data:image/png;base64,two");
+      await Promise.resolve();
+    });
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,two",
+      ),
+    ).not.toHaveLength(0);
+  });
+
+  it("calls onReady when native async generation succeeds", async () => {
+    const pending = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+      () => pending.promise,
+    );
+    const onReady = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, { value: "ready", onReady }),
+      );
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    await act(async () => {
+      pending.resolve("data:image/png;base64,ready");
+      await Promise.resolve();
+    });
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onReady).toHaveBeenCalledWith("data:image/png;base64,ready");
+  });
+
+  it("does not regenerate native QR output when callback identity changes", async () => {
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "stable-callbacks",
+          onReady: firstReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    const callsAfterInitialRender =
+      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+
+    await act(async () => {
+      tree?.update(
+        React.createElement(QRCode, {
+          value: "stable-callbacks",
+          onReady: secondReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+      callsAfterInitialRender,
+    );
+    expect(firstReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).not.toHaveBeenCalled();
+  });
+
+  it("routes async native generation errors to onError when provided", async () => {
+    const pending = createDeferred<never>();
+    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+      () => pending.promise,
+    );
+    const onError = jest.fn();
+
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "broken",
+          onError,
+        }),
+      );
+      pending.reject(new Error("native-boom"));
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    expect(onError.mock.calls[0]?.[0]?.message).toBe("native-boom");
+  });
+
+  it("exposes imperative export methods on the QR component", async () => {
+    const qrRef = React.createRef<QRCodeRef>();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          ref: qrRef,
+          value: "imperative",
+        }),
+      );
+    });
+
+    if (tree === undefined || qrRef.current === null) {
+      throw new Error("Expected QRCode ref to be attached.");
+    }
+
+    expect(qrRef.current.toPngDataUri()).toBe(
+      "data:image/png;base64,png-base64",
+    );
+    expect(qrRef.current.toPngBase64()).toBe("png-base64");
+    expect(mockHybridObject.generatePngDataUri).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngBase64).toHaveBeenCalled();
+  });
+
+  it("validates scanability warnings and errors", () => {
+    const scanable = NitroQRCode.validateOptions({
+      value: "https://example.com",
+      size: 96,
+      quietZone: 0,
+      errorCorrectionLevel: "M",
+      logoAreaSize: 40,
+      foregroundColor: "#AABBCC",
+      backgroundColor: "#CCDDEE",
+    });
+    expect(scanable.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "too-small-size" }),
+        expect.objectContaining({ code: "bad-quiet-zone" }),
+        expect.objectContaining({ code: "logo-too-large" }),
+        expect.objectContaining({ code: "low-ecl-for-logo" }),
+      ]),
+    );
+    expect(scanable.errors).toEqual([]);
+
+    const invalid = NitroQRCode.validateOptions({ value: "" });
+    expect(invalid.errors).toHaveLength(1);
+    expect(invalid.errors[0]?.code).toBe("invalid");
+    expect(invalid.errors[0]?.message).toContain("must not be empty");
+
+    expect(
+      NitroQRCode.validateOptions({
+        value: "https://example.com",
+        quietZone: 16,
+        foregroundColor: "#00000080",
+        backgroundColor: "#000000",
+      }).warnings,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "bad-quiet-zone",
+        }),
+      ]),
+    );
   });
 
   it("ignores async completions after the component unmounts", async () => {
@@ -1341,6 +1597,203 @@ describe("web QRCode API", () => {
         }),
       );
     });
+  });
+
+  it("calls onReady for web QR generation and can still export imperatively", async () => {
+    const canvas = installCanvas();
+    const onReady = jest.fn();
+    const qrRef = React.createRef<QRCodeRef>();
+
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          ref: qrRef,
+          value: "web-ready",
+          onReady,
+          placeholder: React.createElement("placeholder", undefined, "loading"),
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(canvas.toDataURL).toHaveBeenCalled();
+    expect(onReady).toHaveBeenCalledWith("data:image/png;base64,web-png");
+    expect(qrRef.current).not.toBeNull();
+    expect(qrRef.current?.toPngDataUri()).toContain(
+      "data:image/png;base64,web-png",
+    );
+    expect(qrRef.current?.toPngBase64()).toBe("web-png");
+  });
+
+  it("validates web scanability warnings and errors", () => {
+    const scanable = Web.NitroQRCode.validateOptions({
+      value: "https://example.com",
+      size: 96,
+      quietZone: 0,
+      errorCorrectionLevel: "M",
+      logoAreaSize: 40,
+      foregroundColor: "#AABBCC80",
+      backgroundColor: "#CCDDEE",
+    });
+
+    expect(scanable.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "too-small-size" }),
+        expect.objectContaining({ code: "bad-quiet-zone" }),
+        expect.objectContaining({ code: "logo-too-large" }),
+        expect.objectContaining({ code: "low-ecl-for-logo" }),
+      ]),
+    );
+    expect(scanable.errors).toEqual([]);
+
+    const invalid = Web.NitroQRCode.validateOptions({ value: "" });
+    expect(invalid.errors).toHaveLength(1);
+    expect(invalid.errors[0]?.code).toBe("invalid");
+    expect(invalid.errors[0]?.message).toContain("must not be empty");
+
+    expect(
+      Web.NitroQRCode.validateOptions({
+        value: "https://example.com",
+        quietZone: 16,
+      }).warnings,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "bad-quiet-zone" }),
+      ]),
+    );
+  });
+
+  it("surfaces web QR generation errors when no onError handler is provided", async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(
+          ErrorBoundary,
+          undefined,
+          React.createElement(Web.QRCode, { value: "" }),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    if (tree === undefined) {
+      throw new Error("Expected web QRCode test renderer to be created.");
+    }
+    expect(
+      tree.root.find((node) => String(node.type) === "error-boundary").props
+        .message,
+    ).toContain("must not be empty");
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("routes web QR generation errors to onError when provided", async () => {
+    const onError = jest.fn();
+
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          value: "",
+          onError,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    expect(onError.mock.calls[0]?.[0]?.message).toContain("must not be empty");
+  });
+
+  it("normalizes non-Error web generation failures", async () => {
+    installCanvas(() => {
+      throw "web-boom";
+    });
+    const onError = jest.fn();
+
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          value: "web-boom",
+          onError,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    expect(onError.mock.calls[0]?.[0]?.message).toBe("web-boom");
+  });
+
+  it("does not rerun web QR generation when callback identity changes", async () => {
+    installCanvas();
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          value: "web-stable-callbacks",
+          onReady: firstReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected web QRCode test renderer to be created.");
+    }
+
+    await act(async () => {
+      tree?.update(
+        React.createElement(Web.QRCode, {
+          value: "web-stable-callbacks",
+          onReady: secondReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(firstReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).not.toHaveBeenCalled();
+  });
+
+  it("clears the previous web QR image when keepPreviousImage is false", async () => {
+    installCanvas();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          value: "web-one",
+          keepPreviousImage: false,
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected web QRCode test renderer to be created.");
+    }
+
+    await act(async () => {
+      tree?.update(
+        React.createElement(Web.QRCode, {
+          value: "web-two",
+          keepPreviousImage: false,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(
+      tree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,web-png",
+      ),
+    ).not.toHaveLength(0);
   });
 
   it("uses the default web component size", () => {
