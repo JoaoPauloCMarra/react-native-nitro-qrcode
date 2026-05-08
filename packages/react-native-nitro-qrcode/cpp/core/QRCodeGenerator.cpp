@@ -1167,9 +1167,8 @@ Matrix QRCodeGenerator::createMatrix(const std::string &value,
 std::string QRCodeGenerator::generatePngBase64(const std::string &value,
                                                const GenerateOptions &options) {
   const std::string key = cacheKey(value, options, "png-base64");
-  const auto cached = cache_.find(key);
-  if (cached != cache_.end()) {
-    return cached->second;
+  if (const auto cached = getCacheEntry(key)) {
+    return *cached;
   }
 
   const Matrix matrix = createMatrix(value, options);
@@ -1283,9 +1282,8 @@ QRCodeGenerator::generatePngDataUri(const std::string &value,
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
                                                const GenerateOptions &options) {
   const std::string key = cacheKey(value, options, "svg");
-  const auto cached = cache_.find(key);
-  if (cached != cache_.end()) {
-    return cached->second;
+  if (const auto cached = getCacheEntry(key)) {
+    return *cached;
   }
 
   const Matrix matrix = createMatrix(value, options);
@@ -1339,11 +1337,15 @@ int QRCodeGenerator::getMatrixSize(const std::string &value,
 }
 
 void QRCodeGenerator::clearCache() {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
   cache_.clear();
   cacheOrder_.clear();
 }
 
-size_t QRCodeGenerator::getCacheSize() const { return cache_.size(); }
+size_t QRCodeGenerator::getCacheSize() const {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  return cache_.size();
+}
 
 std::string QRCodeGenerator::cacheKey(const std::string &value,
                                       const GenerateOptions &options,
@@ -1389,16 +1391,35 @@ std::string QRCodeGenerator::cacheKey(const std::string &value,
          std::to_string(options.gradient.endY);
 }
 
+std::optional<std::string>
+QRCodeGenerator::getCacheEntry(const std::string &key) const {
+  std::lock_guard<std::mutex> lock(cacheMutex_);
+  const auto cached = cache_.find(key);
+  if (cached == cache_.end()) {
+    return std::nullopt;
+  }
+
+  const auto order = std::find(cacheOrder_.begin(), cacheOrder_.end(), key);
+  if (order != cacheOrder_.end()) {
+    cacheOrder_.erase(order);
+  }
+  cacheOrder_.push_back(key);
+  return cached->second;
+}
+
 void QRCodeGenerator::storeCacheEntry(const std::string &key,
                                       const std::string &value) {
-  if (cache_.find(key) == cache_.end()) {
-    cacheOrder_.push_back(key);
-    while (cacheOrder_.size() > MaxCacheEntries) {
-      cache_.erase(cacheOrder_.front());
-      cacheOrder_.pop_front();
-    }
-  }
+  std::lock_guard<std::mutex> lock(cacheMutex_);
   cache_[key] = value;
+  const auto order = std::find(cacheOrder_.begin(), cacheOrder_.end(), key);
+  if (order != cacheOrder_.end()) {
+    cacheOrder_.erase(order);
+  }
+  cacheOrder_.push_back(key);
+  while (cacheOrder_.size() > MaxCacheEntries) {
+    cache_.erase(cacheOrder_.front());
+    cacheOrder_.pop_front();
+  }
 }
 
 } // namespace NitroQRCode

@@ -15,6 +15,7 @@ import {
   getQRCodeCacheSize,
   NitroQRCode,
   QRCode,
+  type QRCodeRef,
   type QRCodeBodyShape,
   type QRCodeEyeBallShape,
   type QRCodeEyeFrameShape,
@@ -160,7 +161,11 @@ export default function DemoScreen() {
     matrixSize: 0,
     cacheSize: 0,
   });
+  const [readyUri, setReadyUri] = useState("");
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [exportPreview, setExportPreview] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<Error | null>(null);
+  const qrRef = useRef<QRCodeRef>(null);
 
   useEffect(() => {
     let frameId = 0;
@@ -325,8 +330,22 @@ export default function DemoScreen() {
           <View style={styles.stage}>
             <View style={styles.qrShell}>
               <QRCode
+                ref={qrRef}
                 value={value}
                 size={PREVIEW_SIZE}
+                placeholder={
+                  <View style={styles.qrPlaceholder}>
+                    <Text style={styles.qrPlaceholderText}>Generating QR…</Text>
+                  </View>
+                }
+                hideLogoUntilReady
+                onReady={(uri) => {
+                  setReadyUri(uri);
+                  setQrError(null);
+                }}
+                onError={(error) => {
+                  setQrError(error.message);
+                }}
                 errorCorrectionLevel={showLogo ? "H" : "M"}
                 foregroundColor={foregroundColor}
                 backgroundColor={backgroundColor}
@@ -347,7 +366,26 @@ export default function DemoScreen() {
             <View style={styles.stageMeta}>
               <Tag>{capitalize(bodyShape)}</Tag>
               <Tag>{gradient === undefined ? "Single" : "Gradient"}</Tag>
+              <Tag>{readyUri === "" ? "Pending" : "Ready"}</Tag>
+              {qrError !== null ? <Tag>{qrError}</Tag> : null}
             </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const data = qrRef.current?.toPngBase64();
+                setExportPreview(
+                  data === undefined
+                    ? "Export unavailable"
+                    : `Base64: ${data.slice(0, 14)}…`,
+                );
+              }}
+              style={styles.selectButton}
+            >
+              <Text style={styles.selectButtonText}>Export PNG base64</Text>
+            </Pressable>
+            {exportPreview !== null ? (
+              <Text style={styles.label}>{exportPreview}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputPanel}>
@@ -1217,6 +1255,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     boxShadow: "0 14px 34px rgba(0,0,0,0.32)",
+  },
+  qrPlaceholder: {
+    alignItems: "center",
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  qrPlaceholderText: {
+    color: "#A9B0AA",
+    fontSize: 13,
+    fontWeight: "700",
   },
   stageMeta: {
     alignItems: "center",

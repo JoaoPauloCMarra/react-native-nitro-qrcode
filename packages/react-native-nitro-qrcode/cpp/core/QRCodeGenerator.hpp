@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <deque>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -79,6 +81,7 @@ public:
 
 private:
   static constexpr size_t MaxCacheEntries = 128;
+  mutable std::mutex cacheMutex_;
   mutable std::unordered_map<std::string, std::string> cache_;
   mutable std::deque<std::string> cacheOrder_;
 
@@ -86,6 +89,7 @@ private:
                       const GenerateOptions &options) const;
   std::string cacheKey(const std::string &value, const GenerateOptions &options,
                        const std::string &output) const;
+  std::optional<std::string> getCacheEntry(const std::string &key) const;
   void storeCacheEntry(const std::string &key, const std::string &value);
 };
 

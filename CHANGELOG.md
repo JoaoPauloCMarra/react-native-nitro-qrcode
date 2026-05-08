@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1
+
+- Added `<QRCode />` loading callbacks and placeholders:
+  - `onReady`, `onError`
+  - `placeholder`, `keepPreviousImage`, `hideLogoUntilReady`
+- Added explicit rendering presets:
+  - `preset="default" | "rounded" | "dots" | "branded"`
+- Added `NitroQRCode.validateOptions()` with scanability warnings and errors.
+- Added imperative component exports:
+  - `ref.current.toPngDataUri()`
+  - `ref.current.toPngBase64()`
+- Extended docs and example app to cover loading placeholders, exports, presets, and validation guidance.
+- Reduced native generation lock contention by moving cache synchronization into the C++ output cache and updating LRU order on cache hits.
+- Added native benchmark and sanitizer scripts for C++ QR render, cache, matrix, SVG, base64, and parallel paths.
+
 ## 0.2.0
 
 - Added rounded body modules with `shapeOptions.shape: "rounded"` on native and web.

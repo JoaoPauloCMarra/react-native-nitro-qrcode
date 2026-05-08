@@ -1,6 +1,6 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.2.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.2.1-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
 ![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
@@ -68,6 +68,7 @@ bun add react-native-nitro-qrcode react-native-nitro-modules
 ## Expo Support
 
 This package works with Expo development builds. Expo Go cannot load Nitro native code.
+If you need parity for async-ready flow, placeholders, and native cache behavior, test in an Expo dev build or a bare workflow, not Expo Go.
 
 ```sh
 bunx expo prebuild
@@ -213,6 +214,7 @@ Helpers:
 - `NitroQRCode.getMatrix`
 - `NitroQRCode.clearCache`
 - `NitroQRCode.getCacheSize`
+- `NitroQRCode.validateOptions`
 
 ## Options
 
@@ -242,13 +244,19 @@ Helpers:
 | `shapeOptions.cornerRadius`    | `number`                                | automatic for rounded modules                      |
 | `shapeOptions.eyePatternCornerRadius` | `number`                         | automatic for rounded finder eyes                  |
 | `logo`                         | `ReactNode` for `<QRCode />`            | `undefined`                                        |
+| `placeholder`                  | `ReactNode` for `<QRCode />`            | `undefined`                                        |
 | `logoBackgroundColor`          | React Native color string for `<QRCode />` | `backgroundColor`, then `#FFFFFF`               |
 | `logoAreaSize`                 | `number`                                | `0`, or `28%` of component size when `logo` is set |
 | `logoAreaBorderRadius`         | `number`                                | `0`                                                |
+| `preset`                       | `"default" \| "rounded" \| "dots" \| "branded"` | `"default"`                              |
+| `keepPreviousImage`            | `boolean`                               | `true`                                             |
+| `hideLogoUntilReady`           | `boolean`                               | `true`                                             |
 | `minVersion`                   | `1...40`                                | `1`                                                |
 | `maxVersion`                   | `1...40`                                | `40`                                               |
 | `mask`                         | `-1` or `0...7`                         | `-1`                                               |
 | `boostEcl`                     | `boolean`                               | `true`                                             |
+| `onReady`                      | `(uri: string) => void`                 | `undefined`                                        |
+| `onError`                      | `(error: Error) => void`                | `undefined`                                        |
 
 `errorCorrectionLevel` also accepts `"low"`, `"medium"`, `"quartile"`, and `"high"`.
 
@@ -256,12 +264,102 @@ Helpers:
 
 `shapeOptions.eyePatternShape` is still accepted as a deprecated alias for `shapeOptions.eyeFrameShape`.
 
+### Presets
+
+`preset` applies a default shape style and is merged with `shapeOptions`.
+
+- `default`: square modules + square eyes (legacy behavior).
+- `rounded`: rounded modules, rounded eyes, rounded finder corners.
+- `dots`: circular modules and circular eyes, module gaps.
+- `branded`: rounded modules with a mixed eye shape set for brand-centric rendering.
+
+`shapeOptions` properties override preset values when both are provided.
+
+### Loading callbacks + placeholders
+
+```tsx
+import { Pressable, useRef, useState, Text, View } from "react";
+import {
+  type QRCodeRef,
+  QRCode,
+} from "react-native-nitro-qrcode";
+
+const qrRef = useRef<QRCodeRef>(null);
+
+export function CheckoutCode() {
+  const [readyUri, setReadyUri] = useState<string>("");
+
+  return (
+    <>
+      <QRCode
+        ref={qrRef}
+        value="https://example.com/checkout/123"
+        size={220}
+        placeholder={
+          <View>
+            <Text>Loading…</Text>
+          </View>
+        }
+        hideLogoUntilReady
+        onReady={setReadyUri}
+        onError={(error) => {
+          console.error("QR generation failed", error);
+        }}
+      />
+      <Pressable
+        onPress={() => {
+          const uri = qrRef.current?.toPngDataUri();
+          if (uri !== undefined) {
+            console.log(uri.slice(0, 32), "...");
+          }
+        }}
+      >
+        <Text>Export data URI</Text>
+      </Pressable>
+      <Text>{readyUri ? "QR is ready" : "Awaiting QR"}</Text>
+    </>
+  );
+}
+```
+
+`keepPreviousImage` defaults to `true`; set it to `false` for skeleton-first updates while `value` changes.
+
+`hideLogoUntilReady` defaults to `true` to avoid logo-only flashes during async generation.
+
+For stable scanning, keep logo safe areas under ~30% of size and prefer `errorCorrectionLevel="Q"` or `"H"` when a large logo is used.
+
+### Scanability validation
+
+```tsx
+import { NitroQRCode } from "react-native-nitro-qrcode";
+
+const { warnings, errors } = NitroQRCode.validateOptions({
+  value: "https://example.com",
+  size: 96,
+  quietZone: 1,
+  logoAreaSize: 60,
+  errorCorrectionLevel: "M",
+});
+
+for (const warning of warnings) {
+  console.warn(`${warning.code}: ${warning.message}`);
+}
+if (errors.length > 0) {
+  throw new Error(errors[0]!.message);
+}
+```
+
 ## Performance Notes
 
 - Solid-color QR codes stay on the fastest indexed PNG path
 - Gradient renders are opt-in and use RGBA PNG encoding only when needed
-- Repeated identical renders benefit from the built-in cache
+- Repeated identical renders benefit from the built-in native cache, and cache
+  synchronization is scoped so uncached native renders can run concurrently
 - The example app includes generation timing, FPS, PNG size, matrix size, and cache metrics
+- Web rendering uses the package canvas fallback and requires a browser DOM; there is no SSR support path in package code.
+- `bun run benchmark:cpp` runs the optimized native benchmark harness for matrix,
+  PNG, SVG, base64, cache-hit, and parallel render paths.
+- `bun run test:cpp:sanitize` runs the native C++ tests with ASan/UBSan.
 
 ## Example App
 

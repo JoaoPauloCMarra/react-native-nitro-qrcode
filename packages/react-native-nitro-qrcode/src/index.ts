@@ -1,4 +1,12 @@
-import React, { type ReactNode, useEffect, useMemo, useState } from "react";
+import React, {
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Image,
   type ImageStyle,
@@ -56,6 +64,8 @@ export type QRCodeGradient = {
   end?: QRCodeGradientPoint;
 };
 
+export type QRCodePreset = "default" | "rounded" | "dots" | "branded";
+
 export type QRCodeOptions = {
   value: string;
   size?: number;
@@ -87,9 +97,40 @@ export type QRCodeProps = QRCodeOptions & {
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
+  placeholder?: ReactNode;
+  preset?: QRCodePreset;
+  keepPreviousImage?: boolean;
+  hideLogoUntilReady?: boolean;
+  onReady?: (uri: string) => void;
+  onError?: (error: Error) => void;
   logoPadding?: number;
   logoBackgroundColor?: string;
   testID?: string;
+};
+
+export type QRCodeScanabilityWarning = {
+  code:
+    | "low-contrast"
+    | "too-small-size"
+    | "logo-too-large"
+    | "low-ecl-for-logo"
+    | "bad-quiet-zone";
+  message: string;
+};
+
+export type QRCodeValidationError = {
+  code: string;
+  message: string;
+};
+
+export type QRCodeValidationResult = {
+  warnings: QRCodeScanabilityWarning[];
+  errors: QRCodeValidationError[];
+};
+
+export type QRCodeRef = {
+  toPngDataUri: () => string;
+  toPngBase64: () => string;
 };
 
 const DEFAULT_SIZE = 512;
@@ -117,6 +158,46 @@ const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
 const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
 const DEFAULT_RADIAL_START: QRCodeGradientPoint = { x: 0.5, y: 0.5 };
 const DEFAULT_RADIAL_END: QRCodeGradientPoint = { x: 1, y: 1 };
+const DEFAULT_KEEP_PREVIOUS_IMAGE = true;
+const DEFAULT_HIDE_LOGO_UNTIL_READY = true;
+const SCANABILITY_MINIMUM_SIZE = 120;
+const SCANABILITY_QUIET_ZONE_MINIMUM = 2;
+const SCANABILITY_QUIET_ZONE_MAXIMUM = 12;
+const SCANABILITY_LOGO_SIZE_LIMIT = 0.3;
+const SCANABILITY_LOW_CONTRAST = 2.5;
+
+const PRESET_SHAPE_OPTIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
+  default: {
+    shape: "square",
+    eyeFrameShape: "square",
+    eyeballShape: "square",
+  },
+  rounded: {
+    shape: "rounded",
+    eyeFrameShape: "rounded",
+    eyeballShape: "rounded",
+    cornerRadius: 8,
+    eyePatternCornerRadius: 8,
+  },
+  dots: {
+    shape: "circle",
+    eyeFrameShape: "circle",
+    eyeballShape: "circle",
+    gap: 1,
+    eyePatternGap: 1,
+    cornerRadius: 0,
+    eyePatternCornerRadius: 0,
+  },
+  branded: {
+    shape: "rounded",
+    eyeFrameShape: "square",
+    eyeballShape: "rounded",
+    gap: 1,
+    eyePatternGap: 1,
+    cornerRadius: 6,
+    eyePatternCornerRadius: 6,
+  },
+};
 
 const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 
@@ -319,35 +400,61 @@ export function getQRCodeCacheSize(): number {
   return NativeQRCode.getCacheSize();
 }
 
-export function QRCode({
-  value,
-  size = 180,
-  quietZone,
-  errorCorrectionLevel,
-  foregroundColor,
-  backgroundColor,
-  strokeColor,
-  eyeColor,
-  eyeStrokeColor,
-  eyeballColor,
-  gradient,
-  minVersion,
-  maxVersion,
-  mask,
-  boostEcl,
-  orbit,
-  shapeOptions,
-  logoAreaSize,
-  logoAreaBorderRadius,
-  style,
-  imageStyle,
-  logo,
-  logoPadding,
-  logoBackgroundColor,
-  testID,
-}: QRCodeProps) {
+export function validateOptions(
+  options: QRCodeOptions,
+): QRCodeValidationResult {
+  try {
+    const normalized = normalizeOptions(options);
+    return { warnings: scanabilityWarnings(normalized), errors: [] };
+  } catch (error: unknown) {
+    return {
+      warnings: [],
+      errors: [{ code: "invalid", message: toError(error).message }],
+    };
+  }
+}
+
+export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
+  {
+    value,
+    size = 180,
+    quietZone,
+    errorCorrectionLevel,
+    foregroundColor,
+    backgroundColor,
+    strokeColor,
+    eyeColor,
+    eyeStrokeColor,
+    eyeballColor,
+    gradient,
+    minVersion,
+    maxVersion,
+    mask,
+    boostEcl,
+    orbit,
+    shapeOptions,
+    logoAreaSize,
+    logoAreaBorderRadius,
+    preset,
+    keepPreviousImage = DEFAULT_KEEP_PREVIOUS_IMAGE,
+    hideLogoUntilReady = DEFAULT_HIDE_LOGO_UNTIL_READY,
+    onReady,
+    onError,
+    style,
+    imageStyle,
+    logo,
+    placeholder,
+    logoPadding,
+    logoBackgroundColor,
+    testID,
+  }: QRCodeProps,
+  ref: React.Ref<QRCodeRef>,
+) {
   const [uri, setUri] = useState<string>();
   const [generationError, setGenerationError] = useState<Error>();
+  const generationId = useRef(0);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   const rasterSize = Math.max(
     Math.ceil(size * COMPONENT_RASTER_MULTIPLIER),
     MIN_COMPONENT_RASTER_SIZE,
@@ -374,7 +481,10 @@ export function QRCode({
       mask,
       boostEcl,
       orbit,
-      shapeOptions: scaleShapeOptions(shapeOptions, rasterScale),
+      shapeOptions: scaleShapeOptions(
+        mergePresetShapeOptions(shapeOptions, preset),
+        rasterScale,
+      ),
       logoAreaSize: Math.round(resolvedLogoAreaSize * rasterScale),
       logoAreaBorderRadius: Math.round(
         (logoAreaBorderRadius ?? DEFAULT_LOGO_AREA_BORDER_RADIUS) * rasterScale,
@@ -383,6 +493,7 @@ export function QRCode({
     [
       value,
       rasterSize,
+      shapeOptions,
       quietZone,
       errorCorrectionLevel,
       foregroundColor,
@@ -397,7 +508,7 @@ export function QRCode({
       mask,
       boostEcl,
       orbit,
-      shapeOptions,
+      preset,
       rasterScale,
       resolvedLogoAreaSize,
       logoAreaBorderRadius,
@@ -405,28 +516,56 @@ export function QRCode({
   );
 
   useEffect(() => {
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  }, [onError, onReady]);
+
+  useEffect(() => {
     let isMounted = true;
+    const request = ++generationId.current;
+    if (!keepPreviousImage) {
+      setUri(undefined);
+    }
 
     void toPngDataUriAsync(options).then(
       (nextUri) => {
-        if (!isMounted) {
+        if (!isMounted || request !== generationId.current) {
           return;
         }
         setGenerationError(undefined);
         setUri(nextUri);
+        onReadyRef.current?.(nextUri);
       },
       (error: unknown) => {
-        if (!isMounted) {
+        if (!isMounted || request !== generationId.current) {
           return;
         }
-        setGenerationError(toError(error));
+        const nextError = toError(error);
+        const onErrorCallback = onErrorRef.current;
+        if (onErrorCallback === undefined) {
+          setGenerationError(nextError);
+          return;
+        }
+        onErrorCallback(nextError);
       },
     );
 
     return () => {
       isMounted = false;
     };
-  }, [options]);
+  }, [keepPreviousImage, options]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toPngDataUri: () => toPngDataUri(options),
+      toPngBase64: () => toPngBase64(options),
+    }),
+    [options],
+  );
+
+  const showLogo =
+    logo !== undefined && (!hideLogoUntilReady || uri !== undefined);
 
   if (generationError !== undefined) {
     throw generationError;
@@ -438,6 +577,7 @@ export function QRCode({
       style: [styles.frame, { width: size, height: size }, style],
       testID,
     },
+    uri === undefined && placeholder,
     uri !== undefined &&
       React.createElement(Image, {
         source: { uri },
@@ -445,7 +585,7 @@ export function QRCode({
         style: [styles.image, imageStyle],
         accessibilityIgnoresInvertColors: Platform.OS !== "web",
       }),
-    logo !== undefined &&
+    showLogo &&
       React.createElement(
         View,
         {
@@ -468,7 +608,7 @@ export function QRCode({
         logo,
       ),
   );
-}
+});
 
 export const NitroQRCode = {
   toPngBase64,
@@ -477,6 +617,7 @@ export const NitroQRCode = {
   toPngDataUriAsync,
   toSvgString,
   getMatrix,
+  validateOptions,
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
 };
@@ -670,6 +811,78 @@ function normalizeShapeOptions(
   };
 }
 
+function mergePresetShapeOptions(
+  options: QRCodeShapeOptions | undefined,
+  preset: QRCodePreset | undefined,
+): QRCodeShapeOptions {
+  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...options };
+}
+
+function scanabilityWarnings(
+  options: NormalizedOptions,
+): QRCodeScanabilityWarning[] {
+  const warnings: QRCodeScanabilityWarning[] = [];
+
+  if (options.size < SCANABILITY_MINIMUM_SIZE) {
+    warnings.push({
+      code: "too-small-size",
+      message:
+        "QRCode size is below 120; tiny modules reduce scan range and increase read failures.",
+    });
+  }
+
+  if (options.quietZone < SCANABILITY_QUIET_ZONE_MINIMUM) {
+    warnings.push({
+      code: "bad-quiet-zone",
+      message:
+        "quietZone is low; using at least 2 quiet modules improves scan reliability.",
+    });
+  }
+
+  if (options.quietZone > SCANABILITY_QUIET_ZONE_MAXIMUM) {
+    warnings.push({
+      code: "bad-quiet-zone",
+      message:
+        "quietZone is high and may reduce symbol density on small symbol sizes.",
+    });
+  }
+
+  if (options.logoAreaSize > options.size * SCANABILITY_LOGO_SIZE_LIMIT) {
+    warnings.push({
+      code: "logo-too-large",
+      message:
+        "logoAreaSize is large; keep the logo under ~30% for better scan reliability.",
+    });
+  }
+
+  if (
+    options.logoAreaSize > 0 &&
+    (options.errorCorrectionLevel === "L" ||
+      options.errorCorrectionLevel === "M") &&
+    options.logoAreaSize > options.size * 0.2
+  ) {
+    warnings.push({
+      code: "low-ecl-for-logo",
+      message:
+        "errorCorrectionLevel is low for a large logo. Use Q/H to reduce decode failures.",
+    });
+  }
+
+  const contrast = contrastRatio(
+    parseHexColor(options.foregroundColor),
+    parseHexColor(options.backgroundColor),
+  );
+  if (contrast < SCANABILITY_LOW_CONTRAST) {
+    warnings.push({
+      code: "low-contrast",
+      message:
+        "foregroundColor and backgroundColor contrast is low; low-contrast codes are harder to scan.",
+    });
+  }
+
+  return warnings;
+}
+
 function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
   const resolved = value ?? DEFAULT_LAYOUT;
   if (resolved !== "matrix") {
@@ -788,6 +1001,54 @@ function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value));
 }
 
+function parseHexColor(color: string): {
+  red: number;
+  green: number;
+  blue: number;
+} {
+  const hex = color.replace(/^#/, "");
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const alpha =
+    hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) / 255 : 1;
+  return {
+    red: Math.round(red * alpha + 255 * (1 - alpha)),
+    green: Math.round(green * alpha + 255 * (1 - alpha)),
+    blue: Math.round(blue * alpha + 255 * (1 - alpha)),
+  };
+}
+
+function linearizeChannel(value: number): number {
+  const normalized = value / 255;
+  return normalized <= 0.03928
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance(color: {
+  red: number;
+  green: number;
+  blue: number;
+}): number {
+  return (
+    0.2126 * linearizeChannel(color.red) +
+    0.7152 * linearizeChannel(color.green) +
+    0.0722 * linearizeChannel(color.blue)
+  );
+}
+
+function contrastRatio(
+  first: { red: number; green: number; blue: number },
+  second: { red: number; green: number; blue: number },
+): number {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const light = Math.max(firstLuminance, secondLuminance);
+  const dark = Math.min(firstLuminance, secondLuminance);
+  return (light + 0.05) / (dark + 0.05);
+}
+
 function validateLogoDimensions(
   logoAreaSize: number,
   logoAreaBorderRadius: number,
@@ -812,13 +1073,9 @@ function validateVersionRange(minVersion: number, maxVersion: number): void {
 }
 
 function scaleShapeOptions(
-  options: QRCodeShapeOptions | undefined,
+  options: QRCodeShapeOptions,
   scale: number,
-): QRCodeShapeOptions | undefined {
-  if (options === undefined) {
-    return undefined;
-  }
-
+): QRCodeShapeOptions {
   return {
     layout: options.layout,
     shape: options.shape,

@@ -23,7 +23,6 @@ std::string HybridQRCode::generatePngBase64(
     const std::vector<std::string> &gradientColors,
     const std::vector<double> &gradientLocations, double gradientStartX,
     double gradientStartY, double gradientEndX, double gradientEndY) {
-  std::lock_guard<std::mutex> lock(mutex_);
   return generator_.generatePngBase64(
       value,
       makeOptions(size, quietZone, errorCorrectionLevel, foregroundColor,
@@ -51,7 +50,6 @@ std::string HybridQRCode::generatePngDataUri(
     const std::vector<std::string> &gradientColors,
     const std::vector<double> &gradientLocations, double gradientStartX,
     double gradientStartY, double gradientEndX, double gradientEndY) {
-  std::lock_guard<std::mutex> lock(mutex_);
   return generator_.generatePngDataUri(
       value,
       makeOptions(size, quietZone, errorCorrectionLevel, foregroundColor,
@@ -90,7 +88,6 @@ std::shared_ptr<Promise<std::string>> HybridQRCode::generatePngBase64Async(
            eyePatternCornerRadius, layout, logoAreaSize, logoAreaBorderRadius,
            gradientType, gradientColors, gradientLocations, gradientStartX,
            gradientStartY, gradientEndX, gradientEndY)]() mutable {
-        std::lock_guard<std::mutex> lock(self->mutex_);
         return self->generator_.generatePngBase64(value, options);
       });
 }
@@ -121,7 +118,6 @@ std::shared_ptr<Promise<std::string>> HybridQRCode::generatePngDataUriAsync(
            eyePatternCornerRadius, layout, logoAreaSize, logoAreaBorderRadius,
            gradientType, gradientColors, gradientLocations, gradientStartX,
            gradientStartY, gradientEndX, gradientEndY)]() mutable {
-        std::lock_guard<std::mutex> lock(self->mutex_);
         return self->generator_.generatePngDataUri(value, options);
       });
 }
@@ -134,7 +130,6 @@ std::string HybridQRCode::generateSvgString(
     const std::vector<std::string> &gradientColors,
     const std::vector<double> &gradientLocations, double gradientStartX,
     double gradientStartY, double gradientEndX, double gradientEndY) {
-  std::lock_guard<std::mutex> lock(mutex_);
   return generator_.generateSvgString(
       value,
       makeOptions(512, quietZone, errorCorrectionLevel, foregroundColor,
@@ -148,7 +143,6 @@ std::string HybridQRCode::generateSvgString(
 std::string HybridQRCode::getMatrixPackedBase64(
     const std::string &value, const std::string &errorCorrectionLevel,
     double minVersion, double maxVersion, double mask, bool boostEcl) {
-  std::lock_guard<std::mutex> lock(mutex_);
   return generator_.getMatrixPackedBase64(
       value, makeMatrixOptions(errorCorrectionLevel, minVersion, maxVersion,
                                mask, boostEcl));
@@ -158,19 +152,16 @@ double HybridQRCode::getMatrixSize(const std::string &value,
                                    const std::string &errorCorrectionLevel,
                                    double minVersion, double maxVersion,
                                    double mask, bool boostEcl) {
-  std::lock_guard<std::mutex> lock(mutex_);
   return generator_.getMatrixSize(
       value, makeMatrixOptions(errorCorrectionLevel, minVersion, maxVersion,
                                mask, boostEcl));
 }
 
 void HybridQRCode::clearCache() {
-  std::lock_guard<std::mutex> lock(mutex_);
   generator_.clearCache();
 }
 
 double HybridQRCode::getCacheSize() {
-  std::lock_guard<std::mutex> lock(mutex_);
   return static_cast<double>(generator_.getCacheSize());
 }
 

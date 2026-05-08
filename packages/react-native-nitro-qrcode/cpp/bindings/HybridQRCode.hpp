@@ -4,7 +4,6 @@
 #include "HybridQRCodeSpec.hpp"
 
 #include <NitroModules/Promise.hpp>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -104,7 +103,6 @@ public:
 
 private:
   ::NitroQRCode::QRCodeGenerator generator_;
-  std::mutex mutex_;
 
   ::NitroQRCode::GenerateOptions makeOptions(
       double size, double quietZone, const std::string &errorCorrectionLevel,

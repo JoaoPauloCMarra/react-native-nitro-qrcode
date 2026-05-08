@@ -1,6 +1,7 @@
 #include "QRCodeGenerator.hpp"
 
 #include <cassert>
+#include <future>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -66,6 +67,33 @@ void testDataUriAndCache() {
   assert(generator.getCacheSize() == 128);
   generator.clearCache();
   assert(generator.getCacheSize() == 0);
+}
+
+void testConcurrentGeneration() {
+  QRCodeGenerator generator;
+  GenerateOptions baseOptions;
+  baseOptions.size = 192;
+
+  std::vector<std::future<std::string>> futures;
+  futures.reserve(32);
+  for (int index = 0; index < 32; index++) {
+    futures.push_back(std::async(
+        std::launch::async, [&generator, baseOptions, index]() mutable {
+          if (index % 2 == 1) {
+            baseOptions.gradient.type = "linear";
+            baseOptions.gradient.colors = {parseColor("#111111"),
+                                           parseColor("#F5A623")};
+          }
+          return generator.generatePngBase64(
+              "parallel-entry-" + std::to_string(index % 12), baseOptions);
+        }));
+  }
+
+  for (auto &future : futures) {
+    assertPngHeader(future.get());
+  }
+  assert(generator.getCacheSize() > 0);
+  assert(generator.getCacheSize() <= 24);
 }
 
 void testStyledPngGeneration() {
@@ -503,6 +531,7 @@ void testValidation() {
 int main() {
   testPngGeneration();
   testDataUriAndCache();
+  testConcurrentGeneration();
   testStyledPngGeneration();
   testSvgGeneration();
   testMatrixPacking();
