@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(SOURCES
   "../cpp/bindings/HybridQRCode.cpp"
+  "../cpp/bindings/QRCodeBridgeOptions.cpp"
   "../cpp/core/QRCodeGenerator.cpp"
   "../cpp/qrcodegen/qrcodegen.cpp"
 )

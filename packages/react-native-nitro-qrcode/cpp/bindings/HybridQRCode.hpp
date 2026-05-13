@@ -126,7 +126,6 @@ private:
   makeMatrixOptions(const std::string &errorCorrectionLevel, double minVersion,
                     double maxVersion, double mask, bool boostEcl) const;
 
-  int toInt(double value, const char *name) const;
 };
 
 } // namespace margelo::nitro::NitroQRCode

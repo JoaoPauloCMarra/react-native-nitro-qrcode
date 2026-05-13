@@ -501,6 +501,33 @@ describe("native QRCode API", () => {
       toPngBase64({
         value: "x",
         gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          start: { x: 0, y: 2 },
+        },
+      }),
+    ).toThrow("gradient.start.y must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          end: { x: -1, y: 1 },
+        },
+      }),
+    ).toThrow("gradient.end.x must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          end: { x: 1, y: Number.NaN },
+        },
+      }),
+    ).toThrow("gradient.end.y must be");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        gradient: {
           colors: ["#000000", "nope"],
         },
       }),
@@ -871,6 +898,7 @@ describe("native QRCode API", () => {
         expect.objectContaining({ code: "bad-quiet-zone" }),
         expect.objectContaining({ code: "logo-too-large" }),
         expect.objectContaining({ code: "low-ecl-for-logo" }),
+        expect.objectContaining({ code: "low-contrast" }),
       ]),
     );
     expect(scanable.errors).toEqual([]);
@@ -1483,6 +1511,33 @@ describe("web QRCode API", () => {
         },
       }),
     ).toThrow("gradient.start.x must be");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          start: { x: 0, y: Number.POSITIVE_INFINITY },
+        },
+      }),
+    ).toThrow("gradient.start.y must be");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          end: { x: -1, y: 1 },
+        },
+      }),
+    ).toThrow("gradient.end.x must be");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        gradient: {
+          colors: ["#000000", "#FFFFFF"],
+          end: { x: 1, y: 2 },
+        },
+      }),
+    ).toThrow("gradient.end.y must be");
   });
 
   it("uses the square-run fast path for default web PNG output", () => {
@@ -1642,6 +1697,7 @@ describe("web QRCode API", () => {
         expect.objectContaining({ code: "bad-quiet-zone" }),
         expect.objectContaining({ code: "logo-too-large" }),
         expect.objectContaining({ code: "low-ecl-for-logo" }),
+        expect.objectContaining({ code: "low-contrast" }),
       ]),
     );
     expect(scanable.errors).toEqual([]);

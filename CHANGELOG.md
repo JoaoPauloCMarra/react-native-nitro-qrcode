@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2
+
+- Updated the Expo example to the current SDK 55 patch recommendations.
+- Shipped a package-level Watchman config to ignore Android CMake/build output.
+- Added C++ bridge option mapping tests for native boundary argument conversion.
+- Added validation coverage for low-contrast scanability and gradient coordinate errors.
+- Added package tarball auditing and example smoke scripts for release verification.
+- Added an Expo example config plugin to keep generated Android Gradle files on assignment syntax.
+
 ## 0.2.1
 
 - Added `<QRCode />` loading callbacks and placeholders:

@@ -176,7 +176,7 @@ async function main() {
   }
 
   log("Checking package contents...", "cyan");
-  must("bun", ["pm", "pack", "--dry-run"], { cwd: packageDir });
+  must("bun", ["run", "audit:package"]);
 
   if (!dryRun) {
     const answer = await ask(

@@ -14,6 +14,8 @@ fs.mkdirSync(buildDir, { recursive: true });
 
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
+  path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
+  path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
   path.join(cppDir, "core", "QRCodeGenerator.cpp"),
   path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
 ];
@@ -28,6 +30,7 @@ const compileCmd = [
   "-g",
   "-fprofile-instr-generate",
   "-fcoverage-mapping",
+  `-I${path.join(cppDir, "bindings")}`,
   `-I${path.join(cppDir, "core")}`,
   `-I${path.join(cppDir, "qrcodegen")}`,
   ...sources,

@@ -28,6 +28,7 @@
     "plugins": [
       "expo-router",
       "expo-build-properties",
+      "./plugins/with-gradle-assignment-syntax",
       "react-native-nitro-qrcode"
     ],
     "experiments": {

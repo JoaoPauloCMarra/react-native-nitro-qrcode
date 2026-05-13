@@ -13,6 +13,8 @@ using NitroQRCode::GenerateOptions;
 using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
 
+void runQRCodeBridgeOptionsTests();
+
 namespace {
 
 void assertPngHeader(const std::string &encoded) {
@@ -537,6 +539,7 @@ int main() {
   testMatrixPacking();
   testColorAndBase64Helpers();
   testValidation();
+  runQRCodeBridgeOptionsTests();
   std::cout << "QRCodeGenerator tests passed" << std::endl;
   return 0;
 }
