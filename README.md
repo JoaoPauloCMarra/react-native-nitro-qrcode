@@ -1,6 +1,6 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.2.1-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.2.2-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
 ![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
@@ -405,6 +405,8 @@ Useful repo scripts:
 - `bun run dev` starts the Expo example.
 - `bun run check` runs the full library and example verification pass.
 - `bun run example:check` runs example lint plus `expo-doctor`.
+- `bun run example:smoke` checks the launched native example app for basic rendered output.
+- `bun run audit:package` verifies the npm tarball includes required release files and excludes test/build artifacts.
 - `bun run --cwd packages/react-native-nitro-qrcode verify` runs the package-only gate.
 - `bun run publish-package:dry-run` runs the release publish path without uploading to npm.
 
@@ -418,6 +420,7 @@ Before creating a GitHub release:
 
 - Confirm `packages/react-native-nitro-qrcode/package.json` matches the release tag without the `v` prefix.
 - Run `bun run check`.
+- Run `bun run example:smoke` after native example runs.
 - Run `bun run publish-package:dry-run`.
 - Create the GitHub release from the same ref as `.github/workflows/npm-publish.yml`.
 

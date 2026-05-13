@@ -1,8 +1,5 @@
 #include "HybridQRCode.hpp"
-
-#include <cmath>
-#include <limits>
-#include <stdexcept>
+#include "QRCodeBridgeOptions.hpp"
 
 namespace margelo::nitro::NitroQRCode {
 
@@ -179,68 +176,22 @@ double HybridQRCode::getCacheSize() {
     const std::vector<std::string> &gradientColors,
     const std::vector<double> &gradientLocations, double gradientStartX,
     double gradientStartY, double gradientEndX, double gradientEndY) const {
-  ::NitroQRCode::GenerateOptions options;
-  options.size = toInt(size, "size");
-  options.quietZone = toInt(quietZone, "quietZone");
-  options.errorCorrectionLevel = errorCorrectionLevel;
-  options.foregroundColor = foregroundColor;
-  options.backgroundColor = backgroundColor;
-  options.strokeColor = strokeColor;
-  options.eyeColor = eyeColor;
-  options.eyeStrokeColor = eyeStrokeColor;
-  options.eyeballColor = eyeballColor;
-  options.foreground = ::NitroQRCode::parseColor(foregroundColor);
-  options.background = ::NitroQRCode::parseColor(backgroundColor);
-  options.stroke = ::NitroQRCode::parseColor(strokeColor);
-  options.eye = ::NitroQRCode::parseColor(eyeColor);
-  options.eyeStroke = ::NitroQRCode::parseColor(eyeStrokeColor);
-  options.eyeball = ::NitroQRCode::parseColor(eyeballColor);
-  options.minVersion = toInt(minVersion, "minVersion");
-  options.maxVersion = toInt(maxVersion, "maxVersion");
-  options.mask = toInt(mask, "mask");
-  options.boostEcl = boostEcl;
-  options.moduleShape = moduleShape;
-  options.eyePatternShape = eyePatternShape;
-  options.eyeballShape = eyeballShape;
-  options.gap = toInt(gap, "gap");
-  options.eyePatternGap = toInt(eyePatternGap, "eyePatternGap");
-  options.cornerRadius = toInt(cornerRadius, "cornerRadius");
-  options.eyePatternCornerRadius =
-      toInt(eyePatternCornerRadius, "eyePatternCornerRadius");
-  options.layout = layout;
-  options.logoAreaSize = toInt(logoAreaSize, "logoAreaSize");
-  options.logoAreaBorderRadius =
-      toInt(logoAreaBorderRadius, "logoAreaBorderRadius");
-  options.gradient.type = gradientType;
-  options.gradient.locations = gradientLocations;
-  options.gradient.startX = gradientStartX;
-  options.gradient.startY = gradientStartY;
-  options.gradient.endX = gradientEndX;
-  options.gradient.endY = gradientEndY;
-  options.gradient.colors.reserve(gradientColors.size());
-  for (const auto &color : gradientColors) {
-    options.gradient.colors.push_back(::NitroQRCode::parseColor(color));
-  }
-  return options;
+  return makeGenerateOptions(
+      size, quietZone, errorCorrectionLevel, foregroundColor, backgroundColor,
+      strokeColor, eyeColor, eyeStrokeColor, eyeballColor, minVersion,
+      maxVersion, mask, boostEcl, moduleShape, eyePatternShape, eyeballShape,
+      gap, eyePatternGap, cornerRadius, eyePatternCornerRadius, layout,
+      logoAreaSize, logoAreaBorderRadius, gradientType, gradientColors,
+      gradientLocations, gradientStartX, gradientStartY, gradientEndX,
+      gradientEndY);
 }
 
 ::NitroQRCode::GenerateOptions
 HybridQRCode::makeMatrixOptions(const std::string &errorCorrectionLevel,
                                 double minVersion, double maxVersion,
                                 double mask, bool boostEcl) const {
-  return makeOptions(512, 4, errorCorrectionLevel, "#000000", "#FFFFFF",
-                     "#000000", "#000000", "#000000", "#000000", minVersion,
-                     maxVersion, mask, boostEcl);
-}
-
-int HybridQRCode::toInt(double value, const char *name) const {
-  if (!std::isfinite(value) || std::floor(value) != value ||
-      value < static_cast<double>(std::numeric_limits<int>::min()) ||
-      value > static_cast<double>(std::numeric_limits<int>::max())) {
-    throw std::invalid_argument(std::string(name) +
-                                " must be a finite integer.");
-  }
-  return static_cast<int>(value);
+  return margelo::nitro::NitroQRCode::makeMatrixOptions(
+      errorCorrectionLevel, minVersion, maxVersion, mask, boostEcl);
 }
 
 } // namespace margelo::nitro::NitroQRCode

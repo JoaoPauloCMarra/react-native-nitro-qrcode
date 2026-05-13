@@ -6,6 +6,7 @@ node_modules/
 **/lib/
 **/dist/
 **/build/
+**/build-sanitize/
 **/.turbo/
 *.tsbuildinfo
 

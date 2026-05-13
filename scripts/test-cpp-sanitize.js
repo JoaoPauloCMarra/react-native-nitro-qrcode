@@ -17,6 +17,8 @@ fs.mkdirSync(buildDir, { recursive: true });
 
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
+  path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
+  path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
   path.join(cppDir, "core", "QRCodeGenerator.cpp"),
   path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
 ];
@@ -31,6 +33,7 @@ const compileCmd = [
   "-g",
   "-fno-omit-frame-pointer",
   "-fsanitize=address,undefined",
+  `-I${path.join(cppDir, "bindings")}`,
   `-I${path.join(cppDir, "core")}`,
   `-I${path.join(cppDir, "qrcodegen")}`,
   ...sources,
