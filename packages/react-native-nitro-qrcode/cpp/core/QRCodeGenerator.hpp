@@ -53,6 +53,7 @@ struct GenerateOptions {
   std::string eyeballShape = "square";
   int gap = 0;
   int eyePatternGap = 0;
+  std::string bodyDensity = "dense";
   int cornerRadius = -1;
   int eyePatternCornerRadius = -1;
   std::string layout = "matrix";

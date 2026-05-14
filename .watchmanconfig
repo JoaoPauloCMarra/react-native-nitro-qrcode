@@ -1,0 +1,10 @@
+{
+  "ignore_dirs": [
+    "apps/example/android/.gradle",
+    "apps/example/android/app/.cxx",
+    "apps/example/android/app/build",
+    "apps/example/android/build",
+    "apps/example/ios/Pods",
+    "node_modules"
+  ]
+}

@@ -104,6 +104,7 @@ void testStyledPngGeneration() {
   options.size = 160;
   options.moduleShape = "circle";
   options.eyePatternShape = "rounded";
+  options.bodyDensity = "balanced";
   options.gap = 2;
   options.eyePatternGap = 1;
   options.cornerRadius = 4;
@@ -129,6 +130,10 @@ void testStyledPngGeneration() {
   options.logoAreaSize = 0;
   assertPngHeader(
       generator.generatePngBase64("https://example.com/styled-3", options));
+
+  options.bodyDensity = "sparse";
+  assertPngHeader(
+      generator.generatePngBase64("https://example.com/sparse", options));
 
   options.moduleShape = "circle";
   options.eyePatternShape = "circle-border";
@@ -440,6 +445,10 @@ void testValidation() {
 
   options = GenerateOptions{};
   options.eyeballShape = "triangle";
+  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+
+  options = GenerateOptions{};
+  options.bodyDensity = "crowded";
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
 
   options = GenerateOptions{};

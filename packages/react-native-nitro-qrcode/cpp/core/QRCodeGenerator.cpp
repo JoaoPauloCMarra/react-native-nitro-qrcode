@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <utility>
+#include <zlib.h>
 
 namespace NitroQRCode {
 namespace {
@@ -27,6 +28,12 @@ enum class ModuleShape {
   Leaf,
   Clover,
   CircleBorder,
+};
+
+enum class BodyDensity {
+  Sparse,
+  Balanced,
+  Dense,
 };
 
 qrcodegen::QrCode::Ecc parseEcc(const std::string &value) {
@@ -80,6 +87,16 @@ ModuleShape parseEyePatternShape(const std::string &value) {
 
 ModuleShape parseEyeballShape(const std::string &value) {
   return parseShape(value, "eyeballShape");
+}
+
+BodyDensity parseBodyDensity(const std::string &value) {
+  if (value == "sparse")
+    return BodyDensity::Sparse;
+  if (value == "balanced")
+    return BodyDensity::Balanced;
+  if (value == "dense")
+    return BodyDensity::Dense;
+  throw std::invalid_argument("bodyDensity must be sparse, balanced, or dense.");
 }
 
 void validateLayout(const std::string &value) {
@@ -340,6 +357,7 @@ void validateOptions(const std::string &value, const GenerateOptions &options) {
   parseShape(options.moduleShape, "shape");
   parseEyePatternShape(options.eyePatternShape);
   parseEyeballShape(options.eyeballShape);
+  parseBodyDensity(options.bodyDensity);
   if (options.gap < 0 || options.gap > 256) {
     throw std::invalid_argument("gap must be between 0 and 256.");
   }
@@ -625,6 +643,17 @@ void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
     return;
   }
   fillRect(indices, imageSize, x0, y0, x1, y1, value);
+}
+
+int resolveBodyGap(const GenerateOptions &options, int width, int height) {
+  const BodyDensity density = parseBodyDensity(options.bodyDensity);
+  if (density == BodyDensity::Dense) {
+    return options.gap;
+  }
+  const int moduleSize = std::max(1, std::min(width, height));
+  const double ratio = density == BodyDensity::Sparse ? 0.22 : 0.12;
+  return std::max(options.gap,
+                  static_cast<int>(std::round(moduleSize * ratio)));
 }
 
 void drawFinderCircleBorder(std::vector<uint8_t> &indices, int imageSize,
@@ -975,14 +1004,13 @@ uint32_t crc32(const uint8_t *data, size_t size) {
   return crc ^ 0xFFFFFFFF;
 }
 
-uint32_t adler32(const std::vector<uint8_t> &bytes) {
-  uint32_t a = 1;
-  uint32_t b = 0;
-  for (uint8_t byte : bytes) {
-    a = (a + byte) % 65521;
-    b = (b + a) % 65521;
+std::string hashCachePart(const std::string &value) {
+  uint64_t hash = 14695981039346656037ULL;
+  for (unsigned char character : value) {
+    hash ^= character;
+    hash *= 1099511628211ULL;
   }
-  return (b << 16) | a;
+  return std::to_string(hash);
 }
 
 void appendChunk(std::vector<uint8_t> &png, const char *type,
@@ -994,31 +1022,14 @@ void appendChunk(std::vector<uint8_t> &png, const char *type,
   writeU32(png, crc32(png.data() + crcStart, png.size() - crcStart));
 }
 
-std::vector<uint8_t> zlibStore(const std::vector<uint8_t> &data) {
-  std::vector<uint8_t> output;
-  output.reserve(data.size() + (data.size() / 65535 + 1) * 5 + 6);
-  output.push_back(0x78);
-  output.push_back(0x01);
-
-  size_t offset = 0;
-  while (offset < data.size()) {
-    const size_t remaining = data.size() - offset;
-    const uint16_t blockSize =
-        static_cast<uint16_t>(std::min<size_t>(remaining, 65535));
-    const bool finalBlock = offset + blockSize == data.size();
-    output.push_back(finalBlock ? 0x01 : 0x00);
-    output.push_back(static_cast<uint8_t>(blockSize & 0xFF));
-    output.push_back(static_cast<uint8_t>((blockSize >> 8) & 0xFF));
-    const uint16_t nlen = static_cast<uint16_t>(~blockSize);
-    output.push_back(static_cast<uint8_t>(nlen & 0xFF));
-    output.push_back(static_cast<uint8_t>((nlen >> 8) & 0xFF));
-    output.insert(
-        output.end(), data.begin() + static_cast<std::ptrdiff_t>(offset),
-        data.begin() + static_cast<std::ptrdiff_t>(offset + blockSize));
-    offset += blockSize;
-  }
-
-  writeU32(output, adler32(data));
+std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {
+  uLongf compressedSize = compressBound(static_cast<uLong>(data.size()));
+  std::vector<uint8_t> output(static_cast<size_t>(compressedSize));
+  const int result =
+      compress2(output.data(), &compressedSize, data.data(),
+                static_cast<uLong>(data.size()), Z_BEST_SPEED);
+  if (result != Z_OK) throw std::runtime_error("PNG compression failed.");
+  output.resize(static_cast<size_t>(compressedSize));
   return output;
 }
 
@@ -1061,7 +1072,7 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
   };
   appendChunk(png, "PLTE", palette);
   appendChunk(png, "tRNS", {background.a, foreground.a});
-  appendChunk(png, "IDAT", zlibStore(raw));
+  appendChunk(png, "IDAT", zlibCompress(raw));
   appendChunk(png, "IEND", {});
   return png;
 }
@@ -1138,7 +1149,7 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
   ihdr.push_back(0);
   ihdr.push_back(0);
   appendChunk(png, "IHDR", ihdr);
-  appendChunk(png, "IDAT", zlibStore(raw));
+  appendChunk(png, "IDAT", zlibCompress(raw));
   appendChunk(png, "IEND", {});
   return png;
 }
@@ -1228,7 +1239,8 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
       const ModuleShape shape =
           eyeballModule ? eyeballShape
                         : (eyeModule ? eyePatternShape : moduleShape);
-      const int gap = eyeModule ? options.eyePatternGap : options.gap;
+      const int gap = eyeModule ? options.eyePatternGap
+                                : resolveBodyGap(options, x1 - x0, y1 - y0);
       const int radius =
           eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
       uint8_t layer = 1;
@@ -1362,7 +1374,8 @@ std::string QRCodeGenerator::cacheKey(const std::string &value,
     gradientLocations += std::to_string(location) + ";";
   }
 
-  return output + "|" + value + "|" + std::to_string(options.size) + "|" +
+  return output + "|" + hashCachePart(value) + "|" +
+         std::to_string(options.size) + "|" +
          std::to_string(options.quietZone) + "|" +
          options.errorCorrectionLevel + "|" +
          std::to_string(options.foreground.r) + "," +
@@ -1379,8 +1392,9 @@ std::string QRCodeGenerator::cacheKey(const std::string &value,
          std::to_string(options.mask) + "|" + std::to_string(options.boostEcl) +
          "|" + options.moduleShape + "|" + options.eyePatternShape + "|" +
          std::to_string(options.gap) + "|" +
-         std::to_string(options.eyePatternGap) + "|" + options.eyeballShape +
-         "|" + std::to_string(options.cornerRadius) + "|" +
+         std::to_string(options.eyePatternGap) + "|" + options.bodyDensity +
+         "|" + options.eyeballShape + "|" +
+         std::to_string(options.cornerRadius) + "|" +
          std::to_string(options.eyePatternCornerRadius) + "|" + options.layout +
          "|" + std::to_string(options.logoAreaSize) + "|" +
          std::to_string(options.logoAreaBorderRadius) + "|" +

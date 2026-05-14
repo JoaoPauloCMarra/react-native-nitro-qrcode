@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Added `shapeOptions.bodyDensity` with `"sparse"`, `"balanced"`, and `"dense"` output density controls across native and web renderers.
+- Kept `"dense"` as the default QR body density for scanability and platform parity.
+- Reduced component raster cost while preserving output quality for live example rendering.
+- Added scan-safe option normalization, stricter scanability validation coverage, and hashed cache keys so QR payload values are not stored in cache metadata.
+- Updated native bridge, generated Nitro bindings, C++ tests, benchmarks, and the Expo example for the body-density option.
+- Replaced README screenshots with a single current demo image and documented the new density controls.
+
 ## 0.2.2
 
 - Updated the Expo example to the current SDK 55 patch recommendations.

@@ -14,7 +14,8 @@ namespace margelo::nitro::NitroQRCode {
     double minVersion, double maxVersion, double mask, bool boostEcl,
     const std::string &moduleShape, const std::string &eyePatternShape,
     const std::string &eyeballShape, double gap, double eyePatternGap,
-    double cornerRadius, double eyePatternCornerRadius,
+    const std::string &bodyDensity, double cornerRadius,
+    double eyePatternCornerRadius,
     const std::string &layout, double logoAreaSize, double logoAreaBorderRadius,
     const std::string &gradientType,
     const std::vector<std::string> &gradientColors,
@@ -45,6 +46,7 @@ namespace margelo::nitro::NitroQRCode {
   options.eyeballShape = eyeballShape;
   options.gap = toBridgeInt(gap, "gap");
   options.eyePatternGap = toBridgeInt(eyePatternGap, "eyePatternGap");
+  options.bodyDensity = bodyDensity;
   options.cornerRadius = toBridgeInt(cornerRadius, "cornerRadius");
   options.eyePatternCornerRadius =
       toBridgeInt(eyePatternCornerRadius, "eyePatternCornerRadius");

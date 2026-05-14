@@ -34,4 +34,5 @@ target_link_libraries(
   NitroQRCode
   android
   log
+  z
 )

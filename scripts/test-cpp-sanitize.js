@@ -39,6 +39,7 @@ const compileCmd = [
   ...sources,
   "-o",
   outputFile,
+  "-lz",
   process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread",
 ].join(" ");
 
