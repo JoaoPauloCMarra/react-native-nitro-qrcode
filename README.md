@@ -1,18 +1,16 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.2.2-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm](https://img.shields.io/badge/npm-v0.3.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 ![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
-![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.4-black)
+![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.6-black)
 
 `react-native-nitro-qrcode` is a fast QR code generator for React Native and Expo built with Nitro and native C++.
 
 Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.
 
 <p align="center">
-  <img src="./docs/assets/screenshots/example-color.png" alt="Nitro QRCode example app Color tab" width="260" />
-  <img src="./docs/assets/screenshots/example-shapes.png" alt="Nitro QRCode example app Shapes tab" width="260" />
-  <img src="./docs/assets/screenshots/example-logo-on.png" alt="Nitro QRCode example app Logo tab with logo enabled" width="260" />
+  <img src="./docs/demo.png" alt="DEMO" width="260" />
 </p>
 
 ## Why this package
@@ -59,7 +57,7 @@ bun add react-native-nitro-qrcode react-native-nitro-modules
 
 - React `>=18.2.0 <20.0.0`.
 - React Native `>=0.75.0 <1.0.0`.
-- `react-native-nitro-modules >=0.35.4 <0.36.0`.
+- `react-native-nitro-modules >=0.35.6 <0.36.0`.
 - iOS 13+ and Android API 24+.
 - Web support requires the app's normal React Native Web setup: `react-dom >=18.2.0 <20.0.0` and `react-native-web >=0.19.0 <1.0.0`. These peers are optional so native-only apps are not forced to install them.
 
@@ -121,6 +119,7 @@ export function BrandedCode() {
     <QRCode
       value="https://example.com/checkout/123"
       size={240}
+      scanSafe
       errorCorrectionLevel="H"
       foregroundColor="#101112"
       backgroundColor="#FFFFFF"
@@ -134,6 +133,7 @@ export function BrandedCode() {
         shape: "circle",
         eyeFrameShape: "rounded",
         eyeballShape: "circle",
+        bodyDensity: "dense",
         gap: 1,
         eyePatternGap: 1,
       }}
@@ -241,6 +241,7 @@ Helpers:
 | `shapeOptions.eyeballShape`    | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
 | `shapeOptions.gap`             | `number`                                | `0`                                                |
 | `shapeOptions.eyePatternGap`   | `number`                                | `shapeOptions.gap`                                 |
+| `shapeOptions.bodyDensity`     | `"sparse"` \| `"balanced"` \| `"dense"` | `"dense"`                                          |
 | `shapeOptions.cornerRadius`    | `number`                                | automatic for rounded modules                      |
 | `shapeOptions.eyePatternCornerRadius` | `number`                         | automatic for rounded finder eyes                  |
 | `logo`                         | `ReactNode` for `<QRCode />`            | `undefined`                                        |
@@ -263,6 +264,11 @@ Helpers:
 `gradient.colors` must contain between 2 and 8 colors. When `gradient` is provided, it overrides the solid `foregroundColor` for PNG and SVG output while keeping the no-gradient path fast.
 
 `shapeOptions.eyePatternShape` is still accepted as a deprecated alias for `shapeOptions.eyeFrameShape`.
+
+`shapeOptions.bodyDensity` controls how much white space is carved around body
+modules when using rounded or circular modules. Use `"dense"` for maximum
+scanability and the default output, `"balanced"` for a lighter branded look, and
+`"sparse"` only when the QR code remains large enough to scan reliably.
 
 ### Presets
 
@@ -349,12 +355,20 @@ if (errors.length > 0) {
 }
 ```
 
+Set `scanSafe` to `true` on `QRCode` or export helpers to preserve existing
+styling while hardening the generated symbol: quiet zones below four modules are
+raised to four, and logo-backed output uses high error correction. Set
+`scanSafe: "strict"` when calling `validateOptions` to promote scanability
+warnings into validation errors.
+
 ## Performance Notes
 
 - Solid-color QR codes stay on the fastest indexed PNG path
 - Gradient renders are opt-in and use RGBA PNG encoding only when needed
 - Repeated identical renders benefit from the built-in native cache, and cache
   synchronization is scoped so uncached native renders can run concurrently
+- Native and web cache keys hash payload values instead of storing raw QR
+  payload text in cache metadata
 - The example app includes generation timing, FPS, PNG size, matrix size, and cache metrics
 - Web rendering uses the package canvas fallback and requires a browser DOM; there is no SSR support path in package code.
 - `bun run benchmark:cpp` runs the optimized native benchmark harness for matrix,

@@ -38,6 +38,19 @@ GenerateOptions indexedOptions() {
   return options;
 }
 
+GenerateOptions previewOptions() {
+  GenerateOptions options = indexedOptions();
+  options.size = 488;
+  options.gradient.type = "linear";
+  options.gradient.colors = {parseColor("#09090B"), parseColor("#1E3A8A")};
+  options.gradient.locations = {0.0, 1.0};
+  options.logoAreaSize = 66;
+  options.logoAreaBorderRadius = 14;
+  options.errorCorrectionLevel = "H";
+  options.quietZone = 4;
+  return options;
+}
+
 GenerateOptions gradientOptions() {
   GenerateOptions options = indexedOptions();
   options.gradient.type = "linear";
@@ -56,6 +69,7 @@ int main() {
   QRCodeGenerator generator;
   const GenerateOptions indexed = indexedOptions();
   const GenerateOptions gradient = gradientOptions();
+  const GenerateOptions preview = previewOptions();
 
   std::cout << "benchmark,runs,total_us,avg_us" << std::endl;
 
@@ -88,6 +102,13 @@ int main() {
     return generator
         .generatePngBase64(
             "https://example.com/gradient/" + std::to_string(index), gradient)
+        .size();
+  });
+
+  runBenchmark("preview-styled-png-cold", RenderRuns, [&](int index) {
+    return generator
+        .generatePngBase64(
+            "https://example.com/preview/" + std::to_string(index), preview)
         .size();
   });
 

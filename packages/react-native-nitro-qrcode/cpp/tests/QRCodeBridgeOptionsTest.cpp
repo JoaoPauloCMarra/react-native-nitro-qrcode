@@ -21,9 +21,9 @@ void assertThrows(const std::function<void()> &callback) {
 void testBridgeOptionMapping() {
   const auto options = margelo::nitro::NitroQRCode::makeGenerateOptions(
       256, 3, "H", "#111111", "#EEEEEE", "#222222", "#333333", "#444444",
-      "#555555", 2, 8, 4, false, "rounded", "circle", "square", 2, 1, 5, 6,
-      "matrix", 48, 12, "linear", {"#000000", "#FFFFFF"}, {0.25, 1.0}, 0.1,
-      0.2, 0.9, 0.8);
+      "#555555", 2, 8, 4, false, "rounded", "circle", "square", 2, 1,
+      "balanced", 5, 6, "matrix", 48, 12, "linear", {"#000000", "#FFFFFF"},
+      {0.25, 1.0}, 0.1, 0.2, 0.9, 0.8);
 
   assert(options.size == 256);
   assert(options.quietZone == 3);
@@ -43,6 +43,7 @@ void testBridgeOptionMapping() {
   assert(options.eyeballShape == "square");
   assert(options.gap == 2);
   assert(options.eyePatternGap == 1);
+  assert(options.bodyDensity == "balanced");
   assert(options.cornerRadius == 5);
   assert(options.eyePatternCornerRadius == 6);
   assert(options.layout == "matrix");
@@ -72,6 +73,7 @@ void testBridgeMatrixDefaults() {
   assert(options.moduleShape == "square");
   assert(options.eyePatternShape == "square");
   assert(options.eyeballShape == "square");
+  assert(options.bodyDensity == "dense");
   assert(options.gradient.type == "none");
   assert(options.gradient.colors.empty());
 }

@@ -18,6 +18,9 @@ target_include_directories(QRCodeCore PUBLIC
   "${CPP_ROOT}/qrcodegen"
 )
 
+find_package(ZLIB REQUIRED)
+target_link_libraries(QRCodeCore PUBLIC ZLIB::ZLIB)
+
 add_executable(QRCodeGeneratorTest
   core/QRCodeGeneratorTest.cpp
   tests/QRCodeBridgeOptionsTest.cpp

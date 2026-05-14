@@ -16,6 +16,7 @@ import {
   NitroQRCode,
   QRCode,
   type QRCodeRef,
+  type QRCodeBodyDensity,
   type QRCodeBodyShape,
   type QRCodeEyeBallShape,
   type QRCodeEyeFrameShape,
@@ -26,10 +27,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
-const METRIC_RASTER_SIZE = Math.max(Math.ceil(PREVIEW_SIZE * 3), 96);
+const METRIC_RASTER_SIZE = PREVIEW_SIZE * 2;
 const APP_ICON = require("../assets/icon.png");
+const PAYLOAD_INITIAL_SELECTION = { start: 0, end: 0 };
 const CONFIG_TABS = ["color", "shapes", "logo"] as const;
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
+const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
 const BODY_SHAPES = ["square", "circle"] as const;
 const EYE_FRAME_SHAPES = [
   "square",
@@ -111,6 +114,7 @@ const DEFAULT_SHAPE_OPTIONS: QRCodeShapeOptions = {
   shape: "square",
   eyeFrameShape: "square",
   eyeballShape: "square",
+  bodyDensity: "dense",
   gap: 0,
   eyePatternGap: 0,
 };
@@ -127,6 +131,7 @@ export default function DemoScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isWideLayout = windowWidth >= 900;
   const [value, setValue] = useState(INITIAL_URL);
+  const [payloadTouched, setPayloadTouched] = useState(false);
   const [foregroundConfig, setForegroundConfig] = useState<ForegroundConfig>(
     DEFAULT_FOREGROUND_CONFIG,
   );
@@ -150,6 +155,7 @@ export default function DemoScreen() {
     useState<QRCodeEyeFrameShape>("square");
   const [eyeballShape, setEyeballShape] =
     useState<QRCodeEyeBallShape>("square");
+  const [bodyDensity, setBodyDensity] = useState<QRCodeBodyDensity>("dense");
   const [showLogo, setShowLogo] = useState(false);
   const [logoPadding, setLogoPadding] = useState<LogoPaddingPreset>("medium");
   const [fps, setFps] = useState(60);
@@ -201,8 +207,9 @@ export default function DemoScreen() {
         bodyShape,
         eyeFrameShape,
         eyeballShape,
+        bodyDensity,
       }),
-    [bodyShape, eyeFrameShape, eyeballShape],
+    [bodyDensity, bodyShape, eyeFrameShape, eyeballShape],
   );
   const foregroundColor = resolveForegroundColor(foregroundConfig);
   const backgroundColor = resolveBackgroundColor(backgroundConfig);
@@ -226,6 +233,7 @@ export default function DemoScreen() {
       void NitroQRCode.toPngBase64Async({
         value,
         size: METRIC_RASTER_SIZE,
+        scanSafe: true,
         errorCorrectionLevel: showLogo ? "H" : "M",
         foregroundColor,
         backgroundColor,
@@ -283,7 +291,6 @@ export default function DemoScreen() {
     gradient,
     logoAreaBorderRadius,
     logoAreaSize,
-    logoPadding,
     shapeOptions,
     showLogo,
     strokeColor,
@@ -346,6 +353,7 @@ export default function DemoScreen() {
                 onError={(error) => {
                   setQrError(error.message);
                 }}
+                scanSafe
                 errorCorrectionLevel={showLogo ? "H" : "M"}
                 foregroundColor={foregroundColor}
                 backgroundColor={backgroundColor}
@@ -393,9 +401,13 @@ export default function DemoScreen() {
             <TextInput
               value={value}
               onChangeText={setValue}
+              onFocus={() => {
+                setPayloadTouched(true);
+              }}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType={Platform.OS === "web" ? "default" : "url"}
+              selection={payloadTouched ? undefined : PAYLOAD_INITIAL_SELECTION}
               style={styles.input}
               selectionColor="#26A269"
             />
@@ -459,9 +471,11 @@ export default function DemoScreen() {
                 bodyShape={bodyShape}
                 eyeFrameShape={eyeFrameShape}
                 eyeballShape={eyeballShape}
+                bodyDensity={bodyDensity}
                 onBodyShapeChange={setBodyShape}
                 onEyeFrameShapeChange={setEyeFrameShape}
                 onEyeballShapeChange={setEyeballShape}
+                onBodyDensityChange={setBodyDensity}
               />
             ) : null}
             {activeConfigTab === "logo" ? (
@@ -699,19 +713,32 @@ function ShapeConfigPanel({
   bodyShape,
   eyeFrameShape,
   eyeballShape,
+  bodyDensity,
   onBodyShapeChange,
   onEyeFrameShapeChange,
   onEyeballShapeChange,
+  onBodyDensityChange,
 }: {
   bodyShape: QRCodeBodyShape;
   eyeFrameShape: QRCodeEyeFrameShape;
   eyeballShape: QRCodeEyeBallShape;
+  bodyDensity: QRCodeBodyDensity;
   onBodyShapeChange: (value: QRCodeBodyShape) => void;
   onEyeFrameShapeChange: (value: QRCodeEyeFrameShape) => void;
   onEyeballShapeChange: (value: QRCodeEyeBallShape) => void;
+  onBodyDensityChange: (value: QRCodeBodyDensity) => void;
 }) {
   return (
     <View style={styles.builderPanel}>
+      <ControlGroup label="Body density">
+        <SegmentedControl
+          value={bodyDensity}
+          values={BODY_DENSITIES}
+          onChange={onBodyDensityChange}
+          getLabel={getDensityLabel}
+        />
+      </ControlGroup>
+
       <ControlGroup label="Body type">
         <ShapeGrid
           value={bodyShape}
@@ -1066,19 +1093,32 @@ function getShapeLabel(value: string): string {
     .join(" ");
 }
 
+function getDensityLabel(value: QRCodeBodyDensity): string {
+  if (value === "sparse") {
+    return "Airy";
+  }
+  if (value === "balanced") {
+    return "Balanced";
+  }
+  return "Dense";
+}
+
 function resolveShapeOptions({
   bodyShape,
   eyeFrameShape,
   eyeballShape,
+  bodyDensity,
 }: {
   bodyShape: QRCodeBodyShape;
   eyeFrameShape: QRCodeEyeFrameShape;
   eyeballShape: QRCodeEyeBallShape;
+  bodyDensity: QRCodeBodyDensity;
 }): QRCodeShapeOptions {
   return {
     shape: bodyShape,
     eyeFrameShape,
     eyeballShape,
+    bodyDensity,
     gap: 0,
     eyePatternGap: 0,
     cornerRadius: DEFAULT_SHAPE_OPTIONS.cornerRadius,
@@ -1145,6 +1185,7 @@ function scaleShapeOptions(
     eyeFrameShape: options.eyeFrameShape,
     eyeballShape: options.eyeballShape,
     eyePatternShape: options.eyePatternShape,
+    bodyDensity: options.bodyDensity,
     gap: Math.round((options.gap ?? 0) * scale),
     eyePatternGap: Math.round((options.eyePatternGap ?? 0) * scale),
     cornerRadius:

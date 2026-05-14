@@ -21,6 +21,9 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.blockList = exclusionList([
   /node_modules\/.*\/android\/\.cxx\/.*/,
+  /apps\/example\/android\/app\/\.cxx\/.*/,
+  /apps\/example\/android\/\.gradle\/.*/,
+  /apps\/example\/android\/build\/.*/,
 ]);
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {

@@ -33,6 +33,7 @@ Pod::Spec.new do |s|
   }
 
   s.dependency "React-Core"
+  s.library = "z"
   
   load 'nitrogen/generated/ios/NitroQRCode+autolinking.rb'
   add_nitrogen_files(s)

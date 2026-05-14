@@ -34,6 +34,7 @@ export type QRCodeShape = QRCodeBodyShape;
 export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
 export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
 export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
+export type QRCodeBodyDensity = "sparse" | "balanced" | "dense";
 export type QRCodeLayout = "matrix";
 
 export type QRCodeShapeOptions = {
@@ -45,6 +46,7 @@ export type QRCodeShapeOptions = {
   eyePatternShape?: QRCodeEyePatternShape;
   gap?: number;
   eyePatternGap?: number;
+  bodyDensity?: QRCodeBodyDensity;
   cornerRadius?: number;
   eyePatternCornerRadius?: number;
 };
@@ -71,6 +73,7 @@ export type QRCodeOptions = {
   size?: number;
   quietZone?: number;
   errorCorrectionLevel?: ErrorCorrectionLevel;
+  scanSafe?: boolean | "strict";
   foregroundColor?: string;
   backgroundColor?: string;
   strokeColor?: string;
@@ -133,6 +136,18 @@ export type QRCodeRef = {
   toPngBase64: () => string;
 };
 
+export type NitroQRCodeApi = Readonly<{
+  toPngBase64: (options: QRCodeOptions) => string;
+  toPngDataUri: (options: QRCodeOptions) => string;
+  toPngBase64Async: (options: QRCodeOptions) => Promise<string>;
+  toPngDataUriAsync: (options: QRCodeOptions) => Promise<string>;
+  toSvgString: (options: QRCodeOptions) => string;
+  getMatrix: (options: QRCodeOptions) => QRCodeMatrix;
+  validateOptions: (options: QRCodeOptions) => QRCodeValidationResult;
+  clearCache: () => void;
+  getCacheSize: () => number;
+}>;
+
 const DEFAULT_SIZE = 512;
 const DEFAULT_QUIET_ZONE = 4;
 const DEFAULT_ECL: ErrorCorrectionLevel = "M";
@@ -149,10 +164,11 @@ const DEFAULT_BOOST_ECL = true;
 const DEFAULT_SHAPE: QRCodeBodyShape = "square";
 const DEFAULT_EYE_FRAME_SHAPE: QRCodeEyeFrameShape = "square";
 const DEFAULT_EYEBALL_SHAPE: QRCodeEyeBallShape = "square";
+const DEFAULT_BODY_DENSITY: QRCodeBodyDensity = "dense";
 const DEFAULT_LAYOUT: QRCodeLayout = "matrix";
 const DEFAULT_LOGO_AREA_SIZE = 0;
 const DEFAULT_LOGO_AREA_BORDER_RADIUS = 0;
-const COMPONENT_RASTER_MULTIPLIER = 3;
+const COMPONENT_RASTER_MULTIPLIER = 2;
 const MIN_COMPONENT_RASTER_SIZE = 96;
 const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
 const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
@@ -162,6 +178,7 @@ const DEFAULT_KEEP_PREVIOUS_IMAGE = true;
 const DEFAULT_HIDE_LOGO_UNTIL_READY = true;
 const SCANABILITY_MINIMUM_SIZE = 120;
 const SCANABILITY_QUIET_ZONE_MINIMUM = 2;
+const SCAN_SAFE_QUIET_ZONE_MINIMUM = 4;
 const SCANABILITY_QUIET_ZONE_MAXIMUM = 12;
 const SCANABILITY_LOGO_SIZE_LIMIT = 0.3;
 const SCANABILITY_LOW_CONTRAST = 2.5;
@@ -223,6 +240,7 @@ export function toPngBase64(options: QRCodeOptions): string {
     normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.bodyDensity,
     normalized.shapeOptions.cornerRadius,
     normalized.shapeOptions.eyePatternCornerRadius,
     normalized.shapeOptions.layout,
@@ -260,6 +278,7 @@ export function toPngDataUri(options: QRCodeOptions): string {
     normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.bodyDensity,
     normalized.shapeOptions.cornerRadius,
     normalized.shapeOptions.eyePatternCornerRadius,
     normalized.shapeOptions.layout,
@@ -275,7 +294,9 @@ export function toPngDataUri(options: QRCodeOptions): string {
   );
 }
 
-export function toPngBase64Async(options: QRCodeOptions): Promise<string> {
+export async function toPngBase64Async(
+  options: QRCodeOptions,
+): Promise<string> {
   const normalized = normalizeOptions(options);
   return NativeQRCode.generatePngBase64Async(
     normalized.value,
@@ -297,6 +318,7 @@ export function toPngBase64Async(options: QRCodeOptions): Promise<string> {
     normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.bodyDensity,
     normalized.shapeOptions.cornerRadius,
     normalized.shapeOptions.eyePatternCornerRadius,
     normalized.shapeOptions.layout,
@@ -312,7 +334,9 @@ export function toPngBase64Async(options: QRCodeOptions): Promise<string> {
   );
 }
 
-export function toPngDataUriAsync(options: QRCodeOptions): Promise<string> {
+export async function toPngDataUriAsync(
+  options: QRCodeOptions,
+): Promise<string> {
   const normalized = normalizeOptions(options);
   return NativeQRCode.generatePngDataUriAsync(
     normalized.value,
@@ -334,6 +358,7 @@ export function toPngDataUriAsync(options: QRCodeOptions): Promise<string> {
     normalized.shapeOptions.eyeballShape,
     normalized.shapeOptions.gap,
     normalized.shapeOptions.eyePatternGap,
+    normalized.shapeOptions.bodyDensity,
     normalized.shapeOptions.cornerRadius,
     normalized.shapeOptions.eyePatternCornerRadius,
     normalized.shapeOptions.layout,
@@ -405,7 +430,17 @@ export function validateOptions(
 ): QRCodeValidationResult {
   try {
     const normalized = normalizeOptions(options);
-    return { warnings: scanabilityWarnings(normalized), errors: [] };
+    const warnings = scanabilityWarnings(normalized);
+    return {
+      warnings,
+      errors:
+        normalized.scanSafe === "strict"
+          ? warnings.map((warning) => ({
+              code: warning.code,
+              message: warning.message,
+            }))
+          : [],
+    };
   } catch (error: unknown) {
     return {
       warnings: [],
@@ -420,6 +455,7 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
     size = 180,
     quietZone,
     errorCorrectionLevel,
+    scanSafe,
     foregroundColor,
     backgroundColor,
     strokeColor,
@@ -469,6 +505,7 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       size: rasterSize,
       quietZone,
       errorCorrectionLevel,
+      scanSafe,
       foregroundColor,
       backgroundColor,
       strokeColor,
@@ -496,6 +533,7 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       shapeOptions,
       quietZone,
       errorCorrectionLevel,
+      scanSafe,
       foregroundColor,
       backgroundColor,
       strokeColor,
@@ -610,7 +648,7 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
   );
 });
 
-export const NitroQRCode = {
+export const NitroQRCode: NitroQRCodeApi = {
   toPngBase64,
   toPngDataUri,
   toPngBase64Async,
@@ -625,10 +663,11 @@ export const NitroQRCode = {
 type NormalizedOptions = Required<
   Omit<
     QRCodeOptions,
-    "errorCorrectionLevel" | "shapeOptions" | "gradient" | "orbit"
+    "errorCorrectionLevel" | "scanSafe" | "shapeOptions" | "gradient" | "orbit"
   >
 > & {
   errorCorrectionLevel: "L" | "M" | "Q" | "H";
+  scanSafe: false | "standard" | "strict";
   shapeOptions: Required<QRCodeShapeOptions>;
   gradient: NormalizedGradient;
 };
@@ -680,19 +719,30 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
   );
   validateVersionRange(minVersion, maxVersion);
 
+  const scanSafe = normalizeScanSafe(options.scanSafe);
+  const requestedQuietZone = sanitizeInteger(
+    options.quietZone,
+    DEFAULT_QUIET_ZONE,
+    "quietZone",
+    0,
+    32,
+  );
+  const requestedEcl = normalizeEcl(
+    options.errorCorrectionLevel ?? DEFAULT_ECL,
+  );
+  const quietZone =
+    scanSafe === false
+      ? requestedQuietZone
+      : Math.max(requestedQuietZone, SCAN_SAFE_QUIET_ZONE_MINIMUM);
+  const errorCorrectionLevel =
+    scanSafe !== false && logoAreaSize > 0 ? "H" : requestedEcl;
+
   return {
     value: options.value,
     size,
-    quietZone: sanitizeInteger(
-      options.quietZone,
-      DEFAULT_QUIET_ZONE,
-      "quietZone",
-      0,
-      32,
-    ),
-    errorCorrectionLevel: normalizeEcl(
-      options.errorCorrectionLevel ?? DEFAULT_ECL,
-    ),
+    quietZone,
+    errorCorrectionLevel,
+    scanSafe,
     foregroundColor: sanitizeColor(
       options.foregroundColor ?? DEFAULT_FOREGROUND,
       "foregroundColor",
@@ -723,6 +773,21 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     logoAreaSize,
     logoAreaBorderRadius,
   };
+}
+
+function normalizeScanSafe(
+  value: QRCodeOptions["scanSafe"] | undefined,
+): false | "standard" | "strict" {
+  if (value === undefined || value === false) {
+    return false;
+  }
+  if (value === true) {
+    return "standard";
+  }
+  if (value === "strict") {
+    return "strict";
+  }
+  throw new Error("scanSafe must be true, false, or strict.");
 }
 
 function normalizeGradient(
@@ -796,6 +861,7 @@ function normalizeShapeOptions(
       0,
       256,
     ),
+    bodyDensity: sanitizeBodyDensity(options?.bodyDensity),
     cornerRadius: sanitizeOptionalInteger(
       options?.cornerRadius,
       "cornerRadius",
@@ -930,6 +996,20 @@ function sanitizeEyeballShape(
     resolved !== "rounded"
   ) {
     throw new Error("eyeballShape must be square, circle, or rounded.");
+  }
+  return resolved;
+}
+
+function sanitizeBodyDensity(
+  value: QRCodeBodyDensity | undefined,
+): QRCodeBodyDensity {
+  const resolved = value ?? DEFAULT_BODY_DENSITY;
+  if (
+    resolved !== "sparse" &&
+    resolved !== "balanced" &&
+    resolved !== "dense"
+  ) {
+    throw new Error("bodyDensity must be sparse, balanced, or dense.");
   }
   return resolved;
 }
@@ -1082,6 +1162,7 @@ function scaleShapeOptions(
     eyeFrameShape: options.eyeFrameShape,
     eyeballShape: options.eyeballShape,
     eyePatternShape: options.eyePatternShape,
+    bodyDensity: options.bodyDensity,
     gap:
       options.gap === undefined ? undefined : Math.round(options.gap * scale),
     eyePatternGap:

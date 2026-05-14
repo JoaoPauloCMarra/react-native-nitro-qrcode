@@ -106,6 +106,7 @@ describe("native QRCode API", () => {
       "square",
       0,
       0,
+      "dense",
       -1,
       -1,
       "matrix",
@@ -141,6 +142,7 @@ describe("native QRCode API", () => {
           eyeballShape: "rounded",
           gap: 2,
           eyePatternGap: 1,
+          bodyDensity: "balanced",
           cornerRadius: 3,
           eyePatternCornerRadius: 4,
         },
@@ -168,6 +170,7 @@ describe("native QRCode API", () => {
       "rounded",
       2,
       1,
+      "balanced",
       3,
       4,
       "matrix",
@@ -216,6 +219,7 @@ describe("native QRCode API", () => {
       "square",
       0,
       0,
+      "dense",
       -1,
       -1,
       "matrix",
@@ -262,6 +266,7 @@ describe("native QRCode API", () => {
       "square",
       0,
       0,
+      "dense",
       -1,
       -1,
       "matrix",
@@ -286,6 +291,15 @@ describe("native QRCode API", () => {
     );
     expect(mockHybridObject.generatePngBase64Async).toHaveBeenCalled();
     expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalled();
+  });
+
+  it("rejects async PNG helpers when native options are invalid", async () => {
+    await expect(toPngBase64Async({ value: "" })).rejects.toThrow(
+      "must not be empty",
+    );
+    await expect(toPngDataUriAsync({ value: "" })).rejects.toThrow(
+      "must not be empty",
+    );
   });
 
   it("uses radial gradient defaults on the native bridge", () => {
@@ -319,6 +333,7 @@ describe("native QRCode API", () => {
       "square",
       0,
       0,
+      "dense",
       -1,
       -1,
       "matrix",
@@ -337,7 +352,22 @@ describe("native QRCode API", () => {
   it("keeps the orbit prop on the scan-safe native matrix layout", () => {
     toPngBase64({ value: "orbit", orbit: true });
     const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
-    expect(calls.at(-1)?.[21]).toBe("matrix");
+    expect(calls.at(-1)?.[22]).toBe("matrix");
+  });
+
+  it("hardens native output when scanSafe is enabled", () => {
+    toPngBase64({
+      value: "scan-safe",
+      quietZone: 0,
+      errorCorrectionLevel: "L",
+      logoAreaSize: 32,
+      scanSafe: true,
+    });
+
+    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
+    const lastCall = calls.at(-1);
+    expect(lastCall?.[2]).toBe(4);
+    expect(lastCall?.[3]).toBe("H");
   });
 
   it("generates SVG and matrix output", () => {
@@ -425,6 +455,12 @@ describe("native QRCode API", () => {
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
     ).toThrow("eyeballShape must be square, circle, or rounded");
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { bodyDensity: "crowded" as "dense" },
+      }),
+    ).toThrow("bodyDensity must be sparse, balanced, or dense");
     expect(() => toPngBase64({ value: "x", logoAreaSize: 4097 })).toThrow(
       "logoAreaSize must be",
     );
@@ -908,6 +944,12 @@ describe("native QRCode API", () => {
     expect(invalid.errors[0]?.code).toBe("invalid");
     expect(invalid.errors[0]?.message).toContain("must not be empty");
 
+    const invalidScanSafe = NitroQRCode.validateOptions({
+      value: "https://example.com",
+      scanSafe: "always" as unknown as true,
+    });
+    expect(invalidScanSafe.errors[0]?.message).toContain("scanSafe must be");
+
     expect(
       NitroQRCode.validateOptions({
         value: "https://example.com",
@@ -920,6 +962,36 @@ describe("native QRCode API", () => {
         expect.objectContaining({
           code: "bad-quiet-zone",
         }),
+      ]),
+    );
+
+    const strict = NitroQRCode.validateOptions({
+      value: "https://example.com",
+      size: 96,
+      foregroundColor: "#AABBCC",
+      backgroundColor: "#CCDDEE",
+      scanSafe: "strict",
+    });
+    expect(strict.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "too-small-size" }),
+        expect.objectContaining({ code: "low-contrast" }),
+      ]),
+    );
+
+    expect(
+      NitroQRCode.validateOptions({
+        value: "https://example.com",
+        size: 200,
+        quietZone: 0,
+        errorCorrectionLevel: "L",
+        logoAreaSize: 50,
+        scanSafe: true,
+      }).warnings,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "bad-quiet-zone" }),
+        expect.objectContaining({ code: "low-ecl-for-logo" }),
       ]),
     );
   });
@@ -1211,6 +1283,7 @@ describe("web QRCode API", () => {
         eyeballShape: "rounded",
         gap: 1,
         eyePatternGap: 0,
+        bodyDensity: "balanced",
         cornerRadius: 2,
         eyePatternCornerRadius: 3,
       },
@@ -1250,6 +1323,7 @@ describe("web QRCode API", () => {
         size: 96,
         shapeOptions: {
           shape: "rounded",
+          bodyDensity: "sparse",
         },
       }),
     ).toBe("web-png");
@@ -1322,6 +1396,11 @@ describe("web QRCode API", () => {
     expect(Web.getQRCodeCacheSize()).toBe(0);
     for (let index = 0; index < 140; index++) {
       Web.toSvgString({ value: `cache-entry-${index}` });
+    }
+    expect(Web.getQRCodeCacheSize()).toBe(128);
+    Web.clearQRCodeCache();
+    for (let index = 0; index < 140; index++) {
+      Web.toPngDataUri({ value: `png-cache-entry-${index}` });
     }
     expect(Web.getQRCodeCacheSize()).toBe(128);
     Web.clearQRCodeCache();
@@ -1424,6 +1503,12 @@ describe("web QRCode API", () => {
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
     ).toThrow("eyeballShape must be square, circle, or rounded");
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { bodyDensity: "crowded" as "dense" },
+      }),
+    ).toThrow("bodyDensity must be sparse, balanced, or dense");
     expect(() =>
       Web.toSvgString({ value: "x", shapeOptions: { eyePatternGap: 257 } }),
     ).toThrow("eyePatternGap must be");
@@ -1707,6 +1792,12 @@ describe("web QRCode API", () => {
     expect(invalid.errors[0]?.code).toBe("invalid");
     expect(invalid.errors[0]?.message).toContain("must not be empty");
 
+    const invalidScanSafe = Web.NitroQRCode.validateOptions({
+      value: "https://example.com",
+      scanSafe: "always" as unknown as true,
+    });
+    expect(invalidScanSafe.errors[0]?.message).toContain("scanSafe must be");
+
     expect(
       Web.NitroQRCode.validateOptions({
         value: "https://example.com",
@@ -1715,6 +1806,36 @@ describe("web QRCode API", () => {
     ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "bad-quiet-zone" }),
+      ]),
+    );
+
+    const strict = Web.NitroQRCode.validateOptions({
+      value: "https://example.com",
+      size: 96,
+      foregroundColor: "#AABBCC",
+      backgroundColor: "#CCDDEE",
+      scanSafe: "strict",
+    });
+    expect(strict.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "too-small-size" }),
+        expect.objectContaining({ code: "low-contrast" }),
+      ]),
+    );
+
+    expect(
+      Web.NitroQRCode.validateOptions({
+        value: "https://example.com",
+        size: 200,
+        quietZone: 0,
+        errorCorrectionLevel: "L",
+        logoAreaSize: 50,
+        scanSafe: true,
+      }).warnings,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "bad-quiet-zone" }),
+        expect.objectContaining({ code: "low-ecl-for-logo" }),
       ]),
     );
   });
