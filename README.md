@@ -10,7 +10,7 @@
 Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.
 
 <p align="center">
-  <img src="./docs/demo.png" alt="DEMO" width="260" />
+  <img src="./docs/demo.png" alt="DEMO" width="500" />
 </p>
 
 ## Why this package
