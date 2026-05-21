@@ -1,7 +1,8 @@
-const config = require("eslint-config-expo-magic");
+const expoConfig = require("eslint-config-expo/flat");
+const { defineConfig } = require("eslint/config");
 
-module.exports = [
-  ...(Array.isArray(config) ? config : [config]),
+module.exports = defineConfig([
+  ...expoConfig,
   {
     ignores: [
       "**/node_modules/**",
@@ -25,6 +26,8 @@ module.exports = [
   {
     files: ["packages/react-native-nitro-qrcode/src/__tests__/**/*.{ts,tsx}"],
     rules: {
+      "import/first": "off",
+      "import/order": "off",
       "import-x/first": "off",
       "import-x/order": "off",
     },
@@ -46,4 +49,4 @@ module.exports = [
       "no-console": "off",
     },
   },
-];
+]);

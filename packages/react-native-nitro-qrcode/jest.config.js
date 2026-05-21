@@ -1,5 +1,5 @@
 module.exports = {
-  preset: "react-native",
+  preset: "@react-native/jest-preset",
   testEnvironment: "node",
   moduleFileExtensions: ["ts", "tsx", "js", "jsx"],
   transform: {

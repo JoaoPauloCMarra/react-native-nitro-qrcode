@@ -58,10 +58,65 @@ export type QRCodeGradientPoint = {
   y: number;
 };
 
+export type QRCodeColor = `#${string}`;
+export type QRCodeBackgroundColor = QRCodeColor | "transparent";
+export type QRCodeMaskPattern = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type QRCodeVersion =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20
+  | 21
+  | 22
+  | 23
+  | 24
+  | 25
+  | 26
+  | 27
+  | 28
+  | 29
+  | 30
+  | 31
+  | 32
+  | 33
+  | 34
+  | 35
+  | 36
+  | 37
+  | 38
+  | 39
+  | 40;
+type Tuple2To8<T> =
+  | readonly [T, T]
+  | readonly [T, T, T]
+  | readonly [T, T, T, T]
+  | readonly [T, T, T, T, T]
+  | readonly [T, T, T, T, T, T]
+  | readonly [T, T, T, T, T, T, T]
+  | readonly [T, T, T, T, T, T, T, T];
+export type QRCodeGradientColors = Tuple2To8<QRCodeColor>;
+export type QRCodeGradientLocations = Tuple2To8<number>;
+
 export type QRCodeGradient = {
   type?: QRCodeGradientType;
-  colors: readonly [string, string, ...string[]];
-  locations?: readonly number[];
+  colors: QRCodeGradientColors;
+  locations?: QRCodeGradientLocations;
   start?: QRCodeGradientPoint;
   end?: QRCodeGradientPoint;
 };
@@ -74,16 +129,16 @@ export type QRCodeOptions = {
   quietZone?: number;
   errorCorrectionLevel?: ErrorCorrectionLevel;
   scanSafe?: boolean | "strict";
-  foregroundColor?: string;
-  backgroundColor?: string;
-  strokeColor?: string;
-  eyeColor?: string;
-  eyeStrokeColor?: string;
-  eyeballColor?: string;
+  foregroundColor?: QRCodeColor;
+  backgroundColor?: QRCodeBackgroundColor;
+  strokeColor?: QRCodeColor;
+  eyeColor?: QRCodeColor;
+  eyeStrokeColor?: QRCodeColor;
+  eyeballColor?: QRCodeColor;
   gradient?: QRCodeGradient;
-  minVersion?: number;
-  maxVersion?: number;
-  mask?: number;
+  minVersion?: QRCodeVersion;
+  maxVersion?: QRCodeVersion;
+  mask?: QRCodeMaskPattern;
   boostEcl?: boolean;
   orbit?: boolean;
   shapeOptions?: QRCodeShapeOptions;
@@ -627,7 +682,6 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       React.createElement(
         View,
         {
-          pointerEvents: "none",
           style: [
             styles.logo,
             {
@@ -703,19 +757,15 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     2048,
   );
   validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
-  const minVersion = sanitizeInteger(
+  const minVersion = sanitizeVersion(
     options.minVersion,
     DEFAULT_MIN_VERSION,
     "minVersion",
-    1,
-    40,
   );
-  const maxVersion = sanitizeInteger(
+  const maxVersion = sanitizeVersion(
     options.maxVersion,
     DEFAULT_MAX_VERSION,
     "maxVersion",
-    1,
-    40,
   );
   validateVersionRange(minVersion, maxVersion);
 
@@ -747,7 +797,7 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
       options.foregroundColor ?? DEFAULT_FOREGROUND,
       "foregroundColor",
     ),
-    backgroundColor: sanitizeColor(
+    backgroundColor: sanitizeBackgroundColor(
       options.backgroundColor ?? DEFAULT_BACKGROUND,
       "backgroundColor",
     ),
@@ -767,7 +817,7 @@ function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
     gradient: normalizeGradient(options.gradient),
     minVersion,
     maxVersion,
-    mask: sanitizeInteger(options.mask, DEFAULT_MASK, "mask", -1, 7),
+    mask: sanitizeMask(options.mask, DEFAULT_MASK),
     boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
     shapeOptions: normalizeShapeOptions(options.shapeOptions, options.orbit),
     logoAreaSize,
@@ -934,16 +984,18 @@ function scanabilityWarnings(
     });
   }
 
-  const contrast = contrastRatio(
-    parseHexColor(options.foregroundColor),
-    parseHexColor(options.backgroundColor),
-  );
-  if (contrast < SCANABILITY_LOW_CONTRAST) {
-    warnings.push({
-      code: "low-contrast",
-      message:
-        "foregroundColor and backgroundColor contrast is low; low-contrast codes are harder to scan.",
-    });
+  if (options.backgroundColor !== "transparent") {
+    const contrast = contrastRatio(
+      parseHexColor(options.foregroundColor),
+      parseHexColor(options.backgroundColor),
+    );
+    if (contrast < SCANABILITY_LOW_CONTRAST) {
+      warnings.push({
+        code: "low-contrast",
+        message:
+          "foregroundColor and backgroundColor contrast is low; low-contrast codes are harder to scan.",
+      });
+    }
   }
 
   return warnings;
@@ -1070,11 +1122,34 @@ function sanitizeUnitNumber(value: number, name: string): number {
   return value;
 }
 
-function sanitizeColor(value: string, name: string): string {
-  if (!/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)) {
-    throw new Error(`${name} must be #RRGGBB or #RRGGBBAA.`);
+function sanitizeColor(value: string, name: string): QRCodeColor {
+  return sanitizeHexColor(value, name);
+}
+
+function sanitizeBackgroundColor(
+  value: string,
+  name: string,
+): QRCodeBackgroundColor {
+  if (value.toLowerCase() === "transparent") {
+    return "transparent";
   }
-  return value.toUpperCase();
+  return sanitizeHexColor(value, name);
+}
+
+function sanitizeHexColor(value: string, name: string): QRCodeColor {
+  if (/^#[0-9A-Fa-f]{3}([0-9A-Fa-f])?$/.test(value)) {
+    const hex = value.slice(1);
+    return `#${hex
+      .split("")
+      .map((character) => character + character)
+      .join("")}`.toUpperCase() as QRCodeColor;
+  }
+  if (!/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)) {
+    throw new Error(
+      `${name} must be #RGB, #RGBA, #RRGGBB, or #RRGGBBAA.`,
+    );
+  }
+  return value.toUpperCase() as QRCodeColor;
 }
 
 function toError(value: unknown): Error {
@@ -1207,6 +1282,21 @@ function sanitizeInteger(
   return resolved;
 }
 
+function sanitizeVersion(
+  value: QRCodeVersion | undefined,
+  fallback: QRCodeVersion,
+  name: string,
+): QRCodeVersion {
+  return sanitizeInteger(value, fallback, name, 1, 40) as QRCodeVersion;
+}
+
+function sanitizeMask(
+  value: QRCodeMaskPattern | undefined,
+  fallback: QRCodeMaskPattern,
+): QRCodeMaskPattern {
+  return sanitizeInteger(value, fallback, "mask", -1, 7) as QRCodeMaskPattern;
+}
+
 function sanitizeOptionalInteger(
   value: number | undefined,
   name: string,
@@ -1231,6 +1321,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    pointerEvents: "none",
     position: "absolute",
   },
 });

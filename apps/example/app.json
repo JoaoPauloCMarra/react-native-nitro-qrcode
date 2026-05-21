@@ -29,9 +29,11 @@
       "expo-router",
       "expo-build-properties",
       "./plugins/with-gradle-assignment-syntax",
-      "react-native-nitro-qrcode"
+      "react-native-nitro-qrcode",
+      "expo-status-bar"
     ],
     "experiments": {
+      "reactCompiler": true,
       "typedRoutes": true
     }
   }

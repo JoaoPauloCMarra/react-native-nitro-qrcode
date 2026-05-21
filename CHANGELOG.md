@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- Updated the repo, package, and Expo example to Expo SDK 56, React Native 0.85, React 19.2, TypeScript 6, and Nitro Modules 0.35.7.
+- Raised the iOS deployment target to 16.4 to match the Expo SDK 56 native baseline.
+- Switched the lint and Jest setup to SDK 56-compatible packages, including the external React Native Jest preset.
+- Enabled React Compiler in the Expo example and isolated the FPS metric so it no longer re-renders the whole QR builder.
+- Strengthened public TypeScript types for QR colors, gradient tuples, QR versions, and mask patterns so invalid options are caught earlier in IDEs and AI-assisted edits.
+- Added `QRCodeBackgroundColor` with `"transparent"` background support while keeping foreground, stroke, eye, eyeball, and gradient colors hex-only.
+- Added `#RGB` and `#RGBA` shorthand normalization for QR colors across native and web paths.
+- Reserved the full logo footprint in PNG output before drawing modules, then cleared that footprint to transparency so QR modules do not sit under transparent or rounded logo corners.
+- Updated the README API reference, TypeScript guidance, and logo/background documentation to match the current package behavior.
+- Added the C++ ASan/UBSan sanitizer pass to release verification.
+- Removed stale template dependencies and regenerated the Expo example native projects cleanly for SDK 56.
+
 ## 0.3.0
 
 - Added `shapeOptions.bodyDensity` with `"sparse"`, `"balanced"`, and `"dense"` output density controls across native and web renderers.

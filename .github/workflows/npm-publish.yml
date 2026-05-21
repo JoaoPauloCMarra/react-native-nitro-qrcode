@@ -50,6 +50,9 @@ jobs:
       - name: Verify package
         run: bun run check
 
+      - name: Run C++ sanitizer checks
+        run: bun run test:cpp:sanitize
+
       - name: Check package contents
         working-directory: packages/react-native-nitro-qrcode
         run: npm pack --dry-run
