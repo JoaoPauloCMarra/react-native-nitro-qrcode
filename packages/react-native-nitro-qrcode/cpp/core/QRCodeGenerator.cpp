@@ -14,6 +14,7 @@ namespace {
 
 constexpr uint32_t CrcPolynomial = 0xEDB88320;
 constexpr double Pi = 3.14159265358979323846;
+constexpr uint8_t TransparentLayer = 6;
 
 enum class ModuleShape {
   Square,
@@ -200,6 +201,8 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
                      options.gradient,
                      gradientProgressAt(options.gradient, imageSize, x, y))
                : options.foreground;
+  case TransparentLayer:
+    return {0, 0, 0, 0};
   default:
     return options.background;
   }
@@ -968,7 +971,19 @@ void clearLogoArea(std::vector<uint8_t> &indices, int imageSize,
   const int x0 = (imageSize - areaSize) / 2;
   const int y0 = (imageSize - areaSize) / 2;
   fillRoundedRect(indices, imageSize, x0, y0, x0 + areaSize, y0 + areaSize,
-                  logoAreaBorderRadius, 0);
+                  logoAreaBorderRadius, TransparentLayer);
+}
+
+bool intersectsLogoArea(int x0, int y0, int x1, int y1, int imageSize,
+                        int logoAreaSize) {
+  if (logoAreaSize == 0) {
+    return false;
+  }
+  const int areaSize = std::min(logoAreaSize, imageSize);
+  const int logoX0 = (imageSize - areaSize) / 2;
+  const int logoY0 = (imageSize - areaSize) / 2;
+  return x0 < logoX0 + areaSize && x1 > logoX0 && y0 < logoY0 + areaSize &&
+         y1 > logoY0;
 }
 
 uint8_t hexValue(char value) {
@@ -1080,8 +1095,12 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
 } // namespace
 
 Color parseColor(const std::string &value) {
+  if (value == "transparent") {
+    return {0, 0, 0, 0};
+  }
   if (value.size() != 7 && value.size() != 9) {
-    throw std::invalid_argument("Color must be #RRGGBB or #RRGGBBAA.");
+    throw std::invalid_argument(
+        "Color must be transparent, #RRGGBB, or #RRGGBBAA.");
   }
   if (value[0] != '#') {
     throw std::invalid_argument("Color must start with #.");
@@ -1191,8 +1210,11 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
     drawRadialMatrix(indices, imageSize, matrix, options);
     clearLogoArea(indices, imageSize, options.logoAreaSize,
                   options.logoAreaBorderRadius);
+    const bool useRgbaOutput =
+        hasGradient(options) || hasCustomLayerColors(options) ||
+        options.logoAreaSize > 0;
     const std::string encoded =
-        hasGradient(options) || hasCustomLayerColors(options)
+        useRgbaOutput
             ? base64Encode(
                   encodePngRgba(imageSize, imageSize,
                                 renderLayeredRgba(indices, imageSize, options)))
@@ -1235,6 +1257,10 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
       const int x0 = ((moduleX + options.quietZone) * imageSize) / totalModules;
       const int x1 =
           ((moduleX + options.quietZone + 1) * imageSize) / totalModules;
+      if (intersectsLogoArea(x0, y0, x1, y1, imageSize,
+                             options.logoAreaSize)) {
+        continue;
+      }
       const bool eyeballModule = isEyeBallModule(moduleX, moduleY, matrix.size);
       const ModuleShape shape =
           eyeballModule ? eyeballShape
@@ -1273,8 +1299,11 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
   clearLogoArea(indices, imageSize, options.logoAreaSize,
                 options.logoAreaBorderRadius);
 
+  const bool useRgbaOutput =
+      hasGradient(options) || hasCustomLayerColors(options) ||
+      options.logoAreaSize > 0;
   const std::string encoded =
-      hasGradient(options) || hasCustomLayerColors(options)
+      useRgbaOutput
           ? base64Encode(
                 encodePngRgba(imageSize, imageSize,
                               renderLayeredRgba(indices, imageSize, options)))

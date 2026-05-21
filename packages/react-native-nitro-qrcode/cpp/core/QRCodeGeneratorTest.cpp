@@ -1,11 +1,14 @@
 #include "QRCodeGenerator.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <future>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <zlib.h>
 
 using NitroQRCode::base64Encode;
 using NitroQRCode::encodePngRgba;
@@ -19,6 +22,93 @@ namespace {
 
 void assertPngHeader(const std::string &encoded) {
   assert(encoded.rfind("iVBORw0KGgo", 0) == 0);
+}
+
+std::vector<uint8_t> base64Decode(const std::string &encoded) {
+  std::vector<int> values(256, -1);
+  const std::string alphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  for (size_t index = 0; index < alphabet.size(); index++) {
+    values[static_cast<unsigned char>(alphabet[index])] =
+        static_cast<int>(index);
+  }
+
+  std::vector<uint8_t> output;
+  int accumulator = 0;
+  int bits = -8;
+  for (unsigned char character : encoded) {
+    if (character == '=') {
+      break;
+    }
+    const int value = values[character];
+    if (value < 0) {
+      continue;
+    }
+    accumulator = (accumulator << 6) | value;
+    bits += 6;
+    if (bits >= 0) {
+      output.push_back(static_cast<uint8_t>((accumulator >> bits) & 0xFF));
+      bits -= 8;
+    }
+  }
+  return output;
+}
+
+uint32_t readU32(const std::vector<uint8_t> &bytes, size_t offset) {
+  return (static_cast<uint32_t>(bytes[offset]) << 24) |
+         (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
+         (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
+         static_cast<uint32_t>(bytes[offset + 3]);
+}
+
+std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
+                                   int &height) {
+  const std::vector<uint8_t> png = base64Decode(encoded);
+  assert(png.size() > 8);
+  std::vector<uint8_t> compressed;
+  size_t offset = 8;
+  while (offset + 12 <= png.size()) {
+    const uint32_t chunkSize = readU32(png, offset);
+    const size_t typeOffset = offset + 4;
+    const size_t dataOffset = typeOffset + 4;
+    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
+    assert(dataOffset + chunkSize + 4 <= png.size());
+    if (type == "IHDR") {
+      width = static_cast<int>(readU32(png, dataOffset));
+      height = static_cast<int>(readU32(png, dataOffset + 4));
+      assert(png[dataOffset + 8] == 8);
+      assert(png[dataOffset + 9] == 6);
+    } else if (type == "IDAT") {
+      compressed.insert(compressed.end(), png.begin() + dataOffset,
+                        png.begin() + dataOffset + chunkSize);
+    } else if (type == "IEND") {
+      break;
+    }
+    offset = dataOffset + chunkSize + 4;
+  }
+
+  std::vector<uint8_t> raw((static_cast<size_t>(width) * 4 + 1) *
+                           static_cast<size_t>(height));
+  uLongf rawSize = static_cast<uLongf>(raw.size());
+  const int result = uncompress(raw.data(), &rawSize, compressed.data(),
+                                static_cast<uLong>(compressed.size()));
+  assert(result == Z_OK);
+  assert(rawSize == raw.size());
+
+  std::vector<uint8_t> rgba(static_cast<size_t>(width) *
+                            static_cast<size_t>(height) * 4);
+  for (int y = 0; y < height; y++) {
+    const size_t rawRow = static_cast<size_t>(y) *
+                          (static_cast<size_t>(width) * 4 + 1);
+    assert(raw[rawRow] == 0);
+    const size_t rgbaRow =
+        static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
+    std::copy(raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1),
+              raw.begin() + static_cast<std::ptrdiff_t>(
+                                rawRow + 1 + static_cast<size_t>(width) * 4),
+              rgba.begin() + static_cast<std::ptrdiff_t>(rgbaRow));
+  }
+  return rgba;
 }
 
 void testPngGeneration() {
@@ -297,6 +387,34 @@ void testStyledPngGeneration() {
       "https://example.com/layer-radial-eyes", options));
 }
 
+void testLogoAreaIsTransparent() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 128;
+  options.logoAreaSize = 32;
+  options.logoAreaBorderRadius = 4;
+  const std::string encoded =
+      generator.generatePngBase64("https://example.com/logo-hole", options);
+
+  int width = 0;
+  int height = 0;
+  const std::vector<uint8_t> rgba = decodeRgbaPng(encoded, width, height);
+  assert(width == 128);
+  assert(height == 128);
+
+  const auto alphaAt = [&](int x, int y) {
+    return rgba[(static_cast<size_t>(y) * static_cast<size_t>(width) +
+                 static_cast<size_t>(x)) *
+                    4 +
+                3];
+  };
+
+  assert(alphaAt(width / 2, height / 2) == 0);
+  assert(alphaAt(width / 2 - 10, height / 2) == 0);
+  assert(alphaAt(width / 2 + 10, height / 2) == 0);
+  assert(alphaAt(0, 0) == 255);
+}
+
 void testSvgGeneration() {
   QRCodeGenerator generator;
   GenerateOptions options;
@@ -359,6 +477,12 @@ void testColorAndBase64Helpers() {
   assert(upperWithAlpha.g == 0x34);
   assert(upperWithAlpha.b == 0x56);
   assert(upperWithAlpha.a == 0x78);
+
+  const auto transparent = parseColor("transparent");
+  assert(transparent.r == 0);
+  assert(transparent.g == 0);
+  assert(transparent.b == 0);
+  assert(transparent.a == 0);
 
   assert(base64Encode({}) == "");
   assert(base64Encode({'f'}) == "Zg==");
@@ -430,6 +554,7 @@ void testValidation() {
   options = GenerateOptions{};
   options.errorCorrectionLevel = "bad";
   assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.getMatrixSize("Hello", options); });
 
   options = GenerateOptions{};
   options.layout = "spiral";
@@ -544,6 +669,7 @@ int main() {
   testDataUriAndCache();
   testConcurrentGeneration();
   testStyledPngGeneration();
+  testLogoAreaIsTransparent();
   testSvgGeneration();
   testMatrixPacking();
   testColorAndBase64Helpers();

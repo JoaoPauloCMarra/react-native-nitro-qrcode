@@ -20,7 +20,6 @@ def isNewArchitectureEnabled() {
 
 apply plugin: "com.android.library"
 apply plugin: "org.jetbrains.kotlin.android"
-// Apply autolinking script for Nitro
 apply from: "../nitrogen/generated/android/NitroQRCode+autolinking.gradle"
 
 if (isNewArchitectureEnabled()) {

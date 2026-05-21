@@ -121,9 +121,9 @@ const DEFAULT_SHAPE_OPTIONS: QRCodeShapeOptions = {
 
 const LOGO_PADDING_CONFIG: Record<LogoPaddingPreset, number> = {
   none: 0,
-  small: 6,
-  medium: 10,
-  large: 14,
+  small: 2,
+  medium: 4,
+  large: 8,
 };
 
 export default function DemoScreen() {
@@ -158,9 +158,6 @@ export default function DemoScreen() {
   const [bodyDensity, setBodyDensity] = useState<QRCodeBodyDensity>("dense");
   const [showLogo, setShowLogo] = useState(false);
   const [logoPadding, setLogoPadding] = useState<LogoPaddingPreset>("medium");
-  const [fps, setFps] = useState(60);
-  const frameCount = useRef(0);
-  const lastFpsTick = useRef(0);
   const [metrics, setMetrics] = useState<DemoMetrics>({
     elapsed: 0,
     bytes: 0,
@@ -172,34 +169,6 @@ export default function DemoScreen() {
   const [exportPreview, setExportPreview] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<Error | null>(null);
   const qrRef = useRef<QRCodeRef>(null);
-
-  useEffect(() => {
-    let frameId = 0;
-    let mounted = true;
-    lastFpsTick.current = Date.now();
-
-    function tick() {
-      if (!mounted) {
-        return;
-      }
-
-      frameCount.current += 1;
-      const timestamp = Date.now();
-      const elapsed = timestamp - lastFpsTick.current;
-      if (elapsed >= 500) {
-        setFps(Math.round((frameCount.current * 1000) / elapsed));
-        frameCount.current = 0;
-        lastFpsTick.current = timestamp;
-      }
-      frameId = requestAnimationFrame(tick);
-    }
-
-    frameId = requestAnimationFrame(tick);
-    return () => {
-      mounted = false;
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
 
   const shapeOptions = useMemo<QRCodeShapeOptions>(
     () =>
@@ -222,8 +191,8 @@ export default function DemoScreen() {
     [foregroundConfig],
   );
 
-  const logoAreaSize = showLogo ? 66 : 0;
-  const logoAreaBorderRadius = showLogo ? 14 : 0;
+  const logoAreaSize = showLogo ? 58 : 0;
+  const logoAreaBorderRadius = showLogo ? 12 : 0;
   const logoPaddingSize = showLogo ? LOGO_PADDING_CONFIG[logoPadding] : 0;
 
   useEffect(() => {
@@ -335,7 +304,7 @@ export default function DemoScreen() {
           </View>
 
           <View style={styles.stage}>
-            <View style={styles.qrShell}>
+            <View style={[styles.qrShell, { backgroundColor }]}>
               <QRCode
                 ref={qrRef}
                 value={value}
@@ -419,11 +388,7 @@ export default function DemoScreen() {
               value={`${metrics.elapsed.toFixed(2)} ms`}
               tone="green"
             />
-            <Metric
-              label="FPS"
-              value={`${fps}`}
-              tone={fps >= 55 ? "green" : "amber"}
-            />
+            <FpsMetric />
             <Metric
               label="PNG"
               value={`${formatBytes(metrics.bytes)}`}
@@ -1058,6 +1023,40 @@ function Metric({
   );
 }
 
+function FpsMetric() {
+  const [fps, setFps] = useState(60);
+
+  useEffect(() => {
+    let frameCount = 0;
+    let frameId = 0;
+    let lastFpsTick = 0;
+
+    function tick(timestamp: number) {
+      if (lastFpsTick === 0) {
+        lastFpsTick = timestamp;
+      }
+
+      frameCount += 1;
+      const elapsed = timestamp - lastFpsTick;
+      if (elapsed >= 500) {
+        setFps(Math.round((frameCount * 1000) / elapsed));
+        frameCount = 0;
+        lastFpsTick = timestamp;
+      }
+      frameId = requestAnimationFrame(tick);
+    }
+
+    frameId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  return (
+    <Metric label="FPS" value={`${fps}`} tone={fps >= 55 ? "green" : "amber"} />
+  );
+}
+
 function getToneStyle(tone: "green" | "amber" | "blue" | "purple") {
   switch (tone) {
     case "green":
@@ -1168,11 +1167,29 @@ function resolveGradient(config: ForegroundConfig): QRCodeGradient | undefined {
 }
 
 function resolveHexColor(value: string, fallback: string): string {
+  if (value.toLowerCase() === "transparent") {
+    return "transparent";
+  }
+  const shorthand = /^#([0-9a-f])([0-9a-f])([0-9a-f])([0-9a-f])?$/i.exec(
+    value,
+  );
+  if (shorthand !== null) {
+    return `#${shorthand
+      .slice(1)
+      .filter((part): part is string => part !== undefined)
+      .map((part) => part + part)
+      .join("")}`;
+  }
   return isHexColor(value) ? value : fallback;
 }
 
 function isHexColor(value: string): boolean {
-  return /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
+  if (value.toLowerCase() === "transparent") {
+    return true;
+  }
+  return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(
+    value,
+  );
 }
 
 function scaleShapeOptions(

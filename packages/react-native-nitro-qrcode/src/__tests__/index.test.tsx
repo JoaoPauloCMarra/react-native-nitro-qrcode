@@ -73,6 +73,26 @@ import {
 } from "../index";
 import * as Web from "../index.web";
 
+function nativeOptions(options: unknown): Parameters<typeof toPngBase64>[0] {
+  return options as Parameters<typeof toPngBase64>[0];
+}
+
+function webOptions(options: unknown): Parameters<typeof Web.toSvgString>[0] {
+  return options as Parameters<typeof Web.toSvgString>[0];
+}
+
+function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
+  return (
+    Array.isArray(node.props.style) &&
+    node.props.style.some(
+      (style: unknown) =>
+        typeof style === "object" &&
+        style !== null &&
+        "pointerEvents" in style,
+    )
+  );
+}
+
 describe("native QRCode API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -382,14 +402,18 @@ describe("native QRCode API", () => {
     toPngBase64({
       value: "low",
       errorCorrectionLevel: "low",
-      foregroundColor: "#abcdef",
+      foregroundColor: "#abc",
+      backgroundColor: "#1234",
     });
     toPngBase64({ value: "medium", errorCorrectionLevel: "medium" });
     toPngBase64({ value: "quartile", errorCorrectionLevel: "quartile" });
+    toPngBase64({ value: "transparent", backgroundColor: "transparent" });
 
     const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
-    expect(calls.map((call) => call[3])).toEqual(["L", "M", "Q"]);
-    expect(calls[0][4]).toBe("#ABCDEF");
+    expect(calls.map((call) => call[3])).toEqual(["L", "M", "Q", "M"]);
+    expect(calls[0][4]).toBe("#AABBCC");
+    expect(calls[0][5]).toBe("#11223344");
+    expect(calls[3][5]).toBe("transparent");
   });
 
   it("exposes cache helpers and grouped API", () => {
@@ -406,16 +430,20 @@ describe("native QRCode API", () => {
     expect(() => toPngBase64({ value: "x", quietZone: 33 })).toThrow(
       "quietZone must be",
     );
-    expect(() => toPngBase64({ value: "x", minVersion: 0 })).toThrow(
-      "minVersion must be",
-    );
-    expect(() => toPngBase64({ value: "x", maxVersion: 41 })).toThrow(
+    expect(() =>
+      toPngBase64(nativeOptions({ value: "x", minVersion: 0 })),
+    ).toThrow("minVersion must be");
+    expect(() =>
+      toPngBase64(nativeOptions({ value: "x", maxVersion: 41 })),
+    ).toThrow(
       "maxVersion must be",
     );
     expect(() =>
       toPngBase64({ value: "x", minVersion: 3, maxVersion: 2 }),
     ).toThrow("minVersion and maxVersion");
-    expect(() => toPngBase64({ value: "x", mask: 8 })).toThrow("mask must be");
+    expect(() => toPngBase64(nativeOptions({ value: "x", mask: 8 }))).toThrow(
+      "mask must be",
+    );
     expect(() =>
       toPngBase64({
         value: "x",
@@ -471,7 +499,7 @@ describe("native QRCode API", () => {
       toPngBase64({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
     ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
     expect(() =>
-      toPngBase64({
+      toPngBase64(nativeOptions({
         value: "x",
         gradient: {
           colors: [
@@ -486,16 +514,16 @@ describe("native QRCode API", () => {
             "#888888",
           ],
         },
-      }),
+      })),
     ).toThrow("gradient.colors must contain");
     expect(() =>
-      toPngBase64({
+      toPngBase64(nativeOptions({
         value: "x",
         gradient: {
           colors: ["#000000", "#FFFFFF"],
           locations: [0],
         },
-      }),
+      })),
     ).toThrow("gradient.locations must match");
     expect(() =>
       toPngBase64({
@@ -561,12 +589,12 @@ describe("native QRCode API", () => {
       }),
     ).toThrow("gradient.end.y must be");
     expect(() =>
-      toPngBase64({
+      toPngBase64(nativeOptions({
         value: "x",
         gradient: {
           colors: ["#000000", "nope"],
         },
-      }),
+      })),
     ).toThrow("gradient.colors[1] must be");
   });
 
@@ -607,11 +635,10 @@ describe("native QRCode API", () => {
         (node) => node.props.source?.uri === "data:image/png;base64,png-base64",
       ),
     ).not.toHaveLength(0);
-    const logoView = currentTree.root.findAll(
-      (node) => node.props.pointerEvents === "none",
-    )[0];
+    const logoView = currentTree.root.findAll(hasStylePointerEvents)[0];
     expect(logoView.props.style).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({ pointerEvents: "none" }),
         expect.objectContaining({ backgroundColor: "#101112" }),
       ]),
     );
@@ -624,9 +651,8 @@ describe("native QRCode API", () => {
         }),
       );
     });
-    const backgroundLogoView = currentTree.root.findAll(
-      (node) => node.props.pointerEvents === "none",
-    )[0];
+    const backgroundLogoView =
+      currentTree.root.findAll(hasStylePointerEvents)[0];
     expect(backgroundLogoView.props.style).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ backgroundColor: "#ABCDEF" }),
@@ -640,9 +666,7 @@ describe("native QRCode API", () => {
         }),
       );
     });
-    const defaultLogoView = currentTree.root.findAll(
-      (node) => node.props.pointerEvents === "none",
-    )[0];
+    const defaultLogoView = currentTree.root.findAll(hasStylePointerEvents)[0];
     expect(defaultLogoView.props.style).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ backgroundColor: "#FFFFFF" }),
@@ -994,6 +1018,15 @@ describe("native QRCode API", () => {
         expect.objectContaining({ code: "low-ecl-for-logo" }),
       ]),
     );
+    expect(
+      NitroQRCode.validateOptions({
+        value: "https://example.com",
+        foregroundColor: "#000000",
+        backgroundColor: "transparent",
+      }).warnings,
+    ).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "low-contrast" })]),
+    );
   });
 
   it("ignores async completions after the component unmounts", async () => {
@@ -1119,6 +1152,7 @@ describe("web QRCode API", () => {
   type MockContext = {
     arc: jest.Mock<void, [number, number, number, number, number]>;
     fillStyle: string | MockGradient;
+    globalCompositeOperation: GlobalCompositeOperation;
     lineCap: CanvasLineCap;
     lineWidth: number;
     strokeStyle: string | MockGradient;
@@ -1165,6 +1199,7 @@ describe("web QRCode API", () => {
     return {
       arc: jest.fn(),
       fillStyle: "",
+      globalCompositeOperation: "source-over",
       lineCap: "butt",
       lineWidth: 1,
       strokeStyle: "",
@@ -1239,6 +1274,14 @@ describe("web QRCode API", () => {
     expect(
       Web.toSvgString({ value: "Hello", errorCorrectionLevel: "high" }),
     ).toContain("#FFFFFF");
+    expect(
+      Web.toSvgString({ value: "Hello", backgroundColor: "#333" }),
+    ).toContain("#333333");
+    expect(Web.toSvgString({ value: "Hello", foregroundColor: "#1234" }))
+      .toContain("#11223344");
+    expect(
+      Web.toSvgString({ value: "Hello", backgroundColor: "transparent" }),
+    ).toContain('fill="transparent"');
     expect(
       Web.toSvgString({
         value: "Hello",
@@ -1461,16 +1504,20 @@ describe("web QRCode API", () => {
     expect(() => Web.toSvgString({ value: "x", quietZone: 33 })).toThrow(
       "quietZone must be",
     );
-    expect(() => Web.toSvgString({ value: "x", minVersion: 0 })).toThrow(
+    expect(() =>
+      Web.toSvgString(webOptions({ value: "x", minVersion: 0 })),
+    ).toThrow(
       "minVersion must be",
     );
-    expect(() => Web.toSvgString({ value: "x", maxVersion: 41 })).toThrow(
+    expect(() =>
+      Web.toSvgString(webOptions({ value: "x", maxVersion: 41 })),
+    ).toThrow(
       "maxVersion must be",
     );
     expect(() =>
       Web.toSvgString({ value: "x", minVersion: 3, maxVersion: 2 }),
     ).toThrow("minVersion and maxVersion");
-    expect(() => Web.toSvgString({ value: "x", mask: 8 })).toThrow(
+    expect(() => Web.toSvgString(webOptions({ value: "x", mask: 8 }))).toThrow(
       "mask must be",
     );
     expect(() =>
@@ -1528,13 +1575,13 @@ describe("web QRCode API", () => {
       Web.toSvgString({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
     ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
     expect(() =>
-      Web.toSvgString({
+      Web.toSvgString(webOptions({
         value: "x",
         foregroundColor: "bad",
-      }),
+      })),
     ).toThrow("foregroundColor must be");
     expect(() =>
-      Web.toSvgString({
+      Web.toSvgString(webOptions({
         value: "x",
         gradient: {
           colors: [
@@ -1549,7 +1596,7 @@ describe("web QRCode API", () => {
             "#888888",
           ],
         },
-      }),
+      })),
     ).toThrow("gradient.colors must contain");
     expect(() =>
       Web.toSvgString({
@@ -1561,13 +1608,13 @@ describe("web QRCode API", () => {
       }),
     ).toThrow("gradient.type must be");
     expect(() =>
-      Web.toSvgString({
+      Web.toSvgString(webOptions({
         value: "x",
         gradient: {
           colors: ["#000000", "#FFFFFF"],
           locations: [0],
         },
-      }),
+      })),
     ).toThrow("gradient.locations must match");
     expect(() =>
       Web.toSvgString({
@@ -1636,6 +1683,25 @@ describe("web QRCode API", () => {
     expect(context.beginPath).not.toHaveBeenCalled();
     expect(context.ellipse).not.toHaveBeenCalled();
     expect(context.quadraticCurveTo).not.toHaveBeenCalled();
+  });
+
+  it("reserves a transparent logo footprint on web PNG output", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    expect(
+      Web.toPngDataUri({
+        value: "Hello",
+        size: 64,
+        logoAreaSize: 12,
+        logoAreaBorderRadius: 6,
+      }),
+    ).toBe("data:image/png;base64,web-png");
+
+    expect(context.beginPath).toHaveBeenCalled();
+    expect(context.quadraticCurveTo).toHaveBeenCalled();
+    expect(context.fillRect).not.toHaveBeenCalledWith(26, 26, 12, 12);
+    expect(context.restore).toHaveBeenCalled();
   });
 
   it("uses a linear gradient fill on web", () => {
@@ -1837,6 +1903,15 @@ describe("web QRCode API", () => {
         expect.objectContaining({ code: "bad-quiet-zone" }),
         expect.objectContaining({ code: "low-ecl-for-logo" }),
       ]),
+    );
+    expect(
+      Web.NitroQRCode.validateOptions({
+        value: "https://example.com",
+        foregroundColor: "#000000",
+        backgroundColor: "transparent",
+      }).warnings,
+    ).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "low-contrast" })]),
     );
   });
 
