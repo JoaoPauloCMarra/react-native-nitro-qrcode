@@ -496,9 +496,13 @@ Useful repo scripts:
 
 - `bun run dev` starts the Expo example.
 - `bun run check` runs the full library and example verification pass.
+- `bun run check:ci` adds the native C++ ASan/UBSan pass to `check`.
+- `bun run release:preflight` runs `check:ci`, package content audit, and publish dry run.
 - `bun run test:cpp:sanitize` runs the native C++ ASan/UBSan pass.
-- `bun run example:check` runs example lint plus `expo-doctor`.
-- `bun run example:smoke` checks the launched native example app for basic rendered output.
+- `bun run example:check` runs example lint, typecheck, and `expo-doctor`.
+- `bun run example:android:assemble` builds the generated Android example project.
+- `bun run example:ios:build` builds the generated iOS example project.
+- `bun run example:smoke` checks the installed native example app with Metro running for basic rendered output.
 - `bun run audit:package` verifies the npm tarball includes required release files and excludes test/build artifacts.
 - `bun run --cwd packages/react-native-nitro-qrcode verify` runs the package-only gate.
 - `bun run publish-package:dry-run` runs the release publish path without uploading to npm.
@@ -512,13 +516,13 @@ Use a patch version for backward-compatible fixes and additive props. Use a mino
 Before creating a GitHub release:
 
 - Confirm `packages/react-native-nitro-qrcode/package.json` matches the release tag without the `v` prefix.
-- Run `bun run check`.
-- Run `bun run test:cpp:sanitize`.
-- Run `bun run example:smoke` after native example runs.
-- Run `bun run publish-package:dry-run`.
+- Run `bun run release:preflight`.
+- Run `bun run example:android:assemble`.
+- Run `bun run example:ios:build`.
+- Run `bun run example:smoke` after installing the native example app and starting Metro.
 - Create the GitHub release from the same ref as `.github/workflows/npm-publish.yml`.
 
-The GitHub release workflow runs `npm pack --dry-run` before `npm publish` and publishes through npm Trusted Publishing.
+The GitHub release workflow runs `bun run release:preflight` before `npm publish` and publishes through npm Trusted Publishing.
 
 ## Roadmap
 

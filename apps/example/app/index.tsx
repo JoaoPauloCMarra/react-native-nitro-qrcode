@@ -16,8 +16,10 @@ import {
   NitroQRCode,
   QRCode,
   type QRCodeRef,
+  type QRCodeBackgroundColor,
   type QRCodeBodyDensity,
   type QRCodeBodyShape,
+  type QRCodeColor,
   type QRCodeEyeBallShape,
   type QRCodeEyeFrameShape,
   type QRCodeGradient,
@@ -1128,25 +1130,28 @@ function resolveShapeOptions({
   };
 }
 
-function resolveForegroundColor(config: ForegroundConfig): string {
+function resolveForegroundColor(config: ForegroundConfig): QRCodeColor {
   if (!config.enabled) {
     return "#000000";
   }
-  return resolveHexColor(config.singleColor, "#111315");
+  return resolveOpaqueHexColor(config.singleColor, "#111315");
 }
 
-function resolveBackgroundColor(config: BackgroundConfig): string {
+function resolveBackgroundColor(config: BackgroundConfig): QRCodeBackgroundColor {
   if (!config.enabled) {
     return "#FFFFFF";
   }
   return resolveHexColor(config.color, "#FFFFFF");
 }
 
-function resolveSolidColor(config: SolidColorConfig, fallback: string): string {
+function resolveSolidColor(
+  config: SolidColorConfig,
+  fallback: QRCodeColor,
+): QRCodeColor {
   if (!config.enabled) {
     return fallback;
   }
-  return resolveHexColor(config.color, fallback);
+  return resolveOpaqueHexColor(config.color, fallback);
 }
 
 function resolveGradient(config: ForegroundConfig): QRCodeGradient | undefined {
@@ -1157,8 +1162,8 @@ function resolveGradient(config: ForegroundConfig): QRCodeGradient | undefined {
   return {
     type: config.gradientType,
     colors: [
-      resolveHexColor(config.gradientStartColor, "#111315"),
-      resolveHexColor(config.gradientEndColor, "#303532"),
+      resolveOpaqueHexColor(config.gradientStartColor, "#111315"),
+      resolveOpaqueHexColor(config.gradientEndColor, "#303532"),
     ],
     start:
       config.gradientType === "linear" ? { x: 0, y: 0 } : { x: 0.5, y: 0.5 },
@@ -1166,7 +1171,10 @@ function resolveGradient(config: ForegroundConfig): QRCodeGradient | undefined {
   };
 }
 
-function resolveHexColor(value: string, fallback: string): string {
+function resolveHexColor(
+  value: string,
+  fallback: QRCodeColor,
+): QRCodeBackgroundColor {
   if (value.toLowerCase() === "transparent") {
     return "transparent";
   }
@@ -1183,7 +1191,15 @@ function resolveHexColor(value: string, fallback: string): string {
   return isHexColor(value) ? value : fallback;
 }
 
-function isHexColor(value: string): boolean {
+function resolveOpaqueHexColor(
+  value: string,
+  fallback: QRCodeColor,
+): QRCodeColor {
+  const color = resolveHexColor(value, fallback);
+  return color === "transparent" ? fallback : color;
+}
+
+function isHexColor(value: string): value is QRCodeBackgroundColor {
   if (value.toLowerCase() === "transparent") {
     return true;
   }

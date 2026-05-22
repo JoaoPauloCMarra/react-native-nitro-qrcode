@@ -4,15 +4,18 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
-    "web": "expo start --web",
-    "ios": "expo run:ios",
-    "android": "expo run:android",
-    "prebuild": "expo prebuild",
-    "prebuild:clean": "expo prebuild --clean",
+    "start": "env -u NO_COLOR expo start",
+    "web": "env -u NO_COLOR expo start --web",
+    "ios": "env -u NO_COLOR expo run:ios",
+    "android": "env -u NO_COLOR expo run:android",
+    "prebuild": "env -u NO_COLOR expo prebuild",
+    "prebuild:clean": "env -u NO_COLOR expo prebuild --clean",
     "lint": "bunx eslint app --max-warnings=0",
-    "doctor": "bunx expo-doctor",
-    "check": "bun run lint && bun run doctor"
+    "doctor": "env -u NO_COLOR bunx expo-doctor",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "android:assemble": "cd android && NODE_ENV=development ./gradlew --no-daemon -PreactNativeArchitectures=arm64-v8a :app:assembleDebug",
+    "ios:build": "cd ios && pod install && xcodebuild -workspace NitroQRCode.xcworkspace -scheme NitroQRCode -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build",
+    "check": "bun run lint && bun run typecheck && bun run doctor"
   },
   "dependencies": {
     "expo": "^56.0.3",
@@ -24,7 +27,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-nitro-modules": "0.35.7",
-    "react-native-nitro-qrcode": "*",
+    "react-native-nitro-qrcode": "workspace:*",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.1",
     "react-native-web": "~0.21.0"

@@ -48,6 +48,7 @@ function smokeAndroid() {
     return;
   }
 
+  run("adb", ["shell", "monkey", "-p", ANDROID_PACKAGE, "1"]);
   run("adb", ["shell", "pidof", ANDROID_PACKAGE]);
   run("adb", ["shell", "uiautomator", "dump", "/sdcard/nitro-qrcode-ui.xml"]);
   const output = run("adb", ["shell", "cat", "/sdcard/nitro-qrcode-ui.xml"]);

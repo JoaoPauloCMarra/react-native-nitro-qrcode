@@ -18,6 +18,9 @@
     "lint": {
       "dependsOn": ["^build"]
     },
+    "lint:check": {
+      "dependsOn": ["^build"]
+    },
     "clean": {
       "cache": false
     },
@@ -53,6 +56,9 @@
       "persistent": true
     },
     "test:cpp": {
+      "cache": false
+    },
+    "test:cpp:sanitize": {
       "cache": false
     }
   }
