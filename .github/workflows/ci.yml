@@ -8,6 +8,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_native_examples:
+        description: Run Android and iOS example build jobs
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -42,6 +48,7 @@ jobs:
 
   example-android:
     name: Example Android Build
+    if: ${{ vars.RUN_NATIVE_EXAMPLE_CI == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run_native_examples) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -76,6 +83,7 @@ jobs:
 
   example-ios:
     name: Example iOS Build
+    if: ${{ vars.RUN_NATIVE_EXAMPLE_CI == 'true' || (github.event_name == 'workflow_dispatch' && inputs.run_native_examples) }}
     runs-on: macos-26
 
     steps:
