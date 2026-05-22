@@ -193,13 +193,20 @@ async function main() {
     }
   }
 
-  log(dryRun ? "Running publish dry run..." : "Publishing to npm...", "cyan");
+  if (dryRun) {
+    log("Running package pack dry run...", "cyan");
+    must("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
+      cwd: packageDir,
+    });
+    log("Dry run complete. Package is publishable.", "green");
+    return;
+  }
+
+  log("Publishing to npm...", "cyan");
   must("bun", publishArgs, { cwd: packageDir });
 
   log(
-    dryRun
-      ? "Dry run complete. Package is publishable."
-      : `Published ${packageJson.name}@${packageJson.version}.`,
+    `Published ${packageJson.name}@${packageJson.version}.`,
     "green"
   );
 }
