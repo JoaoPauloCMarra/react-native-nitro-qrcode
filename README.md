@@ -1,540 +1,199 @@
 # react-native-nitro-qrcode
 
-[![npm](https://img.shields.io/badge/npm-v0.4.0-orange)](https://www.npmjs.com/package/react-native-nitro-qrcode)
-[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
-![react-native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)
-![nitro-modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.7-black)
+[![npm version](https://img.shields.io/npm/v/react-native-nitro-qrcode?color=f97316&label=npm)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
+[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/expo-SDK%2056-000020)](https://expo.dev/)
+[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.7-black)](https://nitro.margelo.com/)
 
-`react-native-nitro-qrcode` is a fast QR code generator for React Native and Expo built with Nitro and native C++.
+QR code generation for React Native, Expo, and web without requiring
+`react-native-svg` or Skia.
 
-Use it when you want a QR code package that works on iOS, Android, and web without adding `react-native-svg` or Skia. The component renders a PNG-backed `Image`, and the library also exposes QR export helpers for PNG, SVG, and matrix data.
+Use it when you want a typed QR component plus PNG, SVG, matrix, caching, logo,
+gradient, and scanability helpers from one package.
 
 <p align="center">
-  <img src="./docs/demo.png" alt="DEMO" width="500" />
+  <img src="./docs/demo.png" alt="react-native-nitro-qrcode demo" width="500" />
 </p>
 
-## Why this package
-
-- No `react-native-svg`
-- No Skia dependency
-- Native mobile QR generation through Nitro Modules and shared C++
-- Works with React Native, Expo development builds, and React Native Web
-- Supports PNG export, SVG export, and matrix access
-- Supports square and circular modules with rounded finder eyes
-- Supports eye styling, module gaps, logo safe areas, and linear or radial gradients
-- Includes deterministic caching for repeated QR generation
-
-## Features
-
-- Native iOS and Android QR generation through Nitro Modules
-- Shared C++ QR engine for consistent output across mobile platforms
-- PNG base64 and `data:image/png` output for rendering, sharing, and export
-- Compact SVG string generation for advanced workflows
-- Packed matrix export for custom rendering or scanability tooling
-- Native styling for square and circular modules
-- Finder-eye styling, module gaps, and centered logo clear areas
-- Solid colors and opt-in linear or radial foreground gradients
-- Web fallback for Expo web demos and documentation environments
-- Deterministic cache keyed by QR options
-
-## React Native QR Code Alternatives
-
-If you are comparing packages:
-
-- `react-native-qrcode-svg`: good SVG-based default, but requires `react-native-svg`
-- `react-native-qrcode-skia`: good for Skia-heavy apps, but requires Skia
-- `react-native-nitro-qrcode`: better fit when you want native output, export helpers, and fewer rendering dependencies
-
-This package is designed for teams that want QR generation to stay lightweight at the app surface while still having native performance and export APIs.
-
-## Installation
+## Install
 
 ```sh
 bun add react-native-nitro-qrcode react-native-nitro-modules
 ```
 
-## Requirements
-
-- React `>=18.2.0 <20.0.0`.
-- React Native `>=0.75.0 <1.0.0`.
-- `react-native-nitro-modules >=0.35.7 <0.36.0`.
-- iOS 16.4+ and Android API 24+.
-- Web support requires the app's normal React Native Web setup: `react-dom >=18.2.0 <20.0.0` and `react-native-web >=0.19.0 <1.0.0`. These peers are optional so native-only apps are not forced to install them.
-
-`qrcode` is bundled as an internal runtime dependency for the web fallback. Consumers do not need `react-native-svg`, Skia, canvas packages, or a separate QR package.
-
-## Expo Support
-
-This package works with Expo development builds. Expo Go cannot load Nitro native code.
-The example project tracks Expo SDK 56 and React Native 0.85.
-If you need parity for async-ready flow, placeholders, and native cache behavior, test in an Expo dev build or a bare workflow, not Expo Go.
+For Expo development builds:
 
 ```sh
+bunx expo install react-native-nitro-qrcode react-native-nitro-modules
 bunx expo prebuild
-bunx expo run:ios
-bunx expo run:android
 ```
 
-For bare React Native, install pods after adding the package:
+For bare React Native apps:
 
 ```sh
 cd ios && pod install
 ```
+
+Expo Go cannot load Nitro native modules. Use an Expo development build or a
+bare app.
+
+## Expo Config
+
+No app config options are required for `react-native-nitro-qrcode`.
+
+The package includes a no-op config plugin for compatibility with apps that keep
+all native packages in the Expo `plugins` array, but new apps can omit it.
 
 ## Quick Start
 
 ```tsx
 import { QRCode } from "react-native-nitro-qrcode";
 
-export function CheckoutCode() {
+export function PaymentCode() {
   return (
     <QRCode
-      value="https://example.com/checkout/123"
+      value="https://example.com/pay/invoice_123"
       size={220}
-      errorCorrectionLevel="M"
-    />
-  );
-}
-```
-
-`QRCode` returns an `Image`-backed view. The QR image is generated asynchronously through Nitro on mobile and through the web fallback on web.
-
-TypeScript users get literal unions for QR versions, mask patterns, presets,
-module shapes, error correction levels, gradient tuple sizes, and QR color
-categories. Invalid values such as `mask={9}`, `minVersion={99}`,
-`foregroundColor="black"`, `foregroundColor="transparent"`, or a one-color
-gradient are caught by the compiler before runtime validation. Exact hex length
-and digit validity are also checked at runtime.
-
-## Supported Platforms
-
-- iOS
-- Android
-- Web
-
-The mobile path uses native Nitro bindings. The web path uses the bundled web fallback so the same API can work in Expo web and React Native Web environments.
-
-## Styling
-
-Style the QR code without `react-native-svg`, Skia, or any extra runtime package:
-
-```tsx
-import { Text, View } from "react-native";
-import { QRCode } from "react-native-nitro-qrcode";
-
-export function BrandedCode() {
-  return (
-    <QRCode
-      value="https://example.com/checkout/123"
-      size={240}
-      scanSafe
+      foregroundColor="#111827"
+      backgroundColor="#ffffff"
       errorCorrectionLevel="H"
-      foregroundColor="#101112"
-      backgroundColor="transparent"
-      gradient={{
-        colors: ["#7AC7FF", "#4AA8FF", "#327EFF"],
-        locations: [0, 0.45, 1],
-        start: { x: 0, y: 0 },
-        end: { x: 1, y: 1 },
-      }}
-      shapeOptions={{
-        shape: "circle",
-        eyeFrameShape: "rounded",
-        eyeballShape: "circle",
-        bodyDensity: "dense",
-        gap: 1,
-        eyePatternGap: 1,
-      }}
-      logoAreaSize={64}
-      logoAreaBorderRadius={12}
-      logoBackgroundColor="#101112"
-      logo={
-        <View
-          style={{
-            alignItems: "center",
-            backgroundColor: "#101112",
-            borderRadius: 8,
-            height: 44,
-            justifyContent: "center",
-            width: 44,
-          }}
-        >
-          <Text style={{ color: "#28D17C", fontWeight: "900" }}>N</Text>
-        </View>
-      }
     />
   );
 }
 ```
 
-The native renderer keeps the public layout scan-safe with matrix output, then layers module shapes, finder-eye shapes, gaps, a centered logo safe area, and foreground gradients on top. Solid colors stay on the fastest indexed PNG path. Gradients are opt-in and switch to RGBA PNG encoding only for that render.
-
-## Generate Assets
+## Export Helpers
 
 ```ts
-import { NitroQRCode } from "react-native-nitro-qrcode";
-
-const dataUri = NitroQRCode.toPngDataUri({
-  value: "https://example.com",
-  size: 512,
-});
-
-const base64 = NitroQRCode.toPngBase64({
-  value: "https://example.com",
-  size: 1024,
-  errorCorrectionLevel: "H",
-});
-
-const asyncDataUri = await NitroQRCode.toPngDataUriAsync({
-  value: "https://example.com",
-  size: 512,
-});
-
-const matrix = NitroQRCode.getMatrix({
-  value: "https://example.com",
-});
-```
-
-Available helpers:
-
-- `NitroQRCode.toPngDataUri(options)` returns a `data:image/png;base64,...` URI.
-- `NitroQRCode.toPngBase64(options)` returns PNG bytes encoded as base64.
-- `NitroQRCode.toPngDataUriAsync(options)` returns a data URI without blocking the JS caller.
-- `NitroQRCode.toPngBase64Async(options)` returns base64 without blocking the JS caller.
-- `NitroQRCode.toSvgString(options)` returns a compact SVG string.
-- `NitroQRCode.getMatrix(options)` returns `{ size, packedBase64 }`.
-- `NitroQRCode.clearCache()` clears generated-output cache.
-- `NitroQRCode.getCacheSize()` returns the current cache entry count.
-
-Useful exported types:
-
-- `QRCodeProps`
-- `QRCodeRef`
-- `QRCodeOptions`
-- `QRCodeColor`
-- `QRCodeBackgroundColor`
-- `QRCodeGradient`
-- `QRCodeGradientColors`
-- `QRCodeGradientLocations`
-- `QRCodeVersion`
-- `QRCodeMaskPattern`
-- `QRCodeShapeOptions`
-- `QRCodePreset`
-- `QRCodeValidationResult`
-
-## API Overview
-
-Main component:
-
-- `QRCode`
-
-Helpers:
-
-- `NitroQRCode.toPngDataUri`
-- `NitroQRCode.toPngBase64`
-- `NitroQRCode.toPngDataUriAsync`
-- `NitroQRCode.toPngBase64Async`
-- `NitroQRCode.toSvgString`
-- `NitroQRCode.getMatrix`
-- `NitroQRCode.clearCache`
-- `NitroQRCode.getCacheSize`
-- `NitroQRCode.validateOptions`
-
-## Options
-
-| Option                         | Type                                    | Default                                            |
-| ------------------------------ | --------------------------------------- | -------------------------------------------------- |
-| `value`                        | `string`                                | required                                           |
-| `size`                         | `number`                                | `180` for `<QRCode />`, `512` for asset helpers    |
-| `quietZone`                    | `number`                                | `4`                                                |
-| `errorCorrectionLevel`         | `"L"` \| `"M"` \| `"Q"` \| `"H"`        | `"M"`                                              |
-| `foregroundColor`              | `QRCodeColor` (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`) | `#000000`                    |
-| `backgroundColor`              | `QRCodeBackgroundColor` (`QRCodeColor` or `"transparent"`) | `#FFFFFF`                    |
-| `strokeColor`                  | `QRCodeColor` (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`) | `#000000`                    |
-| `eyeColor`                     | `QRCodeColor` (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`) | `#000000`                    |
-| `eyeStrokeColor`               | `QRCodeColor` (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`) | `#000000`                    |
-| `eyeballColor`                 | `QRCodeColor` (`#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA`) | `#000000`                    |
-| `gradient.type`                | `"linear"` \| `"radial"`                | `"linear"`                                         |
-| `gradient.colors`              | `QRCodeGradientColors` with 2-8 hex colors | `undefined`                                     |
-| `gradient.locations`           | `QRCodeGradientLocations` in `0...1`    | evenly spaced                                      |
-| `gradient.start`               | `{ x: number, y: number }`              | `{0,0}` for linear, `{0.5,0.5}` for radial         |
-| `gradient.end`                 | `{ x: number, y: number }`              | `{1,1}`                                            |
-| `shapeOptions.layout`          | `"matrix"`                              | `"matrix"`                                         |
-| `shapeOptions.shape`           | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
-| `shapeOptions.eyeFrameShape`   | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
-| `shapeOptions.eyeballShape`    | `"square"` \| `"rounded"` \| `"circle"` | `"square"`                                         |
-| `shapeOptions.gap`             | `number`                                | `0`                                                |
-| `shapeOptions.eyePatternGap`   | `number`                                | `shapeOptions.gap`                                 |
-| `shapeOptions.bodyDensity`     | `"sparse"` \| `"balanced"` \| `"dense"` | `"dense"`                                          |
-| `shapeOptions.cornerRadius`    | `number`                                | automatic for rounded modules                      |
-| `shapeOptions.eyePatternCornerRadius` | `number`                         | automatic for rounded finder eyes                  |
-| `logo`                         | `ReactNode` for `<QRCode />`            | `undefined`                                        |
-| `placeholder`                  | `ReactNode` for `<QRCode />`            | `undefined`                                        |
-| `logoBackgroundColor`          | React Native color string for `<QRCode />` | `backgroundColor`, then `#FFFFFF`               |
-| `logoAreaSize`                 | `number`                                | `0`, or `28%` of component size when `logo` is set |
-| `logoAreaBorderRadius`         | `number`                                | `0` for asset helpers, visible overlay radius for `<QRCode />` |
-| `preset`                       | `"default" \| "rounded" \| "dots" \| "branded"` | `"default"`                              |
-| `keepPreviousImage`            | `boolean`                               | `true`                                             |
-| `hideLogoUntilReady`           | `boolean`                               | `true`                                             |
-| `minVersion`                   | `QRCodeVersion` (`1...40`)              | `1`                                                |
-| `maxVersion`                   | `QRCodeVersion` (`1...40`)              | `40`                                               |
-| `mask`                         | `QRCodeMaskPattern` (`-1` or `0...7`)   | `-1`                                               |
-| `boostEcl`                     | `boolean`                               | `true`                                             |
-| `onReady`                      | `(uri: string) => void`                 | `undefined`                                        |
-| `onError`                      | `(error: Error) => void`                | `undefined`                                        |
-
-`errorCorrectionLevel` also accepts `"low"`, `"medium"`, `"quartile"`, and `"high"`.
-
-QR drawing colors are intentionally restricted to hex strings because native and
-web output share the same renderer contract. `#RGB` and `#RGBA` are normalized to
-full hex before crossing the native bridge. `backgroundColor` additionally
-accepts `"transparent"` for PNG and SVG output; foreground, stroke, eye, eyeball,
-and gradient colors stay hex-only so QR modules remain visible by default.
-React Native color names are still accepted for view-only props such as
-`logoBackgroundColor`.
-
-When `logoAreaSize` is set, PNG output reserves the full centered square
-footprint before body modules are rendered, then clears that footprint to
-transparent pixels. This keeps QR modules outside the logo space instead of
-leaving data under transparent or rounded logo corners. The background color is
-still applied to the rest of the QR image; use `backgroundColor="transparent"`
-when the exported PNG/SVG should have no background fill.
-
-`gradient.colors` must contain between 2 and 8 hex colors. TypeScript enforces
-the tuple length and `#` prefix; runtime validation still checks exact hex
-length, digit validity, location count, location ordering, and coordinate bounds.
-When `gradient` is provided, it overrides the solid `foregroundColor` for PNG and
-SVG output while keeping the no-gradient path fast.
-
-### TypeScript safety
-
-The public API narrows common QR options with exported literal types:
-
-```ts
-import type {
-  QRCodeBackgroundColor,
-  QRCodeGradient,
-  QRCodeMaskPattern,
-  QRCodeOptions,
-  QRCodeVersion,
+import {
+  getMatrix,
+  toPngBase64,
+  toPngDataUri,
+  toSvgString,
 } from "react-native-nitro-qrcode";
-
-const background: QRCodeBackgroundColor = "transparent";
-const minVersion: QRCodeVersion = 4;
-const mask: QRCodeMaskPattern = -1;
-
-const gradient = {
-  colors: ["#09090B", "#1E3A8A"],
-  locations: [0, 1],
-} satisfies QRCodeGradient;
 
 const options = {
   value: "https://example.com",
-  backgroundColor: background,
-  gradient,
-  minVersion,
-  mask,
-} satisfies QRCodeOptions;
+  size: 320,
+  errorCorrectionLevel: "H",
+} as const;
+
+const png = toPngBase64(options);
+const uri = toPngDataUri(options);
+const svg = toSvgString(options);
+const matrix = getMatrix(options);
 ```
 
-These types are designed to make invalid categories hard to write in an IDE or
-AI-assisted editor. Runtime validation still protects dynamic values from forms,
-CMS data, or network payloads.
+Async variants are available for UI flows that should yield before generating:
+`toPngBase64Async` and `toPngDataUriAsync`.
 
-`shapeOptions.eyePatternShape` is still accepted as a deprecated alias for `shapeOptions.eyeFrameShape`.
+## Styling
 
-`shapeOptions.bodyDensity` controls how much white space is carved around body
-modules when using rounded or circular modules. Use `"dense"` for maximum
-scanability and the default output, `"balanced"` for a lighter branded look, and
-`"sparse"` only when the QR code remains large enough to scan reliably.
+Common options:
 
-### Presets
-
-`preset` applies a default shape style and is merged with `shapeOptions`.
-
-- `default`: square modules + square eyes (legacy behavior).
-- `rounded`: rounded modules, rounded eyes, rounded finder corners.
-- `dots`: circular modules and circular eyes, module gaps.
-- `branded`: rounded modules with a mixed eye shape set for brand-centric rendering.
-
-`shapeOptions` properties override preset values when both are provided.
-
-### Loading callbacks + placeholders
+| Option                 | What it does                                |
+| ---------------------- | ------------------------------------------- |
+| `value`                | QR payload string.                          |
+| `size`                 | Rendered image size in points.              |
+| `errorCorrectionLevel` | `L`, `M`, `Q`, or `H`. Use `H` with logos.  |
+| `foregroundColor`      | Solid module color.                         |
+| `backgroundColor`      | Solid color or `transparent`.               |
+| `bodyShape`            | `square`, `circle`, or `rounded`.           |
+| `eyeFrameShape`        | Finder frame shape.                         |
+| `eyeBallShape`         | Finder center shape.                        |
+| `moduleGap`            | Space between modules.                      |
+| `logo`                 | Center logo with safe-area clearing.        |
+| `gradient`             | Linear or radial foreground gradient.       |
+| `preset`               | `default`, `rounded`, `dots`, or `branded`. |
 
 ```tsx
-import { Pressable, useRef, useState, Text, View } from "react";
-import {
-  type QRCodeRef,
-  QRCode,
-} from "react-native-nitro-qrcode";
-
-const qrRef = useRef<QRCodeRef>(null);
-
-export function CheckoutCode() {
-  const [readyUri, setReadyUri] = useState<string>("");
-
-  return (
-    <>
-      <QRCode
-        ref={qrRef}
-        value="https://example.com/checkout/123"
-        size={220}
-        placeholder={
-          <View>
-            <Text>Loading…</Text>
-          </View>
-        }
-        hideLogoUntilReady
-        onReady={setReadyUri}
-        onError={(error) => {
-          console.error("QR generation failed", error);
-        }}
-      />
-      <Pressable
-        onPress={() => {
-          const uri = qrRef.current?.toPngDataUri();
-          if (uri !== undefined) {
-            console.log(uri.slice(0, 32), "...");
-          }
-        }}
-      >
-        <Text>Export data URI</Text>
-      </Pressable>
-      <Text>{readyUri ? "QR is ready" : "Awaiting QR"}</Text>
-    </>
-  );
-}
+<QRCode
+  value="https://example.com/app"
+  size={260}
+  preset="branded"
+  bodyShape="rounded"
+  eyeFrameShape="rounded"
+  eyeBallShape="circle"
+  moduleGap={0.1}
+  logo={{ source: require("./logo.png"), size: 48 }}
+  gradient={{
+    type: "linear",
+    colors: ["#111827", "#2563eb"],
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  }}
+/>
 ```
 
-`keepPreviousImage` defaults to `true`; set it to `false` for skeleton-first updates while `value` changes.
+## Validation And Scanability
 
-`hideLogoUntilReady` defaults to `true` to avoid logo-only flashes during async generation.
+```ts
+import { validateOptions } from "react-native-nitro-qrcode";
 
-For stable scanning, keep logo safe areas under ~30% of size and prefer `errorCorrectionLevel="Q"` or `"H"` when a large logo is used.
-
-### Scanability validation
-
-```tsx
-import { NitroQRCode } from "react-native-nitro-qrcode";
-
-const { warnings, errors } = NitroQRCode.validateOptions({
+const result = validateOptions({
   value: "https://example.com",
-  size: 96,
-  quietZone: 1,
-  logoAreaSize: 60,
-  errorCorrectionLevel: "M",
+  size: 180,
+  backgroundColor: "transparent",
+  logo: { size: 64 },
 });
 
-for (const warning of warnings) {
-  console.warn(`${warning.code}: ${warning.message}`);
-}
-if (errors.length > 0) {
-  throw new Error(errors[0]!.message);
+if (!result.valid) {
+  console.log(result.errors);
 }
 ```
 
-Set `scanSafe` to `true` on `QRCode` or export helpers to preserve existing
-styling while hardening the generated symbol: quiet zones below four modules are
-raised to four, and logo-backed output uses high error correction. Set
-`scanSafe: "strict"` when calling `validateOptions` to promote scanability
-warnings into validation errors.
+The validator reports hard errors and scanability warnings for risky logo,
+contrast, size, and option combinations.
 
-## Performance Notes
+## API
 
-- Solid-color QR codes stay on the fastest indexed PNG path
-- Gradient renders are opt-in and use RGBA PNG encoding only when needed
-- Repeated identical renders benefit from the built-in native cache, and cache
-  synchronization is scoped so uncached native renders can run concurrently
-- Native and web cache keys hash payload values instead of storing raw QR
-  payload text in cache metadata
-- The example app includes generation timing, FPS, PNG size, matrix size, and cache metrics
-- Web rendering uses the package canvas fallback and requires a browser DOM; there is no SSR support path in package code.
-- `bun run benchmark:cpp` runs the optimized native benchmark harness for matrix,
-  PNG, SVG, base64, cache-hit, and parallel render paths.
-- `bun run test:cpp:sanitize` runs the native C++ tests with ASan/UBSan.
+Main exports:
 
-## Example App
+- `QRCode` React component.
+- `NitroQRCode` object with the same generation helpers.
+- `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
+- `toPngBase64Async` and `toPngDataUriAsync`.
+- `validateOptions`.
+- `clearQRCodeCache` and `getQRCodeCacheSize`.
+- TypeScript types including `QRCodeOptions`, `QRCodeProps`, `QRCodeRef`,
+  `QRCodeMatrix`, and `QRCodeValidationResult`.
 
-The repo includes an Expo example with a live QR demo, generation timing, FPS, PNG size, matrix size, and cache metrics.
+## Platform Support
 
-```sh
-bun install
-bun run example:web
-bun run example:ios
-bun run example:android
-```
+| Platform | Status                                                              |
+| -------- | ------------------------------------------------------------------- |
+| iOS      | Native Nitro module with shared C++ QR engine.                      |
+| Android  | Native Nitro module with shared C++ QR engine.                      |
+| Web      | JavaScript fallback through React Native Web.                       |
+| Expo     | Development builds; Expo Go is not supported for native Nitro code. |
 
-When testing native payload changes, keep the matching device log open:
+`qrcode` is bundled for the web fallback. Consumers do not need
+`react-native-svg`, Skia, canvas packages, or another QR package.
 
-```sh
-bun run example:logs:ios
-bun run example:logs:android
-```
+## Troubleshooting
 
-The example should stay at 55 FPS or higher while editing the payload. Treat any native redbox, crash, repeated warning, or sustained FPS drop as a release blocker.
-
-## When to use this package
-
-Use `react-native-nitro-qrcode` if you need one or more of these:
-
-- a React Native QR code package without `react-native-svg`
-- an Expo-compatible QR package for development builds
-- PNG export for sharing, printing, or caching
-- QR styling beyond a plain black square
-- a QR component that also works on web
-
-If your app already depends heavily on Skia and your QR rendering is part of a larger Skia canvas workflow, a Skia-based package can still be a better fit.
+- **Expo Go error:** build a dev client; Expo Go cannot load Nitro modules.
+- **Logo makes the code hard to scan:** use `errorCorrectionLevel="H"` and a
+  smaller logo.
+- **Transparent background scans poorly:** validate contrast in the actual UI
+  where the QR code appears.
+- **Need SVG output:** use `toSvgString`; the component itself renders a
+  PNG-backed `Image`.
 
 ## Development
 
 ```sh
 bun install
 bun run check
+bun run release:preflight
+bun run example:android
+bun run example:ios
 ```
 
-Useful repo scripts:
+Run native example builds before release when changing plugin, native, Nitro, or
+packaging files.
 
-- `bun run dev` starts the Expo example.
-- `bun run check` runs the full library and example verification pass.
-- `bun run check:ci` adds the native C++ ASan/UBSan pass to `check`.
-- `bun run release:preflight` runs `check:ci`, package content audit, and publish dry run.
-- `bun run test:cpp:sanitize` runs the native C++ ASan/UBSan pass.
-- `bun run example:check` runs example lint, typecheck, and `expo-doctor`.
-- `bun run example:android:assemble` builds the generated Android example project.
-- `bun run example:ios:build` builds the generated iOS example project.
-- `bun run example:smoke` checks the installed native example app with Metro running for basic rendered output.
-- `bun run audit:package` verifies the npm tarball includes required release files and excludes test/build artifacts.
-- `bun run --cwd packages/react-native-nitro-qrcode verify` runs the package-only gate.
-- `bun run publish-package:dry-run` runs the release publish path without uploading to npm.
+## License
 
-`bun run test:coverage` enforces 100% TypeScript coverage. `bun run test:cpp` compiles the C++ core and checks 100% LLVM line coverage for `QRCodeGenerator.cpp`.
-
-## Release Checklist
-
-Use a patch version for backward-compatible fixes and additive props. Use a minor version when changing defaults, generated output semantics, or public types in a way consumers may need to adapt to.
-
-Before creating a GitHub release:
-
-- Confirm `packages/react-native-nitro-qrcode/package.json` matches the release tag without the `v` prefix.
-- Run `bun run release:preflight`.
-- Run `bun run example:android:assemble`.
-- Run `bun run example:ios:build`.
-- Run `bun run example:smoke` after installing the native example app and starting Metro.
-- Create the GitHub release from the same ref as `.github/workflows/npm-publish.yml`.
-
-The GitHub release workflow runs `bun run release:preflight` before `npm publish` and publishes through npm Trusted Publishing.
-
-## Roadmap
-
-The current focus is:
-
-- keeping the core QR path fast and predictable
-- keeping the dependency surface small
-- improving styling without introducing renderer-heavy dependencies
-- keeping native, web, and example behavior aligned
-
-## License and Credits
-
-MIT.
-
-The C++ QR encoder is vendored from Project Nayuki's QR Code generator library under the MIT License.
+MIT

@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "env -u NO_COLOR expo start",
+    "start": "env -u NO_COLOR expo start -d",
     "web": "env -u NO_COLOR expo start --web",
     "ios": "env -u NO_COLOR expo run:ios",
     "android": "env -u NO_COLOR expo run:android",
@@ -18,9 +18,9 @@
     "check": "bun run lint && bun run typecheck && bun run doctor"
   },
   "dependencies": {
-    "expo": "^56.0.3",
-    "expo-build-properties": "~56.0.13",
-    "expo-router": "~56.2.5",
+    "expo": "~56.0.4",
+    "expo-build-properties": "~56.0.14",
+    "expo-router": "~56.2.6",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
     "react": "19.2.3",
@@ -29,7 +29,7 @@
     "react-native-nitro-modules": "0.35.7",
     "react-native-nitro-qrcode": "workspace:*",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "4.25.1",
+    "react-native-screens": "4.25.2",
     "react-native-web": "~0.21.0"
   },
   "devDependencies": {
