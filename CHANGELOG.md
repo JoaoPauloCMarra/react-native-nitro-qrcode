@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.1
+
+- Avoided redundant `<QRCode />` regeneration when nested `shapeOptions` or
+  `gradient` props are recreated with the same values.
+- Removed an extra image-clearing render while preserving `keepPreviousImage`
+  behavior on native and web.
+- Added `valid` to `QRCodeValidationResult` so validation flows can branch on a
+  typed boolean instead of checking the error array manually.
+- Tightened `logoBackgroundColor` to the same typed background color surface as
+  QR output.
+- Updated README examples, badges, compatibility notes, option tables, and
+  TypeScript guidance to match the current package API.
+- Updated the Expo example patch dependencies to current SDK 56-compatible
+  versions.
+- Hardened the C++ test harness so compiler and LLVM tooling resolve through
+  the active Xcode toolchain when PATH lookup is insufficient.
+
 ## 0.4.0
 
 - Updated the repo, package, and Expo example to Expo SDK 56, React Native 0.85, React 19.2, TypeScript 6, and Nitro Modules 0.35.7.

@@ -71,7 +71,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-nitro-modules": "0.35.7",
-    "expo-constants": "56.0.15",
+    "expo-constants": "~56.0.17",
     "@types/react": "~19.2.15"
   },
   "engines": {
