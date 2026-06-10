@@ -160,7 +160,7 @@ export type QRCodeProps = QRCodeOptions & {
   onReady?: (uri: string) => void;
   onError?: (error: Error) => void;
   logoPadding?: number;
-  logoBackgroundColor?: string;
+  logoBackgroundColor?: QRCodeBackgroundColor;
   testID?: string;
 };
 
@@ -180,6 +180,7 @@ export type QRCodeValidationError = {
 };
 
 export type QRCodeValidationResult = {
+  valid: boolean;
   warnings: QRCodeScanabilityWarning[];
   errors: QRCodeValidationError[];
 };
@@ -536,6 +537,7 @@ export function validateOptions(
     const normalized = normalizeOptions(options);
     const warnings = scanabilityWarnings(normalized);
     return {
+      valid: normalized.scanSafe !== "strict" || warnings.length === 0,
       warnings,
       errors:
         normalized.scanSafe === "strict"
@@ -547,6 +549,7 @@ export function validateOptions(
     };
   } catch (error: unknown) {
     return {
+      valid: false,
       warnings: [],
       errors: [{ code: "invalid", message: toError(error).message }],
     };
@@ -590,7 +593,10 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
   }: QRCodeProps,
   ref,
 ) {
-  const [uri, setUri] = useState<string>();
+  const [result, setResult] = useState<{
+    options: QRCodeOptions;
+    uri: string;
+  }>();
   const [generationError, setGenerationError] = useState<Error>();
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
@@ -601,6 +607,87 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
   const rasterScale = rasterSize / size;
   const resolvedLogoAreaSize =
     logoAreaSize ?? (logo !== undefined ? Math.round(size * 0.28) : 0);
+  const hasShapeOptions = shapeOptions !== undefined;
+  const shapeOptionsLayout = shapeOptions?.layout;
+  const shapeOptionsShape = shapeOptions?.shape;
+  const shapeOptionsEyeFrameShape = shapeOptions?.eyeFrameShape;
+  const shapeOptionsEyeballShape = shapeOptions?.eyeballShape;
+  const shapeOptionsEyePatternShape = shapeOptions?.eyePatternShape;
+  const shapeOptionsGap = shapeOptions?.gap;
+  const shapeOptionsEyePatternGap = shapeOptions?.eyePatternGap;
+  const shapeOptionsBodyDensity = shapeOptions?.bodyDensity;
+  const shapeOptionsCornerRadius = shapeOptions?.cornerRadius;
+  const shapeOptionsEyePatternCornerRadius =
+    shapeOptions?.eyePatternCornerRadius;
+  const gradientType = gradient?.type;
+  const gradientColors = gradient?.colors.join(",");
+  const gradientLocations = gradient?.locations?.join(",");
+  const gradientStartX = gradient?.start?.x;
+  const gradientStartY = gradient?.start?.y;
+  const gradientEndX = gradient?.end?.x;
+  const gradientEndY = gradient?.end?.y;
+  const stableShapeOptions = useMemo<QRCodeShapeOptions | undefined>(
+    () =>
+      !hasShapeOptions
+        ? undefined
+        : {
+            layout: shapeOptionsLayout,
+            shape: shapeOptionsShape,
+            eyeFrameShape: shapeOptionsEyeFrameShape,
+            eyeballShape: shapeOptionsEyeballShape,
+            eyePatternShape: shapeOptionsEyePatternShape,
+            gap: shapeOptionsGap,
+            eyePatternGap: shapeOptionsEyePatternGap,
+            bodyDensity: shapeOptionsBodyDensity,
+            cornerRadius: shapeOptionsCornerRadius,
+            eyePatternCornerRadius: shapeOptionsEyePatternCornerRadius,
+          },
+    [
+      hasShapeOptions,
+      shapeOptionsLayout,
+      shapeOptionsShape,
+      shapeOptionsEyeFrameShape,
+      shapeOptionsEyeballShape,
+      shapeOptionsEyePatternShape,
+      shapeOptionsGap,
+      shapeOptionsEyePatternGap,
+      shapeOptionsBodyDensity,
+      shapeOptionsCornerRadius,
+      shapeOptionsEyePatternCornerRadius,
+    ],
+  );
+  const stableGradient = useMemo<QRCodeGradient | undefined>(
+    () =>
+      gradientColors === undefined
+        ? undefined
+        : {
+            type: gradientType,
+            colors: gradientColors.split(",") as unknown as QRCodeGradientColors,
+            locations:
+              gradientLocations === undefined
+                ? undefined
+                : (gradientLocations
+                    .split(",")
+                    .map(Number) as unknown as QRCodeGradientLocations),
+            start:
+              gradientStartX === undefined || gradientStartY === undefined
+                ? undefined
+                : { x: gradientStartX, y: gradientStartY },
+            end:
+              gradientEndX === undefined || gradientEndY === undefined
+                ? undefined
+                : { x: gradientEndX, y: gradientEndY },
+          },
+    [
+      gradientColors,
+      gradientEndX,
+      gradientEndY,
+      gradientLocations,
+      gradientStartX,
+      gradientStartY,
+      gradientType,
+    ],
+  );
 
   const options = useMemo<QRCodeOptions>(
     () => ({
@@ -615,14 +702,14 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       eyeColor,
       eyeStrokeColor,
       eyeballColor,
-      gradient,
+      gradient: stableGradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
       orbit,
       shapeOptions: scaleShapeOptions(
-        mergePresetShapeOptions(shapeOptions, preset),
+        mergePresetShapeOptions(stableShapeOptions, preset),
         rasterScale,
       ),
       logoAreaSize: Math.round(resolvedLogoAreaSize * rasterScale),
@@ -633,7 +720,6 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
     [
       value,
       rasterSize,
-      shapeOptions,
       quietZone,
       errorCorrectionLevel,
       scanSafe,
@@ -643,13 +729,14 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       eyeColor,
       eyeStrokeColor,
       eyeballColor,
-      gradient,
+      stableGradient,
       minVersion,
       maxVersion,
       mask,
       boostEcl,
       orbit,
       preset,
+      stableShapeOptions,
       rasterScale,
       resolvedLogoAreaSize,
       logoAreaBorderRadius,
@@ -662,14 +749,10 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
   }, [onError, onReady]);
 
   useEffect(() => {
-    if (!keepPreviousImage) {
-      setUri(undefined);
-    }
-
     try {
       const nextUri = toPngDataUri(options);
       setGenerationError(undefined);
-      setUri(nextUri);
+      setResult({ options, uri: nextUri });
       onReadyRef.current?.(nextUri);
     } catch (error: unknown) {
       const nextError = toError(error);
@@ -680,7 +763,7 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
       }
       onErrorCallback(nextError);
     }
-  }, [keepPreviousImage, options]);
+  }, [options]);
 
   useImperativeHandle(
     ref,
@@ -691,6 +774,8 @@ export const QRCode = forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
     [options],
   );
 
+  const uri =
+    keepPreviousImage || result?.options === options ? result?.uri : undefined;
   const showLogo =
     logo !== undefined && (!hideLogoUntilReady || uri !== undefined);
 

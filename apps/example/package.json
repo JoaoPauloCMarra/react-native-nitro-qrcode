@@ -18,9 +18,9 @@
     "check": "bun run lint && bun run typecheck && bun run doctor"
   },
   "dependencies": {
-    "expo": "~56.0.4",
-    "expo-build-properties": "~56.0.14",
-    "expo-router": "~56.2.6",
+    "expo": "~56.0.9",
+    "expo-build-properties": "~56.0.17",
+    "expo-router": "~56.2.9",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
     "react": "19.2.3",

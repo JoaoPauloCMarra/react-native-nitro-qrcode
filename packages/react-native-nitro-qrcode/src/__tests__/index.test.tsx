@@ -894,6 +894,102 @@ describe("native QRCode API", () => {
     expect(secondReady).not.toHaveBeenCalled();
   });
 
+  it("does not regenerate native QR output when nested option identity changes without value changes", async () => {
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "stable-nested-options",
+          shapeOptions: { shape: "rounded", gap: 1 },
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            start: { x: 0, y: 0 },
+            end: { x: 1, y: 1 },
+          },
+          onReady: firstReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    const callsAfterInitialRender =
+      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+
+    await act(async () => {
+      tree?.update(
+        React.createElement(QRCode, {
+          value: "stable-nested-options",
+          shapeOptions: { shape: "rounded", gap: 1 },
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            start: { x: 0, y: 0 },
+            end: { x: 1, y: 1 },
+          },
+          onReady: secondReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+      callsAfterInitialRender,
+    );
+    expect(firstReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).not.toHaveBeenCalled();
+  });
+
+  it("keeps native gradient locations stable without explicit endpoints", async () => {
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "stable-gradient-locations",
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            locations: [0, 1],
+          },
+          onReady: firstReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+
+    const callsAfterInitialRender =
+      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+
+    await act(async () => {
+      tree?.update(
+        React.createElement(QRCode, {
+          value: "stable-gradient-locations",
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            locations: [0, 1],
+          },
+          onReady: secondReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+      callsAfterInitialRender,
+    );
+    expect(firstReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).not.toHaveBeenCalled();
+  });
+
   it("routes async native generation errors to onError when provided", async () => {
     const pending = createDeferred<never>();
     mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
@@ -961,9 +1057,11 @@ describe("native QRCode API", () => {
         expect.objectContaining({ code: "low-contrast" }),
       ]),
     );
+    expect(scanable.valid).toBe(true);
     expect(scanable.errors).toEqual([]);
 
     const invalid = NitroQRCode.validateOptions({ value: "" });
+    expect(invalid.valid).toBe(false);
     expect(invalid.errors).toHaveLength(1);
     expect(invalid.errors[0]?.code).toBe("invalid");
     expect(invalid.errors[0]?.message).toContain("must not be empty");
@@ -972,6 +1070,7 @@ describe("native QRCode API", () => {
       value: "https://example.com",
       scanSafe: "always" as unknown as true,
     });
+    expect(invalidScanSafe.valid).toBe(false);
     expect(invalidScanSafe.errors[0]?.message).toContain("scanSafe must be");
 
     expect(
@@ -996,6 +1095,7 @@ describe("native QRCode API", () => {
       backgroundColor: "#CCDDEE",
       scanSafe: "strict",
     });
+    expect(strict.valid).toBe(false);
     expect(strict.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "too-small-size" }),
@@ -1799,6 +1899,10 @@ describe("web QRCode API", () => {
       tree?.update(
         React.createElement(Web.QRCode, {
           value: "Hello",
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            locations: [0, 1],
+          },
           shapeOptions: { shape: "square", eyePatternGap: 1 },
         }),
       );
@@ -1831,6 +1935,28 @@ describe("web QRCode API", () => {
     expect(qrRef.current?.toPngBase64()).toBe("web-png");
   });
 
+  it("renders web component gradients with endpoints and default locations", async () => {
+    installCanvas();
+    const onReady = jest.fn();
+
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(Web.QRCode, {
+          value: "web-gradient-endpoints",
+          gradient: {
+            colors: ["#000000", "#FFFFFF"],
+            start: { x: 0, y: 0 },
+            end: { x: 1, y: 1 },
+          },
+          onReady,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(onReady).toHaveBeenCalledWith("data:image/png;base64,web-png");
+  });
+
   it("validates web scanability warnings and errors", () => {
     const scanable = Web.NitroQRCode.validateOptions({
       value: "https://example.com",
@@ -1851,9 +1977,11 @@ describe("web QRCode API", () => {
         expect.objectContaining({ code: "low-contrast" }),
       ]),
     );
+    expect(scanable.valid).toBe(true);
     expect(scanable.errors).toEqual([]);
 
     const invalid = Web.NitroQRCode.validateOptions({ value: "" });
+    expect(invalid.valid).toBe(false);
     expect(invalid.errors).toHaveLength(1);
     expect(invalid.errors[0]?.code).toBe("invalid");
     expect(invalid.errors[0]?.message).toContain("must not be empty");
@@ -1862,6 +1990,7 @@ describe("web QRCode API", () => {
       value: "https://example.com",
       scanSafe: "always" as unknown as true,
     });
+    expect(invalidScanSafe.valid).toBe(false);
     expect(invalidScanSafe.errors[0]?.message).toContain("scanSafe must be");
 
     expect(
@@ -1882,6 +2011,7 @@ describe("web QRCode API", () => {
       backgroundColor: "#CCDDEE",
       scanSafe: "strict",
     });
+    expect(strict.valid).toBe(false);
     expect(strict.errors).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "too-small-size" }),
