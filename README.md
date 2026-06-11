@@ -1,10 +1,13 @@
 # react-native-nitro-qrcode
 
 [![npm version](https://img.shields.io/npm/v/react-native-nitro-qrcode?color=f97316&label=npm)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
+[![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75%20%3C1.0-61dafb)](https://reactnative.dev/versions)
-[![Expo](https://img.shields.io/badge/expo-SDK%2056-000020)](https://docs.expo.dev/versions/latest/)
-[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.7%20%3C0.36-black)](https://nitro.margelo.com/)
+[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/expo-SDK%2056-000020)](https://docs.expo.dev/)
+[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.7-black)](https://nitro.margelo.com/)
+[![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
 Typed QR code generation for React Native, Expo development builds, and web.
 The native iOS and Android paths use a shared C++ Nitro module and the web path
@@ -20,6 +23,8 @@ deterministic caching.
 </p>
 
 ## Install
+
+Use your app's package manager to install the package and its Nitro peer:
 
 ```sh
 bun add react-native-nitro-qrcode react-native-nitro-modules
@@ -48,6 +53,7 @@ bare React Native app.
 | React | `>=18.2.0 <20.0.0` |
 | React Native | `>=0.75.0 <1.0.0` |
 | Nitro Modules | `>=0.35.7 <0.36.0` |
+| Expo | SDK 56 development builds |
 | React Native Web | `>=0.19.0 <1.0.0` |
 | Node | `>=18.0.0` |
 
@@ -194,14 +200,17 @@ errors so forms and design tooling can block risky output before rendering.
 The public API is intentionally narrow so editors and AI-assisted changes catch
 common mistakes before runtime:
 
-- colors are typed as hex strings, with `"transparent"` allowed only for
-  backgrounds;
+- colors are typed as `#...` strings and validated as hex at runtime, with
+  `"transparent"` allowed only for backgrounds;
 - gradient color and location arrays require 2 to 8 entries;
 - QR versions are limited to `1` through `40`;
 - mask patterns are limited to `-1` or `0` through `7`;
 - shapes, presets, density, layout, and error correction values are string
   literal unions;
 - `logoBackgroundColor` uses the same background color type as the QR output.
+
+These contracts are checked by the package's declaration tests, so changes to
+the public types fail CI when they stop rejecting invalid options.
 
 ## API
 
@@ -226,8 +235,8 @@ Main exports:
 | `quietZone` | Quiet-zone width in QR modules. |
 | `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases. |
 | `scanSafe` | Raises unsafe defaults; `"strict"` turns scanability warnings into errors. |
-| `foregroundColor` | Hex foreground color. |
-| `backgroundColor` | Hex background color or `"transparent"`. |
+| `foregroundColor` | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color. |
+| `backgroundColor` | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`. |
 | `strokeColor` | Optional body-module stroke color. |
 | `eyeColor` | Finder frame fill color. |
 | `eyeStrokeColor` | Finder frame stroke color. |
@@ -275,13 +284,22 @@ Main exports:
 ```sh
 bun install
 bun run check
+bun run test:types
 bun run release:preflight
 bun run example:android
 bun run example:ios
 ```
 
 Run native example builds before release when changing plugin, native, Nitro, or
-packaging files.
+packaging files. Use `bun run example:smoke -- --strict` when a release must
+fail if no Android device or booted iOS simulator is available.
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/react-native-nitro-qrcode)
+- [GitHub repository](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode)
+- [Issues](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/issues)
+- [Changelog](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/CHANGELOG.md)
 
 ## License
 

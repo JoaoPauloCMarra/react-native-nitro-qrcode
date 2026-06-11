@@ -1,7 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["jest", "node"]
+    "types": [
+      "jest",
+      "node"
+    ],
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": false
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ]
 }

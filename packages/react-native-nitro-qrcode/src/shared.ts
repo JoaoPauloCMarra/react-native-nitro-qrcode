@@ -1,0 +1,943 @@
+import type { ReactNode } from "react";
+import {
+  StyleSheet,
+  type ImageStyle,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+
+export type ErrorCorrectionLevel =
+  | "L"
+  | "M"
+  | "Q"
+  | "H"
+  | "low"
+  | "medium"
+  | "quartile"
+  | "high";
+
+export type QRCodeBodyShape = "square" | "circle" | "rounded";
+
+export type QRCodeShape = QRCodeBodyShape;
+
+export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
+
+export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
+
+export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
+
+export type QRCodeBodyDensity = "sparse" | "balanced" | "dense";
+
+export type QRCodeLayout = "matrix";
+
+export type QRCodeShapeOptions = {
+  layout?: QRCodeLayout;
+  shape?: QRCodeBodyShape;
+  eyeFrameShape?: QRCodeEyeFrameShape;
+  eyeballShape?: QRCodeEyeBallShape;
+  /** @deprecated Use eyeFrameShape. */
+  eyePatternShape?: QRCodeEyePatternShape;
+  gap?: number;
+  eyePatternGap?: number;
+  bodyDensity?: QRCodeBodyDensity;
+  cornerRadius?: number;
+  eyePatternCornerRadius?: number;
+};
+
+export type QRCodeGradientType = "linear" | "radial";
+
+export type QRCodeGradientPoint = {
+  x: number;
+  y: number;
+};
+
+export type QRCodeColor = `#${string}`;
+
+export type QRCodeBackgroundColor = QRCodeColor | "transparent";
+
+export type QRCodeMaskPattern = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type QRCodeVersion =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20
+  | 21
+  | 22
+  | 23
+  | 24
+  | 25
+  | 26
+  | 27
+  | 28
+  | 29
+  | 30
+  | 31
+  | 32
+  | 33
+  | 34
+  | 35
+  | 36
+  | 37
+  | 38
+  | 39
+  | 40;
+
+export type Tuple2To8<T> =
+  | readonly [T, T]
+  | readonly [T, T, T]
+  | readonly [T, T, T, T]
+  | readonly [T, T, T, T, T]
+  | readonly [T, T, T, T, T, T]
+  | readonly [T, T, T, T, T, T, T]
+  | readonly [T, T, T, T, T, T, T, T];
+
+export type QRCodeGradientColors = Tuple2To8<QRCodeColor>;
+
+export type QRCodeGradientLocations = Tuple2To8<number>;
+
+export type QRCodeGradient = {
+  type?: QRCodeGradientType;
+  colors: QRCodeGradientColors;
+  locations?: QRCodeGradientLocations;
+  start?: QRCodeGradientPoint;
+  end?: QRCodeGradientPoint;
+};
+
+export type QRCodePreset = "default" | "rounded" | "dots" | "branded";
+
+export type QRCodeOptions = {
+  value: string;
+  size?: number;
+  quietZone?: number;
+  errorCorrectionLevel?: ErrorCorrectionLevel;
+  scanSafe?: boolean | "strict";
+  foregroundColor?: QRCodeColor;
+  backgroundColor?: QRCodeBackgroundColor;
+  strokeColor?: QRCodeColor;
+  eyeColor?: QRCodeColor;
+  eyeStrokeColor?: QRCodeColor;
+  eyeballColor?: QRCodeColor;
+  gradient?: QRCodeGradient;
+  minVersion?: QRCodeVersion;
+  maxVersion?: QRCodeVersion;
+  mask?: QRCodeMaskPattern;
+  boostEcl?: boolean;
+  orbit?: boolean;
+  shapeOptions?: QRCodeShapeOptions;
+  logoAreaSize?: number;
+  logoAreaBorderRadius?: number;
+};
+
+export type QRCodeMatrix = {
+  size: number;
+  packedBase64: string;
+};
+
+export type QRCodeProps = QRCodeOptions & {
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
+  logo?: ReactNode;
+  placeholder?: ReactNode;
+  preset?: QRCodePreset;
+  keepPreviousImage?: boolean;
+  hideLogoUntilReady?: boolean;
+  onReady?: (uri: string) => void;
+  onError?: (error: Error) => void;
+  logoPadding?: number;
+  logoBackgroundColor?: QRCodeBackgroundColor;
+  testID?: string;
+};
+
+export type QRCodeScanabilityWarning = {
+  code:
+    | "low-contrast"
+    | "too-small-size"
+    | "logo-too-large"
+    | "low-ecl-for-logo"
+    | "bad-quiet-zone";
+  message: string;
+};
+
+export type QRCodeValidationError = {
+  code: string;
+  message: string;
+};
+
+export type QRCodeValidationResult = {
+  valid: boolean;
+  warnings: QRCodeScanabilityWarning[];
+  errors: QRCodeValidationError[];
+};
+
+export type QRCodeRef = {
+  toPngDataUri: () => string;
+  toPngBase64: () => string;
+};
+
+export type NitroQRCodeApi = Readonly<{
+  toPngBase64: (options: QRCodeOptions) => string;
+  toPngDataUri: (options: QRCodeOptions) => string;
+  toPngBase64Async: (options: QRCodeOptions) => Promise<string>;
+  toPngDataUriAsync: (options: QRCodeOptions) => Promise<string>;
+  toSvgString: (options: QRCodeOptions) => string;
+  getMatrix: (options: QRCodeOptions) => QRCodeMatrix;
+  validateOptions: (options: QRCodeOptions) => QRCodeValidationResult;
+  clearCache: () => void;
+  getCacheSize: () => number;
+}>;
+
+export const DEFAULT_SIZE = 512;
+
+export const DEFAULT_QUIET_ZONE = 4;
+
+export const DEFAULT_ECL: ErrorCorrectionLevel = "M";
+
+export const DEFAULT_FOREGROUND = "#000000";
+
+export const DEFAULT_BACKGROUND = "#FFFFFF";
+
+export const DEFAULT_STROKE = "#000000";
+
+export const DEFAULT_EYE = "#000000";
+
+export const DEFAULT_EYE_STROKE = "#000000";
+
+export const DEFAULT_EYEBALL = "#000000";
+
+export const DEFAULT_MIN_VERSION = 1;
+
+export const DEFAULT_MAX_VERSION = 40;
+
+export const DEFAULT_MASK = -1;
+
+export const DEFAULT_BOOST_ECL = true;
+
+export const DEFAULT_SHAPE: QRCodeBodyShape = "square";
+
+export const DEFAULT_EYE_FRAME_SHAPE: QRCodeEyeFrameShape = "square";
+
+export const DEFAULT_EYEBALL_SHAPE: QRCodeEyeBallShape = "square";
+
+export const DEFAULT_BODY_DENSITY: QRCodeBodyDensity = "dense";
+
+export const DEFAULT_LAYOUT: QRCodeLayout = "matrix";
+
+export const DEFAULT_LOGO_AREA_SIZE = 0;
+
+export const DEFAULT_LOGO_AREA_BORDER_RADIUS = 0;
+
+export const COMPONENT_RASTER_MULTIPLIER = 2;
+
+export const MIN_COMPONENT_RASTER_SIZE = 96;
+
+export const DEFAULT_LINEAR_START: QRCodeGradientPoint = { x: 0, y: 0 };
+
+export const DEFAULT_LINEAR_END: QRCodeGradientPoint = { x: 1, y: 1 };
+
+export const DEFAULT_RADIAL_START: QRCodeGradientPoint = { x: 0.5, y: 0.5 };
+
+export const DEFAULT_RADIAL_END: QRCodeGradientPoint = { x: 1, y: 1 };
+
+export const DEFAULT_KEEP_PREVIOUS_IMAGE = true;
+
+export const DEFAULT_HIDE_LOGO_UNTIL_READY = true;
+
+export const SCANABILITY_MINIMUM_SIZE = 120;
+
+export const SCANABILITY_QUIET_ZONE_MINIMUM = 2;
+
+export const SCAN_SAFE_QUIET_ZONE_MINIMUM = 4;
+
+export const SCANABILITY_QUIET_ZONE_MAXIMUM = 12;
+
+export const SCANABILITY_LOGO_SIZE_LIMIT = 0.3;
+
+export const SCANABILITY_LOW_CONTRAST = 2.5;
+
+export const PRESET_SHAPE_OPTIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
+  default: {
+    shape: "square",
+    eyeFrameShape: "square",
+    eyeballShape: "square",
+  },
+  rounded: {
+    shape: "rounded",
+    eyeFrameShape: "rounded",
+    eyeballShape: "rounded",
+    cornerRadius: 8,
+    eyePatternCornerRadius: 8,
+  },
+  dots: {
+    shape: "circle",
+    eyeFrameShape: "circle",
+    eyeballShape: "circle",
+    gap: 1,
+    eyePatternGap: 1,
+    cornerRadius: 0,
+    eyePatternCornerRadius: 0,
+  },
+  branded: {
+    shape: "rounded",
+    eyeFrameShape: "square",
+    eyeballShape: "rounded",
+    gap: 1,
+    eyePatternGap: 1,
+    cornerRadius: 6,
+    eyePatternCornerRadius: 6,
+  },
+};
+
+export function validateOptions(
+  options: QRCodeOptions,
+): QRCodeValidationResult {
+  try {
+    const normalized = normalizeOptions(options);
+    const warnings = scanabilityWarnings(normalized);
+    return {
+      valid: normalized.scanSafe !== "strict" || warnings.length === 0,
+      warnings,
+      errors:
+        normalized.scanSafe === "strict"
+          ? warnings.map((warning) => ({
+              code: warning.code,
+              message: warning.message,
+            }))
+          : [],
+    };
+  } catch (error: unknown) {
+    return {
+      valid: false,
+      warnings: [],
+      errors: [{ code: "invalid", message: toError(error).message }],
+    };
+  }
+}
+
+export type NormalizedOptions = Required<
+  Omit<
+    QRCodeOptions,
+    "errorCorrectionLevel" | "scanSafe" | "shapeOptions" | "gradient" | "orbit"
+  >
+> & {
+  errorCorrectionLevel: "L" | "M" | "Q" | "H";
+  scanSafe: false | "standard" | "strict";
+  shapeOptions: Required<QRCodeShapeOptions>;
+  gradient: NormalizedGradient;
+};
+
+export type NormalizedGradient = {
+  type: QRCodeGradientType | "none";
+  colors: string[];
+  locations: number[];
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+};
+
+export function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
+  if (options.value.length === 0) {
+    throw new Error("QRCode value must not be empty.");
+  }
+
+  const size = sanitizeInteger(options.size, DEFAULT_SIZE, "size", 1, 4096);
+  const logoAreaSize = sanitizeInteger(
+    options.logoAreaSize,
+    DEFAULT_LOGO_AREA_SIZE,
+    "logoAreaSize",
+    0,
+    4096,
+  );
+  const logoAreaBorderRadius = sanitizeInteger(
+    options.logoAreaBorderRadius,
+    DEFAULT_LOGO_AREA_BORDER_RADIUS,
+    "logoAreaBorderRadius",
+    0,
+    2048,
+  );
+  validateLogoDimensions(logoAreaSize, logoAreaBorderRadius, size);
+  const minVersion = sanitizeVersion(
+    options.minVersion,
+    DEFAULT_MIN_VERSION,
+    "minVersion",
+  );
+  const maxVersion = sanitizeVersion(
+    options.maxVersion,
+    DEFAULT_MAX_VERSION,
+    "maxVersion",
+  );
+  validateVersionRange(minVersion, maxVersion);
+
+  const scanSafe = normalizeScanSafe(options.scanSafe);
+  const requestedQuietZone = sanitizeInteger(
+    options.quietZone,
+    DEFAULT_QUIET_ZONE,
+    "quietZone",
+    0,
+    32,
+  );
+  const requestedEcl = normalizeEcl(
+    options.errorCorrectionLevel ?? DEFAULT_ECL,
+  );
+  const quietZone =
+    scanSafe === false
+      ? requestedQuietZone
+      : Math.max(requestedQuietZone, SCAN_SAFE_QUIET_ZONE_MINIMUM);
+  const errorCorrectionLevel =
+    scanSafe !== false && logoAreaSize > 0 ? "H" : requestedEcl;
+
+  return {
+    value: options.value,
+    size,
+    quietZone,
+    errorCorrectionLevel,
+    scanSafe,
+    foregroundColor: sanitizeColor(
+      options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "foregroundColor",
+    ),
+    backgroundColor: sanitizeBackgroundColor(
+      options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "backgroundColor",
+    ),
+    strokeColor: sanitizeColor(
+      options.strokeColor ?? DEFAULT_STROKE,
+      "strokeColor",
+    ),
+    eyeColor: sanitizeColor(options.eyeColor ?? DEFAULT_EYE, "eyeColor"),
+    eyeStrokeColor: sanitizeColor(
+      options.eyeStrokeColor ?? DEFAULT_EYE_STROKE,
+      "eyeStrokeColor",
+    ),
+    eyeballColor: sanitizeColor(
+      options.eyeballColor ?? DEFAULT_EYEBALL,
+      "eyeballColor",
+    ),
+    gradient: normalizeGradient(options.gradient),
+    minVersion,
+    maxVersion,
+    mask: sanitizeMask(options.mask, DEFAULT_MASK),
+    boostEcl: options.boostEcl ?? DEFAULT_BOOST_ECL,
+    shapeOptions: normalizeShapeOptions(options.shapeOptions, options.orbit),
+    logoAreaSize,
+    logoAreaBorderRadius,
+  };
+}
+
+export function normalizeScanSafe(
+  value: QRCodeOptions["scanSafe"] | undefined,
+): false | "standard" | "strict" {
+  if (value === undefined || value === false) {
+    return false;
+  }
+  if (value === true) {
+    return "standard";
+  }
+  if (value === "strict") {
+    return "strict";
+  }
+  throw new Error("scanSafe must be true, false, or strict.");
+}
+
+export function normalizeGradient(
+  gradient: QRCodeGradient | undefined,
+): NormalizedGradient {
+  if (gradient === undefined) {
+    return {
+      type: "none",
+      colors: [],
+      locations: [],
+      startX: DEFAULT_LINEAR_START.x,
+      startY: DEFAULT_LINEAR_START.y,
+      endX: DEFAULT_LINEAR_END.x,
+      endY: DEFAULT_LINEAR_END.y,
+    };
+  }
+
+  const type = sanitizeGradientType(gradient.type);
+  const colors = gradient.colors.map((color, index) =>
+    sanitizeColor(color, `gradient.colors[${index}]`),
+  );
+  if (colors.length < 2 || colors.length > 8) {
+    throw new Error("gradient.colors must contain between 2 and 8 colors.");
+  }
+
+  const locations = normalizeGradientLocations(
+    gradient.locations,
+    colors.length,
+  );
+  const start = sanitizeGradientPoint(
+    gradient.start,
+    type === "radial" ? DEFAULT_RADIAL_START : DEFAULT_LINEAR_START,
+    "gradient.start",
+  );
+  const end = sanitizeGradientPoint(
+    gradient.end,
+    type === "radial" ? DEFAULT_RADIAL_END : DEFAULT_LINEAR_END,
+    "gradient.end",
+  );
+
+  return {
+    type,
+    colors,
+    locations,
+    startX: start.x,
+    startY: start.y,
+    endX: end.x,
+    endY: end.y,
+  };
+}
+
+export function normalizeShapeOptions(
+  options: QRCodeShapeOptions | undefined,
+  _orbit: boolean | undefined,
+): Required<QRCodeShapeOptions> {
+  return {
+    layout: sanitizeLayout(options?.layout),
+    shape: sanitizeShape(options?.shape, "shape"),
+    eyeFrameShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
+    eyeballShape: sanitizeEyeballShape(options?.eyeballShape),
+    eyePatternShape: sanitizeEyeFrameShape(
+      options?.eyeFrameShape ?? options?.eyePatternShape,
+    ),
+    gap: sanitizeInteger(options?.gap, 0, "gap", 0, 256),
+    eyePatternGap: sanitizeInteger(
+      options?.eyePatternGap,
+      options?.gap ?? 0,
+      "eyePatternGap",
+      0,
+      256,
+    ),
+    bodyDensity: sanitizeBodyDensity(options?.bodyDensity),
+    cornerRadius: sanitizeOptionalInteger(
+      options?.cornerRadius,
+      "cornerRadius",
+      0,
+      256,
+    ),
+    eyePatternCornerRadius: sanitizeOptionalInteger(
+      options?.eyePatternCornerRadius,
+      "eyePatternCornerRadius",
+      0,
+      256,
+    ),
+  };
+}
+
+export function mergePresetShapeOptions(
+  options: QRCodeShapeOptions | undefined,
+  preset: QRCodePreset | undefined,
+): QRCodeShapeOptions {
+  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...options };
+}
+
+export function scanabilityWarnings(
+  options: NormalizedOptions,
+): QRCodeScanabilityWarning[] {
+  const warnings: QRCodeScanabilityWarning[] = [];
+
+  if (options.size < SCANABILITY_MINIMUM_SIZE) {
+    warnings.push({
+      code: "too-small-size",
+      message:
+        "QRCode size is below 120; tiny modules reduce scan range and increase read failures.",
+    });
+  }
+
+  if (options.quietZone < SCANABILITY_QUIET_ZONE_MINIMUM) {
+    warnings.push({
+      code: "bad-quiet-zone",
+      message:
+        "quietZone is low; using at least 2 quiet modules improves scan reliability.",
+    });
+  }
+
+  if (options.quietZone > SCANABILITY_QUIET_ZONE_MAXIMUM) {
+    warnings.push({
+      code: "bad-quiet-zone",
+      message:
+        "quietZone is high and may reduce symbol density on small symbol sizes.",
+    });
+  }
+
+  if (options.logoAreaSize > options.size * SCANABILITY_LOGO_SIZE_LIMIT) {
+    warnings.push({
+      code: "logo-too-large",
+      message:
+        "logoAreaSize is large; keep the logo under ~30% for better scan reliability.",
+    });
+  }
+
+  if (
+    options.logoAreaSize > 0 &&
+    (options.errorCorrectionLevel === "L" ||
+      options.errorCorrectionLevel === "M") &&
+    options.logoAreaSize > options.size * 0.2
+  ) {
+    warnings.push({
+      code: "low-ecl-for-logo",
+      message:
+        "errorCorrectionLevel is low for a large logo. Use Q/H to reduce decode failures.",
+    });
+  }
+
+  if (options.backgroundColor !== "transparent") {
+    const contrast = contrastRatio(
+      parseHexColor(options.foregroundColor),
+      parseHexColor(options.backgroundColor),
+    );
+    if (contrast < SCANABILITY_LOW_CONTRAST) {
+      warnings.push({
+        code: "low-contrast",
+        message:
+          "foregroundColor and backgroundColor contrast is low; low-contrast codes are harder to scan.",
+      });
+    }
+  }
+
+  return warnings;
+}
+
+export function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
+  const resolved = value ?? DEFAULT_LAYOUT;
+  if (resolved !== "matrix") {
+    throw new Error("layout must be matrix; radial layouts are not scan-safe.");
+  }
+  return resolved;
+}
+
+export function sanitizeShape(
+  value: QRCodeBodyShape | undefined,
+  name: string,
+): QRCodeBodyShape {
+  const resolved = value ?? DEFAULT_SHAPE;
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error(`${name} must be square, circle, or rounded.`);
+  }
+  return resolved;
+}
+
+export function sanitizeEyeFrameShape(
+  value: QRCodeEyeFrameShape | undefined,
+): QRCodeEyeFrameShape {
+  const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error("eyeFrameShape must be square, circle, or rounded.");
+  }
+  return resolved;
+}
+
+export function sanitizeEyeballShape(
+  value: QRCodeEyeBallShape | undefined,
+): QRCodeEyeBallShape {
+  const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
+  if (
+    resolved !== "square" &&
+    resolved !== "circle" &&
+    resolved !== "rounded"
+  ) {
+    throw new Error("eyeballShape must be square, circle, or rounded.");
+  }
+  return resolved;
+}
+
+export function sanitizeBodyDensity(
+  value: QRCodeBodyDensity | undefined,
+): QRCodeBodyDensity {
+  const resolved = value ?? DEFAULT_BODY_DENSITY;
+  if (
+    resolved !== "sparse" &&
+    resolved !== "balanced" &&
+    resolved !== "dense"
+  ) {
+    throw new Error("bodyDensity must be sparse, balanced, or dense.");
+  }
+  return resolved;
+}
+
+export function sanitizeGradientType(
+  value: QRCodeGradientType | undefined,
+): QRCodeGradientType {
+  const resolved = value ?? "linear";
+  if (resolved !== "linear" && resolved !== "radial") {
+    throw new Error("gradient.type must be linear or radial.");
+  }
+  return resolved;
+}
+
+export function normalizeGradientLocations(
+  value: readonly number[] | undefined,
+  colorCount: number,
+): number[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (value.length !== colorCount) {
+    throw new Error(
+      "gradient.locations must match gradient.colors length when provided.",
+    );
+  }
+
+  return value.map((location, index) => {
+    if (!Number.isFinite(location) || location < 0 || location > 1) {
+      throw new Error(
+        "gradient.locations entries must be finite numbers between 0 and 1.",
+      );
+    }
+    const previous = value[index - 1];
+    if (previous !== undefined && location < previous) {
+      throw new Error("gradient.locations must be in non-decreasing order.");
+    }
+    return location;
+  });
+}
+
+export function sanitizeGradientPoint(
+  value: QRCodeGradientPoint | undefined,
+  fallback: QRCodeGradientPoint,
+  name: string,
+): QRCodeGradientPoint {
+  const point = value ?? fallback;
+  return {
+    x: sanitizeUnitNumber(point.x, `${name}.x`),
+    y: sanitizeUnitNumber(point.y, `${name}.y`),
+  };
+}
+
+export function sanitizeUnitNumber(value: number, name: string): number {
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${name} must be a finite number between 0 and 1.`);
+  }
+  return value;
+}
+
+export function sanitizeColor(value: string, name: string): QRCodeColor {
+  return sanitizeHexColor(value, name);
+}
+
+export function sanitizeBackgroundColor(
+  value: string,
+  name: string,
+): QRCodeBackgroundColor {
+  if (value.toLowerCase() === "transparent") {
+    return "transparent";
+  }
+  return sanitizeHexColor(value, name);
+}
+
+export function sanitizeHexColor(value: string, name: string): QRCodeColor {
+  if (/^#[0-9A-Fa-f]{3}([0-9A-Fa-f])?$/.test(value)) {
+    const hex = value.slice(1);
+    return `#${hex
+      .split("")
+      .map((character) => character + character)
+      .join("")}`.toUpperCase() as QRCodeColor;
+  }
+  if (!/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)) {
+    throw new Error(
+      `${name} must be #RGB, #RGBA, #RRGGBB, or #RRGGBBAA.`,
+    );
+  }
+  return value.toUpperCase() as QRCodeColor;
+}
+
+export function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+export function parseHexColor(color: string): {
+  red: number;
+  green: number;
+  blue: number;
+} {
+  const hex = color.replace(/^#/, "");
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  const alpha =
+    hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) / 255 : 1;
+  return {
+    red: Math.round(red * alpha + 255 * (1 - alpha)),
+    green: Math.round(green * alpha + 255 * (1 - alpha)),
+    blue: Math.round(blue * alpha + 255 * (1 - alpha)),
+  };
+}
+
+export function linearizeChannel(value: number): number {
+  const normalized = value / 255;
+  return normalized <= 0.03928
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+export function relativeLuminance(color: {
+  red: number;
+  green: number;
+  blue: number;
+}): number {
+  return (
+    0.2126 * linearizeChannel(color.red) +
+    0.7152 * linearizeChannel(color.green) +
+    0.0722 * linearizeChannel(color.blue)
+  );
+}
+
+export function contrastRatio(
+  first: { red: number; green: number; blue: number },
+  second: { red: number; green: number; blue: number },
+): number {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const light = Math.max(firstLuminance, secondLuminance);
+  const dark = Math.min(firstLuminance, secondLuminance);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+export function validateLogoDimensions(
+  logoAreaSize: number,
+  logoAreaBorderRadius: number,
+  size: number,
+): void {
+  if (logoAreaSize > size) {
+    throw new Error("logoAreaSize must be between 0 and size.");
+  }
+  if (logoAreaBorderRadius > size / 2) {
+    throw new Error(
+      "logoAreaBorderRadius must be between 0 and half the size.",
+    );
+  }
+}
+
+export function validateVersionRange(minVersion: number, maxVersion: number): void {
+  if (minVersion > maxVersion) {
+    throw new Error(
+      "minVersion and maxVersion must be between 1 and 40, with minVersion <= maxVersion.",
+    );
+  }
+}
+
+export function scaleShapeOptions(
+  options: QRCodeShapeOptions,
+  scale: number,
+): QRCodeShapeOptions {
+  return {
+    layout: options.layout,
+    shape: options.shape,
+    eyeFrameShape: options.eyeFrameShape,
+    eyeballShape: options.eyeballShape,
+    eyePatternShape: options.eyePatternShape,
+    bodyDensity: options.bodyDensity,
+    gap:
+      options.gap === undefined ? undefined : Math.round(options.gap * scale),
+    eyePatternGap:
+      options.eyePatternGap === undefined
+        ? undefined
+        : Math.round(options.eyePatternGap * scale),
+    cornerRadius:
+      options.cornerRadius === undefined
+        ? undefined
+        : Math.round(options.cornerRadius * scale),
+    eyePatternCornerRadius:
+      options.eyePatternCornerRadius === undefined
+        ? undefined
+        : Math.round(options.eyePatternCornerRadius * scale),
+  };
+}
+
+export function normalizeEcl(value: ErrorCorrectionLevel): "L" | "M" | "Q" | "H" {
+  if (value === "L" || value === "M" || value === "Q" || value === "H") {
+    return value;
+  }
+  if (value === "low") return "L";
+  if (value === "medium") return "M";
+  if (value === "quartile") return "Q";
+  if (value === "high") return "H";
+  throw new Error(
+    "errorCorrectionLevel must be L, M, Q, H, low, medium, quartile, or high.",
+  );
+}
+
+export function sanitizeInteger(
+  value: number | undefined,
+  fallback: number,
+  name: string,
+  min: number,
+  max: number,
+): number {
+  const resolved = value ?? fallback;
+  if (!Number.isInteger(resolved) || resolved < min || resolved > max) {
+    throw new Error(`${name} must be an integer between ${min} and ${max}.`);
+  }
+  return resolved;
+}
+
+export function sanitizeVersion(
+  value: QRCodeVersion | undefined,
+  fallback: QRCodeVersion,
+  name: string,
+): QRCodeVersion {
+  return sanitizeInteger(value, fallback, name, 1, 40) as QRCodeVersion;
+}
+
+export function sanitizeMask(
+  value: QRCodeMaskPattern | undefined,
+  fallback: QRCodeMaskPattern,
+): QRCodeMaskPattern {
+  return sanitizeInteger(value, fallback, "mask", -1, 7) as QRCodeMaskPattern;
+}
+
+export function sanitizeOptionalInteger(
+  value: number | undefined,
+  name: string,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined) {
+    return -1;
+  }
+  return sanitizeInteger(value, -1, name, min, max);
+}
+
+export const styles = StyleSheet.create({
+  frame: {
+    overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  logo: {
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    pointerEvents: "none",
+    position: "absolute",
+  },
+});
