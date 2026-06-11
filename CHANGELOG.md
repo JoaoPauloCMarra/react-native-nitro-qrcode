@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2
+
+- Shipped the current package artifact with the README, badges, compatibility
+  table, option reference, and TypeScript guidance aligned to the package API.
+- Kept native and web QR component behavior consistent by sharing option
+  normalization, validation, and component generation logic across entrypoints.
+- Hardened public TypeScript contracts for QRCode colors, gradients, versions,
+  masks, layouts, and component props.
+
 ## 0.4.1
 
 - Avoided redundant `<QRCode />` regeneration when nested `shapeOptions` or
@@ -10,8 +19,8 @@
   typed boolean instead of checking the error array manually.
 - Tightened `logoBackgroundColor` to the same typed background color surface as
   QR output.
-- Updated README examples, compatibility notes, option tables, and TypeScript
-  guidance to match the current package API.
+- Updated README examples, badges, compatibility notes, option tables, and
+  TypeScript guidance to match the current package API.
 
 ## 0.4.0
 
