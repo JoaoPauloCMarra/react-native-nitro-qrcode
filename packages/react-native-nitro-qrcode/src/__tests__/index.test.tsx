@@ -70,6 +70,7 @@ import {
   toPngDataUri,
   toPngDataUriAsync,
   toSvgString,
+  validateOptions,
 } from "../index";
 import * as Web from "../index.web";
 
@@ -92,6 +93,13 @@ function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
     )
   );
 }
+
+describe("entrypoint export parity", () => {
+  it("re-exports validateOptions on both entrypoints", () => {
+    expect(validateOptions).toBe(NitroQRCode.validateOptions);
+    expect(Web.validateOptions).toBe(Web.NitroQRCode.validateOptions);
+  });
+});
 
 describe("native QRCode API", () => {
   beforeEach(() => {
@@ -988,6 +996,77 @@ describe("native QRCode API", () => {
     );
     expect(firstReady).toHaveBeenCalledTimes(1);
     expect(secondReady).not.toHaveBeenCalled();
+  });
+
+  it("preserves native component gradient tuples from three to eight stops", async () => {
+    const scenarios = [
+      {
+        colors: ["#111111", "#222222", "#333333"],
+        locations: [0, 0.5, 1],
+      },
+      {
+        colors: ["#111111", "#222222", "#333333", "#444444"],
+        locations: [0, 0.33, 0.66, 1],
+      },
+      {
+        colors: ["#111111", "#222222", "#333333", "#444444", "#555555"],
+        locations: [0, 0.25, 0.5, 0.75, 1],
+      },
+      {
+        colors: [
+          "#111111",
+          "#222222",
+          "#333333",
+          "#444444",
+          "#555555",
+          "#666666",
+        ],
+        locations: [0, 0.2, 0.4, 0.6, 0.8, 1],
+      },
+      {
+        colors: [
+          "#111111",
+          "#222222",
+          "#333333",
+          "#444444",
+          "#555555",
+          "#666666",
+          "#777777",
+        ],
+        locations: [0, 0.17, 0.34, 0.5, 0.67, 0.84, 1],
+      },
+      {
+        colors: [
+          "#111111",
+          "#222222",
+          "#333333",
+          "#444444",
+          "#555555",
+          "#666666",
+          "#777777",
+          "#888888",
+        ],
+        locations: [0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.84, 1],
+      },
+    ] as const;
+
+    for (const [index, scenario] of scenarios.entries()) {
+      await act(async () => {
+        TestRenderer.create(
+          React.createElement(QRCode, {
+            value: `gradient-${index}`,
+            gradient: scenario,
+          }),
+        );
+        await Promise.resolve();
+      });
+
+      const call = mockHybridObject.generatePngDataUriAsync.mock.calls.at(-1) as
+        | readonly unknown[]
+        | undefined;
+      expect(call?.[26]).toEqual(scenario.colors);
+      expect(call?.[27]).toEqual(scenario.locations);
+    }
   });
 
   it("routes async native generation errors to onError when provided", async () => {

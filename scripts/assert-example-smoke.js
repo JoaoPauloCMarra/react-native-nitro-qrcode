@@ -13,6 +13,8 @@ const FAILURE_TEXT = [
   "Application has not been registered",
   "Exception",
 ];
+const strict =
+  process.argv.includes("--strict") || process.env.QRCODE_SMOKE_STRICT === "1";
 
 function commandExists(command) {
   return spawnSync(command, ["--version"], { stdio: "ignore" }).status === 0;
@@ -38,12 +40,20 @@ function assertVisible(output, platform) {
 
 function smokeAndroid() {
   if (!commandExists("adb")) {
+    if (strict) {
+      throw new Error("Android smoke requires adb in strict mode.");
+    }
     console.log("Android smoke skipped: adb is unavailable.");
     return;
   }
 
   const devices = run("adb", ["devices"]);
   if (!/\tdevice\b/.test(devices)) {
+    if (strict) {
+      throw new Error(
+        "Android smoke requires a connected adb device in strict mode.",
+      );
+    }
     console.log("Android smoke skipped: no adb device is connected.");
     return;
   }
@@ -58,12 +68,18 @@ function smokeAndroid() {
 
 function smokeIos() {
   if (!commandExists("xcrun")) {
+    if (strict) {
+      throw new Error("iOS smoke requires xcrun in strict mode.");
+    }
     console.log("iOS smoke skipped: xcrun is unavailable.");
     return;
   }
 
   const booted = run("xcrun", ["simctl", "list", "devices", "booted"]);
   if (!booted.includes("Booted")) {
+    if (strict) {
+      throw new Error("iOS smoke requires a booted simulator in strict mode.");
+    }
     console.log("iOS smoke skipped: no booted simulator is available.");
     return;
   }

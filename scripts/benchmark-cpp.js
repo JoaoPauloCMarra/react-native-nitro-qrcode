@@ -1,4 +1,4 @@
-const { execSync } = require("child_process");
+const { execFileSync, execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -12,6 +12,26 @@ const cppDir = path.join(packageDir, "cpp");
 const buildDir = path.join(cppDir, "build");
 const outputFile = path.join(buildDir, "qrcode_generator_benchmark");
 
+function resolveTool(name) {
+  try {
+    return execSync(`command -v ${name}`, { encoding: "utf8" }).trim();
+  } catch {
+    if (process.platform !== "darwin") {
+      throw new Error(`${name} was not found on PATH.`);
+    }
+
+    return execFileSync("xcrun", ["--find", name], {
+      encoding: "utf8",
+    }).trim();
+  }
+}
+
+function runCommand(command, args) {
+  execFileSync(command, args, {
+    stdio: "inherit",
+  });
+}
+
 fs.rmSync(buildDir, { recursive: true, force: true });
 fs.mkdirSync(buildDir, { recursive: true });
 
@@ -21,8 +41,7 @@ const sources = [
   path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
 ];
 
-const compileCmd = [
-  "clang++",
+const compileArgs = [
   "-std=c++20",
   "-Wall",
   "-Wextra",
@@ -36,10 +55,10 @@ const compileCmd = [
   outputFile,
   "-lz",
   process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread",
-].join(" ");
+];
 
 console.log("Compiling optimized C++ QRCode benchmark...");
-execSync(compileCmd, { stdio: "inherit" });
+runCommand(resolveTool("clang++"), compileArgs);
 
 console.log("Running C++ QRCode benchmark...");
-execSync(outputFile, { stdio: "inherit" });
+runCommand(outputFile, []);
