@@ -71,7 +71,14 @@ type QRCodeFactory = {
 type CanvasFill = string | CanvasGradient;
 
 const MAX_CACHE_ENTRIES = 128;
-const webCache = new Map<string, string>();
+const MAX_CACHE_BYTES = 4 * 1024 * 1024;
+type WebCacheEntry = {
+  request: string;
+  value: string;
+  bytes: number;
+};
+const webCache = new Map<string, WebCacheEntry>();
+let webCacheBytes = 0;
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
 
 export function toPngBase64(options: QRCodeOptions): string {
@@ -80,8 +87,9 @@ export function toPngBase64(options: QRCodeOptions): string {
 }
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  const key = cacheKey(normalized, "png");
-  const cached = webCache.get(key);
+  const request = cacheRequest(normalized, "png");
+  const key = hashCachePart(request);
+  const cached = getCacheEntry(key, request);
   if (cached !== undefined) {
     return cached;
   }
@@ -115,7 +123,7 @@ export function toPngDataUri(options: QRCodeOptions): string {
     );
     clearLogoArea(context, normalized, foregroundFill);
     const output = canvas.toDataURL("image/png");
-    setCacheEntry(key, output);
+    setCacheEntry(key, request, output);
     return output;
   }
 
@@ -210,7 +218,7 @@ export function toPngDataUri(options: QRCodeOptions): string {
   clearLogoArea(context, normalized, foregroundFill);
 
   const output = canvas.toDataURL("image/png");
-  setCacheEntry(key, output);
+  setCacheEntry(key, request, output);
   return output;
 }
 
@@ -228,8 +236,9 @@ export async function toPngDataUriAsync(
 
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  const key = cacheKey(normalized, "svg");
-  const cached = webCache.get(key);
+  const request = cacheRequest(normalized, "svg");
+  const key = hashCachePart(request);
+  const cached = getCacheEntry(key, request);
   if (cached !== undefined) {
     return cached;
   }
@@ -251,7 +260,7 @@ export function toSvgString(options: QRCodeOptions): string {
       ? normalized.foregroundColor
       : "url(#nitro-qrcode-gradient)";
   const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
-  setCacheEntry(key, output);
+  setCacheEntry(key, request, output);
   return output;
 }
 
@@ -280,6 +289,7 @@ export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
 
 export function clearQRCodeCache(): void {
   webCache.clear();
+  webCacheBytes = 0;
 }
 
 export function getQRCodeCacheSize(): number {
@@ -303,10 +313,37 @@ export const NitroQRCode: NitroQRCodeApi = {
   getCacheSize: getQRCodeCacheSize,
 };
 
-function setCacheEntry(key: string, value: string): void {
-  webCache.set(key, value);
-  if (webCache.size > MAX_CACHE_ENTRIES) {
+function getCacheEntry(key: string, request: string): string | undefined {
+  const cached = webCache.get(key);
+  if (cached === undefined || cached.request !== request) {
+    return undefined;
+  }
+  webCache.delete(key);
+  webCache.set(key, cached);
+  return cached.value;
+}
+
+function setCacheEntry(key: string, request: string, value: string): void {
+  const bytes = (key.length + request.length + value.length) * 2;
+  if (bytes > MAX_CACHE_BYTES) {
+    return;
+  }
+
+  const existing = webCache.get(key);
+  if (existing !== undefined) {
+    webCacheBytes -= existing.bytes;
+    webCache.delete(key);
+  }
+  webCache.set(key, { request, value, bytes });
+  webCacheBytes += bytes;
+
+  while (
+    webCache.size > MAX_CACHE_ENTRIES ||
+    webCacheBytes > MAX_CACHE_BYTES
+  ) {
     const firstKey = webCache.keys().next().value as string;
+    const removed = webCache.get(firstKey) as WebCacheEntry;
+    webCacheBytes -= removed.bytes;
     webCache.delete(firstKey);
   }
 }
@@ -820,10 +857,10 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function cacheKey(options: NormalizedOptions, output: string): string {
-  return [
+function cacheRequest(options: NormalizedOptions, output: string): string {
+  return JSON.stringify([
     output,
-    hashCachePart(options.value),
+    options.value,
     options.size,
     options.quietZone,
     options.errorCorrectionLevel,
@@ -855,7 +892,7 @@ function cacheKey(options: NormalizedOptions, output: string): string {
     options.gradient.startY,
     options.gradient.endX,
     options.gradient.endY,
-  ].join("|");
+  ]);
 }
 
 function hashCachePart(value: string): string {

@@ -161,6 +161,41 @@ void testDataUriAndCache() {
   assert(generator.getCacheSize() == 0);
 }
 
+void testCollisionSafeCache() {
+  QRCodeGenerator generator(
+      [](const std::string &) { return std::string("collision"); });
+  GenerateOptions options;
+  const std::string first = generator.generateSvgString("first", options);
+  const std::string second = generator.generateSvgString("second", options);
+
+  assert(first != second);
+  assert(generator.generateSvgString("first", options) == first);
+  GenerateOptions alternateOptions = options;
+  alternateOptions.backgroundColor = "#FF0000";
+  alternateOptions.background = parseColor("#FF0000");
+  const std::string alternate =
+      generator.generateSvgString("first", alternateOptions);
+  assert(alternate != first);
+  assert(generator.generateSvgString("first", options) == first);
+  assert(generator.getCacheSize() == 1);
+}
+
+void testByteBoundedCache() {
+  QRCodeGenerator generator({}, 16 * 1024);
+  GenerateOptions options;
+  for (int index = 0; index < 30; index++) {
+    generator.generateSvgString("byte-entry-" + std::to_string(index),
+                                options);
+  }
+
+  assert(generator.getCacheSize() > 0);
+  assert(generator.getCacheSize() < 30);
+
+  QRCodeGenerator oversized({}, 1);
+  oversized.generateSvgString("oversized", options);
+  assert(oversized.getCacheSize() == 0);
+}
+
 void testConcurrentGeneration() {
   QRCodeGenerator generator;
   GenerateOptions baseOptions;
@@ -667,6 +702,8 @@ void testValidation() {
 int main() {
   testPngGeneration();
   testDataUriAndCache();
+  testCollisionSafeCache();
+  testByteBoundedCache();
   testConcurrentGeneration();
   testStyledPngGeneration();
   testLogoAreaIsTransparent();

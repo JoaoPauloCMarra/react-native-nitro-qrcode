@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -1028,6 +1030,19 @@ std::string hashCachePart(const std::string &value) {
   return std::to_string(hash);
 }
 
+void appendCachePart(std::string &request, const std::string &part) {
+  request += std::to_string(part.size());
+  request += ":";
+  request += part;
+}
+
+std::string cacheDouble(double value) {
+  std::ostringstream output;
+  output << std::setprecision(std::numeric_limits<double>::max_digits10)
+         << value;
+  return output.str();
+}
+
 void appendChunk(std::vector<uint8_t> &png, const char *type,
                  const std::vector<uint8_t> &data) {
   writeU32(png, static_cast<uint32_t>(data.size()));
@@ -1093,6 +1108,11 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
 }
 
 } // namespace
+
+QRCodeGenerator::QRCodeGenerator(CacheKeyHasher cacheKeyHasher,
+                                 size_t maxCacheBytes)
+    : cacheKeyHasher_(std::move(cacheKeyHasher)),
+      maxCacheBytes_(maxCacheBytes) {}
 
 Color parseColor(const std::string &value) {
   if (value == "transparent") {
@@ -1196,8 +1216,9 @@ Matrix QRCodeGenerator::createMatrix(const std::string &value,
 
 std::string QRCodeGenerator::generatePngBase64(const std::string &value,
                                                const GenerateOptions &options) {
-  const std::string key = cacheKey(value, options, "png-base64");
-  if (const auto cached = getCacheEntry(key)) {
+  const std::string request = cacheRequest(value, options, "png-base64");
+  const std::string key = cacheKey(request);
+  if (const auto cached = getCacheEntry(key, request)) {
     return *cached;
   }
 
@@ -1221,7 +1242,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
             : base64Encode(encodePngIndexed1(imageSize, imageSize, indices,
                                              options.foreground,
                                              options.background));
-    storeCacheEntry(key, encoded);
+    storeCacheEntry(key, request, encoded);
     return encoded;
   }
 
@@ -1310,7 +1331,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
           : base64Encode(encodePngIndexed1(imageSize, imageSize, indices,
                                            options.foreground,
                                            options.background));
-  storeCacheEntry(key, encoded);
+  storeCacheEntry(key, request, encoded);
   return encoded;
 }
 
@@ -1322,8 +1343,9 @@ QRCodeGenerator::generatePngDataUri(const std::string &value,
 
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
                                                const GenerateOptions &options) {
-  const std::string key = cacheKey(value, options, "svg");
-  if (const auto cached = getCacheEntry(key)) {
+  const std::string request = cacheRequest(value, options, "svg");
+  const std::string key = cacheKey(request);
+  if (const auto cached = getCacheEntry(key, request)) {
     return *cached;
   }
 
@@ -1354,13 +1376,21 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
   svg << "</svg>";
 
   const std::string output = svg.str();
-  storeCacheEntry(key, output);
+  storeCacheEntry(key, request, output);
   return output;
 }
 
-std::string
-QRCodeGenerator::getMatrixPackedBase64(const std::string &value,
-                                       const GenerateOptions &options) {
+QRCodeGenerator::PackedMatrix
+QRCodeGenerator::getMatrix(const std::string &value,
+                           const GenerateOptions &options) {
+  const std::string request = cacheRequest(value, options, "matrix");
+  {
+    std::lock_guard<std::mutex> lock(matrixCacheMutex_);
+    if (matrixCache_.has_value() && matrixCache_->request == request) {
+      return matrixCache_->matrix;
+    }
+  }
+
   const Matrix matrix = createMatrix(value, options);
   std::vector<uint8_t> packed((matrix.modules.size() + 7) / 8);
   for (size_t i = 0; i < matrix.modules.size(); i++) {
@@ -1369,18 +1399,36 @@ QRCodeGenerator::getMatrixPackedBase64(const std::string &value,
           static_cast<uint8_t>(packed[i / 8] | (1U << (7U - (i % 8U))));
     }
   }
-  return base64Encode(packed);
+  PackedMatrix result = {matrix.size, base64Encode(packed)};
+  {
+    std::lock_guard<std::mutex> lock(matrixCacheMutex_);
+    matrixCache_ = MatrixCacheEntry{request, result};
+  }
+  return result;
+}
+
+std::string
+QRCodeGenerator::getMatrixPackedBase64(const std::string &value,
+                                       const GenerateOptions &options) {
+  return getMatrix(value, options).packedBase64;
 }
 
 int QRCodeGenerator::getMatrixSize(const std::string &value,
                                    const GenerateOptions &options) {
-  return createMatrix(value, options).size;
+  return getMatrix(value, options).size;
 }
 
 void QRCodeGenerator::clearCache() {
-  std::lock_guard<std::mutex> lock(cacheMutex_);
-  cache_.clear();
-  cacheOrder_.clear();
+  {
+    std::lock_guard<std::mutex> lock(cacheMutex_);
+    cache_.clear();
+    cacheOrder_.clear();
+    cacheBytes_ = 0;
+  }
+  {
+    std::lock_guard<std::mutex> lock(matrixCacheMutex_);
+    matrixCache_.reset();
+  }
 }
 
 size_t QRCodeGenerator::getCacheSize() const {
@@ -1388,57 +1436,90 @@ size_t QRCodeGenerator::getCacheSize() const {
   return cache_.size();
 }
 
-std::string QRCodeGenerator::cacheKey(const std::string &value,
-                                      const GenerateOptions &options,
-                                      const std::string &output) const {
-  std::string gradientColors;
+std::string QRCodeGenerator::cacheRequest(const std::string &value,
+                                          const GenerateOptions &options,
+                                          const std::string &output) const {
+  std::string request;
+  appendCachePart(request, output);
+  appendCachePart(request, value);
+  appendCachePart(request, std::to_string(options.size));
+  appendCachePart(request, std::to_string(options.quietZone));
+  appendCachePart(request, options.errorCorrectionLevel);
+  appendCachePart(request, options.foregroundColor);
+  appendCachePart(request, std::to_string(options.foreground.r));
+  appendCachePart(request, std::to_string(options.foreground.g));
+  appendCachePart(request, std::to_string(options.foreground.b));
+  appendCachePart(request, std::to_string(options.foreground.a));
+  appendCachePart(request, options.backgroundColor);
+  appendCachePart(request, std::to_string(options.background.r));
+  appendCachePart(request, std::to_string(options.background.g));
+  appendCachePart(request, std::to_string(options.background.b));
+  appendCachePart(request, std::to_string(options.background.a));
+  appendCachePart(request, options.strokeColor);
+  appendCachePart(request, std::to_string(options.stroke.r));
+  appendCachePart(request, std::to_string(options.stroke.g));
+  appendCachePart(request, std::to_string(options.stroke.b));
+  appendCachePart(request, std::to_string(options.stroke.a));
+  appendCachePart(request, options.eyeColor);
+  appendCachePart(request, std::to_string(options.eye.r));
+  appendCachePart(request, std::to_string(options.eye.g));
+  appendCachePart(request, std::to_string(options.eye.b));
+  appendCachePart(request, std::to_string(options.eye.a));
+  appendCachePart(request, options.eyeStrokeColor);
+  appendCachePart(request, std::to_string(options.eyeStroke.r));
+  appendCachePart(request, std::to_string(options.eyeStroke.g));
+  appendCachePart(request, std::to_string(options.eyeStroke.b));
+  appendCachePart(request, std::to_string(options.eyeStroke.a));
+  appendCachePart(request, options.eyeballColor);
+  appendCachePart(request, std::to_string(options.eyeball.r));
+  appendCachePart(request, std::to_string(options.eyeball.g));
+  appendCachePart(request, std::to_string(options.eyeball.b));
+  appendCachePart(request, std::to_string(options.eyeball.a));
+  appendCachePart(request, std::to_string(options.minVersion));
+  appendCachePart(request, std::to_string(options.maxVersion));
+  appendCachePart(request, std::to_string(options.mask));
+  appendCachePart(request, std::to_string(options.boostEcl));
+  appendCachePart(request, options.moduleShape);
+  appendCachePart(request, options.eyePatternShape);
+  appendCachePart(request, options.eyeballShape);
+  appendCachePart(request, std::to_string(options.gap));
+  appendCachePart(request, std::to_string(options.eyePatternGap));
+  appendCachePart(request, options.bodyDensity);
+  appendCachePart(request, std::to_string(options.cornerRadius));
+  appendCachePart(request, std::to_string(options.eyePatternCornerRadius));
+  appendCachePart(request, options.layout);
+  appendCachePart(request, std::to_string(options.logoAreaSize));
+  appendCachePart(request, std::to_string(options.logoAreaBorderRadius));
+  appendCachePart(request, options.gradient.type);
   for (const auto &color : options.gradient.colors) {
-    gradientColors += std::to_string(color.r) + "," + std::to_string(color.g) +
-                      "," + std::to_string(color.b) + "," +
-                      std::to_string(color.a) + ";";
+    appendCachePart(request, std::to_string(color.r));
+    appendCachePart(request, std::to_string(color.g));
+    appendCachePart(request, std::to_string(color.b));
+    appendCachePart(request, std::to_string(color.a));
   }
-
-  std::string gradientLocations;
   for (double location : options.gradient.locations) {
-    gradientLocations += std::to_string(location) + ";";
+    appendCachePart(request, cacheDouble(location));
   }
+  appendCachePart(request, cacheDouble(options.gradient.startX));
+  appendCachePart(request, cacheDouble(options.gradient.startY));
+  appendCachePart(request, cacheDouble(options.gradient.endX));
+  appendCachePart(request, cacheDouble(options.gradient.endY));
+  return request;
+}
 
-  return output + "|" + hashCachePart(value) + "|" +
-         std::to_string(options.size) + "|" +
-         std::to_string(options.quietZone) + "|" +
-         options.errorCorrectionLevel + "|" +
-         std::to_string(options.foreground.r) + "," +
-         std::to_string(options.foreground.g) + "," +
-         std::to_string(options.foreground.b) + "," +
-         std::to_string(options.foreground.a) + "|" +
-         std::to_string(options.background.r) + "," +
-         std::to_string(options.background.g) + "," +
-         std::to_string(options.background.b) + "," +
-         std::to_string(options.background.a) + "|" + options.strokeColor +
-         "|" + options.eyeColor + "|" + options.eyeStrokeColor + "|" +
-         options.eyeballColor + "|" + std::to_string(options.minVersion) + "|" +
-         std::to_string(options.maxVersion) + "|" +
-         std::to_string(options.mask) + "|" + std::to_string(options.boostEcl) +
-         "|" + options.moduleShape + "|" + options.eyePatternShape + "|" +
-         std::to_string(options.gap) + "|" +
-         std::to_string(options.eyePatternGap) + "|" + options.bodyDensity +
-         "|" + options.eyeballShape + "|" +
-         std::to_string(options.cornerRadius) + "|" +
-         std::to_string(options.eyePatternCornerRadius) + "|" + options.layout +
-         "|" + std::to_string(options.logoAreaSize) + "|" +
-         std::to_string(options.logoAreaBorderRadius) + "|" +
-         options.gradient.type + "|" + gradientColors + "|" +
-         gradientLocations + "|" + std::to_string(options.gradient.startX) +
-         "|" + std::to_string(options.gradient.startY) + "|" +
-         std::to_string(options.gradient.endX) + "|" +
-         std::to_string(options.gradient.endY);
+std::string QRCodeGenerator::cacheKey(const std::string &request) const {
+  if (cacheKeyHasher_) {
+    return cacheKeyHasher_(request);
+  }
+  return hashCachePart(request);
 }
 
 std::optional<std::string>
-QRCodeGenerator::getCacheEntry(const std::string &key) const {
+QRCodeGenerator::getCacheEntry(const std::string &key,
+                               const std::string &request) const {
   std::lock_guard<std::mutex> lock(cacheMutex_);
   const auto cached = cache_.find(key);
-  if (cached == cache_.end()) {
+  if (cached == cache_.end() || cached->second.request != request) {
     return std::nullopt;
   }
 
@@ -1447,20 +1528,36 @@ QRCodeGenerator::getCacheEntry(const std::string &key) const {
     cacheOrder_.erase(order);
   }
   cacheOrder_.push_back(key);
-  return cached->second;
+  return cached->second.value;
 }
 
 void QRCodeGenerator::storeCacheEntry(const std::string &key,
+                                      const std::string &request,
                                       const std::string &value) {
+  const size_t entryBytes = key.size() + request.size() + value.size();
+  if (entryBytes > maxCacheBytes_) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(cacheMutex_);
-  cache_[key] = value;
+  const auto existing = cache_.find(key);
+  if (existing != cache_.end()) {
+    cacheBytes_ -= existing->second.bytes;
+  }
+  cache_[key] = {request, value, entryBytes};
+  cacheBytes_ += entryBytes;
   const auto order = std::find(cacheOrder_.begin(), cacheOrder_.end(), key);
   if (order != cacheOrder_.end()) {
     cacheOrder_.erase(order);
   }
   cacheOrder_.push_back(key);
-  while (cacheOrder_.size() > MaxCacheEntries) {
-    cache_.erase(cacheOrder_.front());
+  while (cacheOrder_.size() > MaxCacheEntries ||
+         cacheBytes_ > maxCacheBytes_) {
+    const auto oldest = cache_.find(cacheOrder_.front());
+    if (oldest != cache_.end()) {
+      cacheBytes_ -= oldest->second.bytes;
+      cache_.erase(oldest);
+    }
     cacheOrder_.pop_front();
   }
 }

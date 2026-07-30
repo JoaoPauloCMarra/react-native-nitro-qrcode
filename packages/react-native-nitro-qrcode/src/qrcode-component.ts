@@ -35,6 +35,21 @@ export type QRCodeComponentGenerators = {
   accessibilityIgnoresInvertColors?: boolean;
 };
 
+const MAX_COMPONENT_SIZE = 2048;
+
+function validateComponentSize(size: number): void {
+  if (
+    !Number.isFinite(size) ||
+    !Number.isInteger(size) ||
+    size < 1 ||
+    size > MAX_COMPONENT_SIZE
+  ) {
+    throw new Error(
+      "QRCode component size must be an integer between 1 and 2048 points.",
+    );
+  }
+}
+
 function createGradientColors(
   color0: QRCodeColor | undefined,
   color1: QRCodeColor | undefined,
@@ -172,6 +187,8 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
     }: QRCodeProps,
     ref: React.Ref<QRCodeRef>,
   ) {
+    validateComponentSize(size);
+
     const [result, setResult] = useState<{
       options: QRCodeOptions;
       uri: string;

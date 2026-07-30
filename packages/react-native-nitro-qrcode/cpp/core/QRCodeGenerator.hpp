@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -68,6 +70,10 @@ struct Matrix {
 
 class QRCodeGenerator {
 public:
+  using CacheKeyHasher = std::function<std::string(const std::string &)>;
+
+  explicit QRCodeGenerator(CacheKeyHasher cacheKeyHasher = {},
+                           size_t maxCacheBytes = 4 * 1024 * 1024);
   std::string generatePngBase64(const std::string &value,
                                 const GenerateOptions &options);
   std::string generatePngDataUri(const std::string &value,
@@ -82,16 +88,43 @@ public:
 
 private:
   static constexpr size_t MaxCacheEntries = 128;
+  struct CacheEntry {
+    std::string request;
+    std::string value;
+    size_t bytes = 0;
+  };
+
+  struct PackedMatrix {
+    int size = 0;
+    std::string packedBase64;
+  };
+
+  struct MatrixCacheEntry {
+    std::string request;
+    PackedMatrix matrix;
+  };
+
+  CacheKeyHasher cacheKeyHasher_;
+  size_t maxCacheBytes_;
   mutable std::mutex cacheMutex_;
-  mutable std::unordered_map<std::string, std::string> cache_;
+  mutable std::unordered_map<std::string, CacheEntry> cache_;
   mutable std::deque<std::string> cacheOrder_;
+  size_t cacheBytes_ = 0;
+  mutable std::mutex matrixCacheMutex_;
+  std::optional<MatrixCacheEntry> matrixCache_;
 
   Matrix createMatrix(const std::string &value,
                       const GenerateOptions &options) const;
-  std::string cacheKey(const std::string &value, const GenerateOptions &options,
-                       const std::string &output) const;
-  std::optional<std::string> getCacheEntry(const std::string &key) const;
-  void storeCacheEntry(const std::string &key, const std::string &value);
+  PackedMatrix getMatrix(const std::string &value,
+                         const GenerateOptions &options);
+  std::string cacheRequest(const std::string &value,
+                           const GenerateOptions &options,
+                           const std::string &output) const;
+  std::string cacheKey(const std::string &request) const;
+  std::optional<std::string> getCacheEntry(const std::string &key,
+                                           const std::string &request) const;
+  void storeCacheEntry(const std::string &key, const std::string &request,
+                       const std::string &value);
 };
 
 Color parseColor(const std::string &value);
