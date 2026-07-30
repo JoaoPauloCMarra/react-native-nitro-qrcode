@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.3 - 2026-07-30
+
+### Changes
+
+- **Breaking changes:** None.
+- Updated package compatibility to Nitro Modules 0.36.4, Expo SDK 57, and
+  React Native 0.86.
+- Made native and web cache hits verify the full normalized request after
+  hashed lookup, with limits of 128 entries or 4 MiB.
+- Reused one native matrix generation across the existing size and packed-data
+  bridge calls while preserving the Nitro ABI and public return shape.
+- Rejected invalid component layout sizes before rendering or QR generation,
+  while keeping direct generation helpers available through 4096 pixels.
+
 ## 0.4.2
 
 - Shipped the current package artifact with the README, badges, compatibility

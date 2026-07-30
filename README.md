@@ -5,8 +5,8 @@
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
 [![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/)
-[![Expo](https://img.shields.io/badge/expo-SDK%2056-000020)](https://docs.expo.dev/)
-[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.35.7-black)](https://nitro.margelo.com/)
+[![Expo](https://img.shields.io/badge/expo-SDK%2057-000020)](https://docs.expo.dev/)
+[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.36.4-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
 Typed QR code generation for React Native, Expo development builds, and web.
@@ -52,10 +52,14 @@ bare React Native app.
 | --- | --- |
 | React | `>=18.2.0 <20.0.0` |
 | React Native | `>=0.75.0 <1.0.0` |
-| Nitro Modules | `>=0.35.7 <0.36.0` |
-| Expo | SDK 56 development builds |
+| Nitro Modules | `>=0.36.4 <0.37.0` |
+| Expo | SDK 57 development builds; Expo Go is not supported |
 | React Native Web | `>=0.19.0 <1.0.0` |
 | Node | `>=18.0.0` |
+
+Version 0.4.3 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
+Modules 0.36.4. The wider ranges above are the package's declared peer
+compatibility.
 
 ## Expo Config
 
@@ -171,6 +175,55 @@ const matrix = getMatrix(options);
 Async PNG helpers are useful for UI flows that should yield before native
 generation completes.
 
+`getMatrix` returns the QR symbol size and a Base64-encoded, row-major bitset.
+Each module uses one bit, most-significant bit first; dark modules are `1`.
+Rendering-only options such as colors, size, shapes, gradients, and logo area do
+not change this encoding result.
+
+`toSvgString` exports the encoded matrix with quiet zone, background,
+foreground, and gradient settings. Component-only logo nodes are not embedded
+in PNG or SVG exports. Set `logoAreaSize` when an exported image needs a clear
+center area for a logo added by another tool.
+
+Native and web output caches verify the full normalized request after hashed
+lookup. Each cache retains at most 128 entries or 4 MiB, whichever limit is
+reached first, and evicts least-recently-used output. An output larger than 4
+MiB is returned without being cached. Use `clearQRCodeCache()` to clear cached
+output and `getQRCodeCacheSize()` to inspect the entry count.
+
+Native matrix export reuses one internally cached generation across its
+existing size and packed-data bridge calls. No new HybridObject method is
+required, preserving compatibility with existing native binaries.
+
+## Rendering, Logos, And Errors
+
+`QRCode` generates a PNG data URI and renders it through React Native `Image`
+on iOS, Android, and web. Web PNG rendering requires a browser canvas. SVG is
+available through `toSvgString`; the component itself remains PNG-backed.
+
+The `logo` prop is a React node layered above the generated image. Only
+`logoAreaSize` clears QR pixels and reserves room in the encoded image.
+`logoPadding` and `logoBackgroundColor` style the overlay but do not reserve
+additional modules. When `logo` is present and `logoAreaSize` is omitted, the
+component reserves 28% of `size`. Keep the logo area near or below 30% for
+reliable scanning.
+
+With `scanSafe`, quiet zones smaller than four modules are raised to four.
+When a logo area is present, error correction is raised to `H`.
+`scanSafe: "strict"` additionally converts scanability warnings into validation
+errors.
+
+Generation starts when normalized render options change. While it runs,
+`placeholder` is shown if no current image is available. `keepPreviousImage`
+keeps the prior QR visible, and `hideLogoUntilReady` delays the overlay.
+`onReady` receives the successful PNG data URI. Stale or unmounted async
+completions are ignored.
+
+Synchronous export helpers throw validation or generation errors. Async helpers
+reject with them. The component calls `onError` when supplied; otherwise it
+throws the error during render so the nearest React error boundary can handle
+it. Invalid component layout sizes throw before rendering or QR generation.
+
 ## Validation And Scanability
 
 ```ts
@@ -194,6 +247,22 @@ console.log(result.warnings);
 `validateOptions` reports invalid values as hard errors and scanability risks as
 warnings. With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
+
+Direct generation helpers enforce these input bounds:
+
+| Input | Accepted values |
+| --- | --- |
+| `value` | Non-empty string |
+| `size` | Integer from 1 through 4096 |
+| `quietZone` | Integer from 0 through 32 |
+| `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion` |
+| `mask` | `-1` for automatic selection, or integer 0 through 7 |
+| `logoAreaSize` | Integer from 0 through 4096 and no larger than `size` |
+| `logoAreaBorderRadius` | Integer from 0 through 2048 and no larger than half of `size` |
+| Shape gaps and radii | Integers from 0 through 256 |
+| Gradient colors | 2 through 8 valid hex colors |
+| Gradient locations | Same count as colors, finite values from 0 through 1 in non-decreasing order |
+| Gradient points | Finite `x` and `y` values from 0 through 1 |
 
 ## TypeScript Guardrails
 
@@ -230,9 +299,9 @@ Main exports:
 
 | Option | Description |
 | --- | --- |
-| `value` | QR payload string. Required. |
-| `size` | Rendered component size in points. |
-| `quietZone` | Quiet-zone width in QR modules. |
+| `value` | Non-empty QR payload string. Required. |
+| `size` | Positive component layout size up to 2048 points; rasterized internally at a minimum of 512 pixels and at least 2x. |
+| `quietZone` | Quiet-zone width in QR modules; integer 0 through 32. |
 | `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases. |
 | `scanSafe` | Raises unsafe defaults; `"strict"` turns scanability warnings into errors. |
 | `foregroundColor` | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color. |
@@ -241,13 +310,14 @@ Main exports:
 | `eyeColor` | Finder frame fill color. |
 | `eyeStrokeColor` | Finder frame stroke color. |
 | `eyeballColor` | Finder center color. |
-| `gradient` | Linear or radial foreground gradient. |
-| `shapeOptions` | Body, finder, gap, density, and radius controls. |
+| `gradient` | Linear or radial foreground gradient with 2 through 8 colors. |
+| `shapeOptions` | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
 | `preset` | `default`, `rounded`, `dots`, or `branded`. |
-| `logo` | React node rendered above the reserved logo safe area. |
-| `logoAreaSize` | Reserved center logo area in points. |
-| `logoAreaBorderRadius` | Radius for the reserved logo safe area. |
-| `logoPadding` | Padding around the rendered logo node. |
+| `logo` | React node overlaid above the generated image; not embedded in exports. |
+| `logoAreaSize` | Cleared center area in points; integer 0 through `size`. |
+| `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`. |
+| `logoPadding` | Visual padding inside the logo overlay; does not enlarge the reserved area. |
+| `logoBackgroundColor` | Overlay background color; does not change the generated PNG. |
 | `keepPreviousImage` | Keeps the previous image visible while the next image generates. |
 | `hideLogoUntilReady` | Delays logo rendering until the QR image is ready. |
 | `onReady` | Called with the generated PNG data URI. |

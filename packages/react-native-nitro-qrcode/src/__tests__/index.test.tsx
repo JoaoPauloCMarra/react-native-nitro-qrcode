@@ -404,6 +404,8 @@ describe("native QRCode API", () => {
       size: 21,
       packedBase64: "matrix-base64",
     });
+    expect(mockHybridObject.getMatrixSize).toHaveBeenCalledTimes(1);
+    expect(mockHybridObject.getMatrixPackedBase64).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes native error-correction aliases and colors", () => {
@@ -435,6 +437,10 @@ describe("native QRCode API", () => {
   it("validates empty values and integer ranges", () => {
     expect(() => toPngBase64({ value: "" })).toThrow("must not be empty");
     expect(() => toPngBase64({ value: "x", size: 0 })).toThrow("size must be");
+    expect(() => toPngBase64({ value: "x", size: 4096 })).not.toThrow();
+    expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow(
+      "size must be",
+    );
     expect(() => toPngBase64({ value: "x", quietZone: 33 })).toThrow(
       "quietZone must be",
     );
@@ -688,6 +694,64 @@ describe("native QRCode API", () => {
         }),
       );
     });
+  });
+
+  it.each([
+    ["negative", -1],
+    ["zero", 0],
+    ["fractional", 1.5],
+    ["NaN", Number.NaN],
+    ["positive infinity", Number.POSITIVE_INFINITY],
+    ["negative infinity", Number.NEGATIVE_INFINITY],
+    ["above maximum", 2049],
+  ])(
+    "rejects %s component size before native generation",
+    async (_caseName, size) => {
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      let tree: TestRenderer.ReactTestRenderer | undefined;
+
+      await act(async () => {
+        tree = TestRenderer.create(
+          React.createElement(
+            ErrorBoundary,
+            undefined,
+            React.createElement(QRCode, { value: "invalid-size", size }),
+          ),
+        );
+      });
+
+      if (tree === undefined) {
+        throw new Error("Expected QRCode test renderer to be created.");
+      }
+
+      expect(
+        tree.root.find((node) => String(node.type) === "error-boundary").props
+          .message,
+      ).toBe(
+        "QRCode component size must be an integer between 1 and 2048 points.",
+      );
+      expect(mockHybridObject.generatePngDataUriAsync).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    },
+  );
+
+  it("accepts the maximum component size", async () => {
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "maximum-component-size",
+          size: 2048,
+        }),
+      );
+    });
+
+    const call = mockHybridObject.generatePngDataUriAsync.mock.calls.at(-1) as
+      | readonly unknown[]
+      | undefined;
+    expect(call?.[0]).toBe("maximum-component-size");
+    expect(call?.[1]).toBe(4096);
   });
 
   it("renders a placeholder instead of the logo while the async QR is pending", async () => {
@@ -1643,6 +1707,51 @@ describe("web QRCode API", () => {
     await expect(Web.toPngDataUriAsync({ value: "Hello" })).resolves.toBe(
       "data:image/png;base64,web-png",
     );
+  });
+
+  it("verifies cached web requests after an FNV key collision", () => {
+    const first = Web.toSvgString({ value: "w5e0fhr-33w8" });
+    const second = Web.toSvgString({ value: "w22z3ci-35rd" });
+
+    expect(second).not.toBe(first);
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+  });
+
+  it("verifies cached web options after an FNV key collision", () => {
+    const first = Web.toSvgString({
+      value: "option-collision",
+      foregroundColor: "#664982",
+    });
+    const second = Web.toSvgString({
+      value: "option-collision",
+      foregroundColor: "#D347BA",
+    });
+
+    expect(second).not.toBe(first);
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+  });
+
+  it("bounds the web cache by output bytes", () => {
+    for (let index = 0; index < 40; index++) {
+      Web.toSvgString({
+        value: `${"A".repeat(1_000)}-${index}`,
+        errorCorrectionLevel: "L",
+      });
+    }
+
+    expect(Web.getQRCodeCacheSize()).toBeLessThan(40);
+  });
+
+  it("does not retain a web cache entry larger than the byte budget", () => {
+    const canvas = installCanvas();
+    canvas.toDataURL.mockReturnValue(
+      `data:image/png;base64,${"A".repeat(2_100_000)}`,
+    );
+
+    expect(Web.toPngDataUri({ value: "oversized-cache-entry" }).length).toBe(
+      2_100_022,
+    );
+    expect(Web.getQRCodeCacheSize()).toBe(0);
   });
 
   it("uses btoa when available for web matrix output", () => {
