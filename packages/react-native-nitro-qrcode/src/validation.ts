@@ -164,6 +164,7 @@ export type QRCodeOptions = {
   maxVersion?: QRCodeVersion;
   mask?: QRCodeMaskPattern;
   boostEcl?: boolean;
+  orbit?: boolean;
   shapeOptions?: QRCodeShapeOptions;
   logoAreaSize?: number;
   logoAreaBorderRadius?: number;
@@ -198,7 +199,7 @@ export type NormalizedGradient = {
 export type NormalizedOptions = Required<
   Omit<
     QRCodeOptions,
-    "errorCorrectionLevel" | "scanSafe" | "shapeOptions" | "gradient"
+    "errorCorrectionLevel" | "scanSafe" | "shapeOptions" | "gradient" | "orbit"
   >
 > & {
   errorCorrectionLevel: "L" | "M" | "Q" | "H";

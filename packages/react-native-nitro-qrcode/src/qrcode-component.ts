@@ -199,6 +199,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       maxVersion,
       mask,
       boostEcl,
+      orbit,
       shapeOptions,
       logoAreaSize,
       logoAreaBorderRadius,
@@ -372,6 +373,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         maxVersion,
         mask,
         boostEcl,
+        orbit,
         shapeOptions: scaleShapeOptions(
           mergePresetShapeOptions(stableShapeOptions, preset),
           rasterScale,
@@ -399,6 +401,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         maxVersion,
         mask,
         boostEcl,
+        orbit,
         preset,
         stableShapeOptions,
         rasterScale,

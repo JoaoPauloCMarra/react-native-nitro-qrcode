@@ -424,9 +424,7 @@ describe("native QRCode API", () => {
     expect(() => toPngBase64({ value: "" })).toThrow("must not be empty");
     expect(() => toPngBase64({ value: "x", size: 0 })).toThrow("size must be");
     expect(() => toPngBase64({ value: "x", size: 2048 })).not.toThrow();
-    expect(() => toPngBase64({ value: "x", size: 2049 })).toThrow(
-      "Synchronous native PNG generation supports sizes up to 2048",
-    );
+    expect(() => toPngBase64({ value: "x", size: 4096 })).not.toThrow();
     expect(() => toPngBase64Async({ value: "x", size: 4096 })).not.toThrow();
     expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow(
       "size must be",

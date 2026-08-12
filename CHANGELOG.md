@@ -4,11 +4,10 @@
 
 ### Changes
 
-- **Breaking changes:** The accepted no-op `orbit` option was removed from the
-  public types; consumers passing it must delete the prop. Synchronous native
-  PNG helpers now reject sizes above 2048 pixels (a new error, not silent
-  behavior), and the hidden native-only shapes and radial layout remain
-  unreachable because TypeScript never exposed them.
+- **Breaking changes:** None. The deprecated no-op `orbit` option remains
+  accepted for source compatibility, synchronous PNG helpers retain the
+  established 4096-pixel bound, and hidden native-only shapes remain outside
+  the public contract.
 - Updated package compatibility to Nitro Modules 0.36.4, Expo SDK 57, and
   React Native 0.86.
 - Made native and web cache hits verify the full normalized request after
@@ -26,8 +25,8 @@
 - Added a committed native/web encoder parity corpus with decode-back tests
   covering UTF-8, numeric, alphanumeric, fixed-version, masked, boosted, and
   maximum-size inputs, plus golden reference checks in the C++ test gate.
-- Guarded synchronous native PNG helpers to 2048 pixels with a typed error
-  directing large outputs to the async helpers.
+- Kept synchronous native PNG helpers compatible through 4096 pixels while
+  recommending async helpers for UI work.
 - Made web async PNG helpers render in row bands and yield to the main thread
   between bands; the web component now generates asynchronously with
   staleness handling.

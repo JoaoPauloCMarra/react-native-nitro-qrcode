@@ -63,17 +63,6 @@ export {
 
 const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 
-const MAX_SYNC_GENERATION_SIZE = 2048;
-
-function guardSyncGenerationSize(size: number): void {
-  if (size > MAX_SYNC_GENERATION_SIZE) {
-    throw new Error(
-      `Synchronous native PNG generation supports sizes up to ${MAX_SYNC_GENERATION_SIZE} pixels; ` +
-        `use toPngBase64Async or toPngDataUriAsync for larger outputs (up to 4096 pixels).`,
-    );
-  }
-}
-
 function measuredSync<T>(async: boolean, generate: () => T): T {
   if (!isQRCodeMetricsEnabled()) {
     return generate();
@@ -196,7 +185,6 @@ function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
 
 export function toPngBase64(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  guardSyncGenerationSize(normalized.size);
   return measuredSync(false, () =>
     NativeQRCode.generatePngBase64Object(toNativeGenerateOptions(normalized)),
   );
@@ -204,7 +192,6 @@ export function toPngBase64(options: QRCodeOptions): string {
 
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  guardSyncGenerationSize(normalized.size);
   return measuredSync(false, () =>
     NativeQRCode.generatePngDataUriObject(toNativeGenerateOptions(normalized)),
   );

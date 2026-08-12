@@ -225,7 +225,7 @@ Generation input bounds:
 | Input | Accepted values |
 | --- | --- |
 | `value` | Non-empty string; maximum length is limited by QR version 40 capacity (about 2953 bytes, 4296 alphanumeric characters, or 7089 numeric digits) |
-| `size` | Integer from 1 through 4096; synchronous native PNG helpers accept up to 2048 and reject larger sizes with a message directing to the async helpers |
+| `size` | Integer from 1 through 4096 for synchronous and asynchronous helpers |
 | `quietZone` | Integer from 0 through 32 |
 | `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion` |
 | `mask` | `-1` for automatic selection, or integer 0 through 7 |
@@ -253,8 +253,8 @@ Option loss and platform differences:
   background.
 - **Web async PNG helpers** render in row bands and yield to the main thread
   between bands so large canvas work does not block the UI in one step.
-- **Native sync PNG helpers** are intended for small outputs (up to 2048
-  pixels); prefer `toPngBase64Async`/`toPngDataUriAsync` for larger rasters.
+- **Native sync PNG helpers** remain available through 4096 pixels for
+  compatibility; prefer `toPngBase64Async`/`toPngDataUriAsync` for UI flows.
 
 ## Rendering, Logos, And Errors
 
@@ -369,6 +369,7 @@ Main exports:
 | `eyeStrokeColor` | Finder frame stroke color. |
 | `eyeballColor` | Finder center color. |
 | `gradient` | Linear or radial foreground gradient with 2 through 8 colors. |
+| `orbit` | Deprecated no-op retained for source compatibility. |
 | `shapeOptions` | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
 | `preset` | `default`, `rounded`, `dots`, or `branded`. |
 | `logo` | React node overlaid above the generated image; not embedded in exports. |

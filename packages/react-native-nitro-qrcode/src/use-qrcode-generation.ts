@@ -33,10 +33,9 @@ export function useQRCodeGeneration(
   }, [onError, onReady]);
 
   useEffect(() => {
-    const generateAsync = generators.toPngDataUriAsync;
     let isMounted = true;
     const request = ++generationId.current;
-    void generateAsync(options).then(
+    void generators.toPngDataUriAsync(options).then(
       (nextUri) => {
         if (!isMounted || request !== generationId.current) {
           return;
@@ -62,10 +61,7 @@ export function useQRCodeGeneration(
     return () => {
       isMounted = false;
     };
-    // The generator is a stable module-level function; options identity
-    // drives regeneration.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options]);
+  }, [generators, options]);
 
   const uri =
     keepPreviousImage || result?.options === options

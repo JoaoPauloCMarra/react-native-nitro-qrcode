@@ -58,6 +58,7 @@ const validOptions: QRCodeOptions = {
   gradient: validGradient,
   minVersion: version,
   mask,
+  orbit: true,
 };
 
 const validProps: QRCodeProps = {
