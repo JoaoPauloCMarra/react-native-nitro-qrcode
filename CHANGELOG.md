@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.5.0 - 2026-08-12
+
+### Changes
+
+- **Breaking changes:** None. The deprecated no-op `orbit` option remains
+  accepted for source compatibility, synchronous PNG helpers retain the
+  established 4096-pixel bound, and hidden native-only shapes remain outside
+  the public contract.
+- Updated package compatibility to Nitro Modules 0.36.4, Expo SDK 57, and
+  React Native 0.86.
+- Made native and web cache hits verify the full normalized request after
+  hashed lookup, with limits of 128 entries or 4 MiB.
+- Reused one native matrix generation across the existing size and packed-data
+  bridge calls while preserving the Nitro ABI and public return shape.
+- Rejected invalid component layout sizes before rendering or QR generation,
+  while keeping direct generation helpers available through 4096 pixels.
+- Fixed transparent web PNG generation: the background is cleared to real
+  alpha instead of being filled with an invalid `"transparent"` color.
+- Implemented `boostEcl` on web by raising the error correction level as high
+  as the chosen version allows, matching native behavior.
+- Unified circle module geometry to an inscribed ellipse on web, matching the
+  native renderer, with a documented one-pixel golden tolerance.
+- Added a committed native/web encoder parity corpus with decode-back tests
+  covering UTF-8, numeric, alphanumeric, fixed-version, masked, boosted, and
+  maximum-size inputs, plus golden reference checks in the C++ test gate.
+- Kept synchronous native PNG helpers compatible through 4096 pixels while
+  recommending async helpers for UI work.
+- Made web async PNG helpers render in row bands and yield to the main thread
+  between bands; the web component now generates asynchronously with
+  staleness handling.
+- Replaced the single-slot native matrix cache with a bounded 32-entry
+  least-recently-used cache shared by both matrix bridge calls.
+- Extracted independently tested bounded LRU modules on web (`src/cache.ts`)
+  and native (`cpp/core/BoundedCache.hpp`).
+- Added accessible semantics to the component: the image is labeled with the
+  QR meaning, generation state is announced as busy, and the logo overlay is
+  hidden from the accessibility tree.
+- Added development-only generation metrics (`getQRCodeMetrics`,
+  `resetQRCodeMetrics`, `setQRCodeMetricsEnabled`) with request, failure,
+  timing, and web cache counters, gated off in production builds.
+- Added an object-typed `GenerateOptions` native ABI
+  (`generatePngBase64Object` and related methods) while keeping the positional
+  methods for binary compatibility; the JavaScript layer now calls the object
+  ABI, and the native class declares every object-ABI override in its header.
+- Included `cpp/core/BoundedCache.hpp` in the iOS podspec sources so the
+  packaged native library matches the Android CMake sources.
+- Clamped the web PNG canvas to at least the full module grid, matching the
+  native output size for small requested sizes.
+- Exported the `HybridQRCode` type from the web entry, matching the native
+  entry's public type surface.
+- Removed the unused `setMetricsCacheBytes` metrics export; web cache byte
+  counts come from the web cache itself.
+- Recorded the vendored Nayuki encoder provenance (pinned upstream commit and
+  checksums) with a synchronization policy and a parity-corpus generator.
+
 ## 0.4.3 - 2026-07-30
 
 ### Changes

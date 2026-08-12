@@ -1,13 +1,12 @@
 #pragma once
 
+#include "BoundedCache.hpp"
+
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace NitroQRCode {
@@ -88,30 +87,16 @@ public:
 
 private:
   static constexpr size_t MaxCacheEntries = 128;
-  struct CacheEntry {
-    std::string request;
-    std::string value;
-    size_t bytes = 0;
-  };
+  static constexpr size_t MaxMatrixCacheEntries = 32;
 
   struct PackedMatrix {
     int size = 0;
     std::string packedBase64;
   };
 
-  struct MatrixCacheEntry {
-    std::string request;
-    PackedMatrix matrix;
-  };
-
   CacheKeyHasher cacheKeyHasher_;
-  size_t maxCacheBytes_;
-  mutable std::mutex cacheMutex_;
-  mutable std::unordered_map<std::string, CacheEntry> cache_;
-  mutable std::deque<std::string> cacheOrder_;
-  size_t cacheBytes_ = 0;
-  mutable std::mutex matrixCacheMutex_;
-  std::optional<MatrixCacheEntry> matrixCache_;
+  BoundedCache<std::string> outputCache_;
+  BoundedCache<PackedMatrix> matrixCache_;
 
   Matrix createMatrix(const std::string &value,
                       const GenerateOptions &options) const;
@@ -122,7 +107,7 @@ private:
                            const std::string &output) const;
   std::string cacheKey(const std::string &request) const;
   std::optional<std::string> getCacheEntry(const std::string &key,
-                                           const std::string &request) const;
+                                           const std::string &request);
   void storeCacheEntry(const std::string &key, const std::string &request,
                        const std::string &value);
 };

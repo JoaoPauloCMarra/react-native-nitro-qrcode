@@ -14,6 +14,16 @@ public:
   HybridQRCode();
   ~HybridQRCode() override = default;
 
+  std::string generatePngBase64Object(const GenerateOptions &options) override;
+
+  std::shared_ptr<Promise<std::string>>
+  generatePngBase64AsyncObject(const GenerateOptions &options) override;
+
+  std::string generatePngDataUriObject(const GenerateOptions &options) override;
+
+  std::shared_ptr<Promise<std::string>>
+  generatePngDataUriAsyncObject(const GenerateOptions &options) override;
+
   std::string generatePngBase64(
       const std::string &value, double size, double quietZone,
       const std::string &errorCorrectionLevel,

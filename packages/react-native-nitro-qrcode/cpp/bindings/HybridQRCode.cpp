@@ -3,7 +3,55 @@
 
 namespace margelo::nitro::NitroQRCode {
 
+::NitroQRCode::GenerateOptions makeGenerateOptions(
+    const GenerateOptions &options) {
+  return makeGenerateOptions(
+      options.size, options.quietZone, options.errorCorrectionLevel,
+      options.foregroundColor, options.backgroundColor, options.strokeColor,
+      options.eyeColor, options.eyeStrokeColor, options.eyeballColor,
+      options.minVersion, options.maxVersion, options.mask, options.boostEcl,
+      options.moduleShape, options.eyePatternShape, options.eyeballShape,
+      options.gap, options.eyePatternGap, options.bodyDensity,
+      options.cornerRadius, options.eyePatternCornerRadius, options.layout,
+      options.logoAreaSize, options.logoAreaBorderRadius,
+      options.gradientType, options.gradientColors, options.gradientLocations,
+      options.gradientStartX, options.gradientStartY, options.gradientEndX,
+      options.gradientEndY);
+}
+
 HybridQRCode::HybridQRCode() : HybridObject(TAG), HybridQRCodeSpec() {}
+
+std::string HybridQRCode::generatePngBase64Object(
+    const GenerateOptions &options) {
+  return generator_.generatePngBase64(options.value,
+                                      makeGenerateOptions(options));
+}
+
+std::shared_ptr<Promise<std::string>>
+HybridQRCode::generatePngBase64AsyncObject(const GenerateOptions &options) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::string>::async(
+      [self, options]() mutable {
+        return self->generator_.generatePngBase64(options.value,
+                                                  makeGenerateOptions(options));
+      });
+}
+
+std::string HybridQRCode::generatePngDataUriObject(
+    const GenerateOptions &options) {
+  return generator_.generatePngDataUri(options.value,
+                                       makeGenerateOptions(options));
+}
+
+std::shared_ptr<Promise<std::string>>
+HybridQRCode::generatePngDataUriAsyncObject(const GenerateOptions &options) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::string>::async(
+      [self, options]() mutable {
+        return self->generator_.generatePngDataUri(options.value,
+                                                   makeGenerateOptions(options));
+      });
+}
 
 std::string HybridQRCode::generatePngBase64(
     const std::string &value, double size, double quietZone,

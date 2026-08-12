@@ -7,7 +7,7 @@
     "start": "env -u NO_COLOR expo start -d",
     "web": "env -u NO_COLOR expo start --web",
     "ios": "env -u NO_COLOR expo run:ios",
-    "android": "env -u NO_COLOR expo run:android",
+    "android": "bun run android:assemble && env -u NO_COLOR expo run:android --binary android/app/build/outputs/apk/debug/app-debug.apk",
     "prebuild": "env -u NO_COLOR expo prebuild",
     "prebuild:clean": "env -u NO_COLOR expo prebuild --clean",
     "lint": "bunx eslint app --max-warnings=0",
@@ -18,25 +18,25 @@
     "check": "bun run lint && bun run typecheck && bun run doctor"
   },
   "dependencies": {
-    "expo": "~57.0.9",
-    "expo-build-properties": "~57.0.8",
-    "expo-linking": "~57.0.4",
-    "expo-router": "~57.0.9",
+    "expo": "~57.0.12",
+    "expo-build-properties": "~57.0.10",
+    "expo-linking": "~57.0.5",
+    "expo-router": "~57.0.12",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-nitro-modules": "0.36.4",
+    "react-native-nitro-modules": "0.36.5",
     "react-native-nitro-qrcode": "workspace:*",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-worklets": "0.10.1",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@types/react": "~19.2.15"
+    "@types/react": "~19.2.18"
   }
 }

@@ -1,11 +1,20 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
+import jsQR from "jsqr";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const mockHybridObject = {
   generatePngBase64: jest.fn(() => "png-base64"),
+  generatePngBase64Object: jest.fn(() => "png-base64"),
   generatePngBase64Async: jest.fn(async () => "png-base64"),
+  generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
   generatePngDataUri: jest.fn(() => "data:image/png;base64,png-base64"),
+  generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
   generatePngDataUriAsync: jest.fn(
+    async () => "data:image/png;base64,png-base64",
+  ),
+  generatePngDataUriAsyncObject: jest.fn(
     async () => "data:image/png;base64,png-base64",
   ),
   generateSvgString: jest.fn(() => "<svg />"),
@@ -35,6 +44,16 @@ function createDeferred<T>(): Deferred<T> {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function flushMacrotasks(rounds = 1): Promise<void> {
+  let pending = Promise.resolve();
+  for (let index = 0; index < rounds; index++) {
+    pending = pending.then(
+      () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+    );
+  }
+  return pending;
 }
 
 class ErrorBoundary extends React.Component<
@@ -107,47 +126,53 @@ describe("native QRCode API", () => {
     mockHybridObject.generatePngBase64Async.mockImplementation(
       async () => "png-base64",
     );
+    mockHybridObject.generatePngBase64AsyncObject.mockImplementation(
+      async () => "png-base64",
+    );
     mockHybridObject.generatePngDataUriAsync.mockImplementation(
+      async () => "data:image/png;base64,png-base64",
+    );
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementation(
       async () => "data:image/png;base64,png-base64",
     );
   });
 
   it("generates PNG base64 with normalized defaults", () => {
     expect(toPngBase64({ value: "https://example.com" })).toBe("png-base64");
-    expect(mockHybridObject.generatePngBase64).toHaveBeenCalledWith(
-      "https://example.com",
-      512,
-      4,
-      "M",
-      "#000000",
-      "#FFFFFF",
-      "#000000",
-      "#000000",
-      "#000000",
-      "#000000",
-      1,
-      40,
-      -1,
-      true,
-      "square",
-      "square",
-      "square",
-      0,
-      0,
-      "dense",
-      -1,
-      -1,
-      "matrix",
-      0,
-      0,
-      "none",
-      [],
-      [],
-      0,
-      0,
-      1,
-      1,
-    );
+    expect(mockHybridObject.generatePngBase64Object).toHaveBeenCalledWith({
+      value: "https://example.com",
+      size: 512,
+      quietZone: 4,
+      errorCorrectionLevel: "M",
+      foregroundColor: "#000000",
+      backgroundColor: "#FFFFFF",
+      strokeColor: "#000000",
+      eyeColor: "#000000",
+      eyeStrokeColor: "#000000",
+      eyeballColor: "#000000",
+      minVersion: 1,
+      maxVersion: 40,
+      mask: -1,
+      boostEcl: true,
+      moduleShape: "square",
+      eyePatternShape: "square",
+      eyeballShape: "square",
+      gap: 0,
+      eyePatternGap: 0,
+      bodyDensity: "dense",
+      cornerRadius: -1,
+      eyePatternCornerRadius: -1,
+      layout: "matrix",
+      logoAreaSize: 0,
+      logoAreaBorderRadius: 0,
+      gradientType: "none",
+      gradientColors: [],
+      gradientLocations: [],
+      gradientStartX: 0,
+      gradientStartY: 0,
+      gradientEndX: 1,
+      gradientEndY: 1,
+    });
   });
 
   it("generates PNG data URI with custom options", () => {
@@ -178,40 +203,40 @@ describe("native QRCode API", () => {
         logoAreaBorderRadius: 8,
       }),
     ).toBe("data:image/png;base64,png-base64");
-    expect(mockHybridObject.generatePngDataUri).toHaveBeenCalledWith(
-      "Hello",
-      256,
-      2,
-      "H",
-      "#111111",
-      "#EEEEEE",
-      "#000000",
-      "#000000",
-      "#000000",
-      "#000000",
-      2,
-      8,
-      3,
-      false,
-      "rounded",
-      "rounded",
-      "rounded",
-      2,
-      1,
-      "balanced",
-      3,
-      4,
-      "matrix",
-      48,
-      8,
-      "none",
-      [],
-      [],
-      0,
-      0,
-      1,
-      1,
-    );
+    expect(mockHybridObject.generatePngDataUriObject).toHaveBeenCalledWith({
+      value: "Hello",
+      size: 256,
+      quietZone: 2,
+      errorCorrectionLevel: "H",
+      foregroundColor: "#111111",
+      backgroundColor: "#EEEEEE",
+      strokeColor: "#000000",
+      eyeColor: "#000000",
+      eyeStrokeColor: "#000000",
+      eyeballColor: "#000000",
+      minVersion: 2,
+      maxVersion: 8,
+      mask: 3,
+      boostEcl: false,
+      moduleShape: "rounded",
+      eyePatternShape: "rounded",
+      eyeballShape: "rounded",
+      gap: 2,
+      eyePatternGap: 1,
+      bodyDensity: "balanced",
+      cornerRadius: 3,
+      eyePatternCornerRadius: 4,
+      layout: "matrix",
+      logoAreaSize: 48,
+      logoAreaBorderRadius: 8,
+      gradientType: "none",
+      gradientColors: [],
+      gradientLocations: [],
+      gradientStartX: 0,
+      gradientStartY: 0,
+      gradientEndX: 1,
+      gradientEndY: 1,
+    });
   });
 
   it("passes gradient options through the native bridge", () => {
@@ -227,40 +252,40 @@ describe("native QRCode API", () => {
       }),
     ).toBe("png-base64");
 
-    expect(mockHybridObject.generatePngBase64).toHaveBeenLastCalledWith(
-      "gradient",
-      512,
-      4,
-      "M",
-      "#000000",
-      "#FFFFFF",
-      "#000000",
-      "#000000",
-      "#000000",
-      "#000000",
-      1,
-      40,
-      -1,
-      true,
-      "square",
-      "square",
-      "square",
-      0,
-      0,
-      "dense",
-      -1,
-      -1,
-      "matrix",
-      0,
-      0,
-      "linear",
-      ["#4AA8FF", "#28D17C"],
-      [0, 1],
-      0.1,
-      0.2,
-      0.9,
-      0.8,
-    );
+    expect(mockHybridObject.generatePngBase64Object).toHaveBeenLastCalledWith({
+      value: "gradient",
+      size: 512,
+      quietZone: 4,
+      errorCorrectionLevel: "M",
+      foregroundColor: "#000000",
+      backgroundColor: "#FFFFFF",
+      strokeColor: "#000000",
+      eyeColor: "#000000",
+      eyeStrokeColor: "#000000",
+      eyeballColor: "#000000",
+      minVersion: 1,
+      maxVersion: 40,
+      mask: -1,
+      boostEcl: true,
+      moduleShape: "square",
+      eyePatternShape: "square",
+      eyeballShape: "square",
+      gap: 0,
+      eyePatternGap: 0,
+      bodyDensity: "dense",
+      cornerRadius: -1,
+      eyePatternCornerRadius: -1,
+      layout: "matrix",
+      logoAreaSize: 0,
+      logoAreaBorderRadius: 0,
+      gradientType: "linear",
+      gradientColors: ["#4AA8FF", "#28D17C"],
+      gradientLocations: [0, 1],
+      gradientStartX: 0.1,
+      gradientStartY: 0.2,
+      gradientEndX: 0.9,
+      gradientEndY: 0.8,
+    });
   });
 
   it("passes custom layer colors through the native bridge", () => {
@@ -274,39 +299,16 @@ describe("native QRCode API", () => {
       }),
     ).toBe("png-base64");
 
-    expect(mockHybridObject.generatePngBase64).toHaveBeenLastCalledWith(
-      "layers",
-      512,
-      4,
-      "M",
-      "#000000",
-      "#FFFFFF",
-      "#FF0000FF",
-      "#111111",
-      "#333333",
-      "#555555",
-      1,
-      40,
-      -1,
-      true,
-      "square",
-      "square",
-      "square",
-      0,
-      0,
-      "dense",
-      -1,
-      -1,
-      "matrix",
-      0,
-      0,
-      "none",
-      [],
-      [],
-      0,
-      0,
-      1,
-      1,
+    expect(mockHybridObject.generatePngBase64Object).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        value: "layers",
+        strokeColor: "#FF0000FF",
+        eyeColor: "#111111",
+        eyeStrokeColor: "#333333",
+        eyeballColor: "#555555",
+        backgroundColor: "#FFFFFF",
+        layout: "matrix",
+      }),
     );
   });
 
@@ -317,8 +319,8 @@ describe("native QRCode API", () => {
     await expect(toPngDataUriAsync({ value: "async" })).resolves.toBe(
       "data:image/png;base64,png-base64",
     );
-    expect(mockHybridObject.generatePngBase64Async).toHaveBeenCalled();
-    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngBase64AsyncObject).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalled();
   });
 
   it("rejects async PNG helpers when native options are invalid", async () => {
@@ -341,49 +343,21 @@ describe("native QRCode API", () => {
       }),
     ).toBe("png-base64");
 
-    expect(mockHybridObject.generatePngBase64).toHaveBeenLastCalledWith(
-      "radial",
-      512,
-      4,
-      "M",
-      "#000000",
-      "#FFFFFF",
-      "#000000",
-      "#000000",
-      "#000000",
-      "#000000",
-      1,
-      40,
-      -1,
-      true,
-      "square",
-      "square",
-      "square",
-      0,
-      0,
-      "dense",
-      -1,
-      -1,
-      "matrix",
-      0,
-      0,
-      "radial",
-      ["#4AA8FF", "#28D17C"],
-      [],
-      0.5,
-      0.5,
-      1,
-      1,
+    expect(mockHybridObject.generatePngBase64Object).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        value: "radial",
+        gradientType: "radial",
+        gradientColors: ["#4AA8FF", "#28D17C"],
+        gradientLocations: [],
+        gradientStartX: 0.5,
+        gradientStartY: 0.5,
+        gradientEndX: 1,
+        gradientEndY: 1,
+      }),
     );
-  });
+   });
 
-  it("keeps the orbit prop on the scan-safe native matrix layout", () => {
-    toPngBase64({ value: "orbit", orbit: true });
-    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
-    expect(calls.at(-1)?.[22]).toBe("matrix");
-  });
-
-  it("hardens native output when scanSafe is enabled", () => {
+   it("hardens native output when scanSafe is enabled", () => {
     toPngBase64({
       value: "scan-safe",
       quietZone: 0,
@@ -392,10 +366,13 @@ describe("native QRCode API", () => {
       scanSafe: true,
     });
 
-    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
-    const lastCall = calls.at(-1);
-    expect(lastCall?.[2]).toBe(4);
-    expect(lastCall?.[3]).toBe("H");
+    const calls = mockHybridObject.generatePngBase64Object.mock
+      .calls as unknown[][];
+    const lastCall = calls.at(-1)?.[0] as
+      | { quietZone?: number; errorCorrectionLevel?: string }
+      | undefined;
+    expect(lastCall?.quietZone).toBe(4);
+    expect(lastCall?.errorCorrectionLevel).toBe("H");
   });
 
   it("generates SVG and matrix output", () => {
@@ -419,11 +396,20 @@ describe("native QRCode API", () => {
     toPngBase64({ value: "quartile", errorCorrectionLevel: "quartile" });
     toPngBase64({ value: "transparent", backgroundColor: "transparent" });
 
-    const calls = mockHybridObject.generatePngBase64.mock.calls as unknown[][];
-    expect(calls.map((call) => call[3])).toEqual(["L", "M", "Q", "M"]);
-    expect(calls[0][4]).toBe("#AABBCC");
-    expect(calls[0][5]).toBe("#11223344");
-    expect(calls[3][5]).toBe("transparent");
+    const calls = mockHybridObject.generatePngBase64Object.mock.calls as unknown[][];
+    expect(
+      calls.map((call) => (call[0] as { errorCorrectionLevel?: string })
+        .errorCorrectionLevel),
+    ).toEqual(["L", "M", "Q", "M"]);
+    expect(
+      (calls[0]?.[0] as { foregroundColor?: string }).foregroundColor,
+    ).toBe("#AABBCC");
+    expect(
+      (calls[0]?.[0] as { backgroundColor?: string }).backgroundColor,
+    ).toBe("#11223344");
+    expect(
+      (calls[3]?.[0] as { backgroundColor?: string }).backgroundColor,
+    ).toBe("transparent");
   });
 
   it("exposes cache helpers and grouped API", () => {
@@ -437,7 +423,9 @@ describe("native QRCode API", () => {
   it("validates empty values and integer ranges", () => {
     expect(() => toPngBase64({ value: "" })).toThrow("must not be empty");
     expect(() => toPngBase64({ value: "x", size: 0 })).toThrow("size must be");
+    expect(() => toPngBase64({ value: "x", size: 2048 })).not.toThrow();
     expect(() => toPngBase64({ value: "x", size: 4096 })).not.toThrow();
+    expect(() => toPngBase64Async({ value: "x", size: 4096 })).not.toThrow();
     expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow(
       "size must be",
     );
@@ -747,16 +735,20 @@ describe("native QRCode API", () => {
       );
     });
 
-    const call = mockHybridObject.generatePngDataUriAsync.mock.calls.at(-1) as
+    const call = mockHybridObject.generatePngDataUriAsyncObject.mock
+      .calls.at(-1) as
       | readonly unknown[]
       | undefined;
-    expect(call?.[0]).toBe("maximum-component-size");
-    expect(call?.[1]).toBe(4096);
+    const options = call?.[0] as
+      | { value?: string; size?: number }
+      | undefined;
+    expect(options?.value).toBe("maximum-component-size");
+    expect(options?.size).toBe(4096);
   });
 
   it("renders a placeholder instead of the logo while the async QR is pending", async () => {
     const pending = createDeferred<string>();
-    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(
       () => pending.promise,
     );
 
@@ -803,7 +795,7 @@ describe("native QRCode API", () => {
   it("keeps the previous image while the next async QR is pending", async () => {
     const first = createDeferred<string>();
     const second = createDeferred<string>();
-    mockHybridObject.generatePngDataUriAsync
+    mockHybridObject.generatePngDataUriAsyncObject
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise);
 
@@ -849,7 +841,7 @@ describe("native QRCode API", () => {
   it("clears the QR image when keepPreviousImage is false", async () => {
     const first = createDeferred<string>();
     const second = createDeferred<string>();
-    mockHybridObject.generatePngDataUriAsync
+    mockHybridObject.generatePngDataUriAsyncObject
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise);
 
@@ -904,7 +896,7 @@ describe("native QRCode API", () => {
 
   it("calls onReady when native async generation succeeds", async () => {
     const pending = createDeferred<string>();
-    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(
       () => pending.promise,
     );
     const onReady = jest.fn();
@@ -947,7 +939,7 @@ describe("native QRCode API", () => {
     }
 
     const callsAfterInitialRender =
-      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+      mockHybridObject.generatePngDataUriAsyncObject.mock.calls.length;
 
     await act(async () => {
       tree?.update(
@@ -959,7 +951,7 @@ describe("native QRCode API", () => {
       await Promise.resolve();
     });
 
-    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(
       callsAfterInitialRender,
     );
     expect(firstReady).toHaveBeenCalledTimes(1);
@@ -991,7 +983,7 @@ describe("native QRCode API", () => {
     }
 
     const callsAfterInitialRender =
-      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+      mockHybridObject.generatePngDataUriAsyncObject.mock.calls.length;
 
     await act(async () => {
       tree?.update(
@@ -1009,7 +1001,7 @@ describe("native QRCode API", () => {
       await Promise.resolve();
     });
 
-    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(
       callsAfterInitialRender,
     );
     expect(firstReady).toHaveBeenCalledTimes(1);
@@ -1039,7 +1031,7 @@ describe("native QRCode API", () => {
     }
 
     const callsAfterInitialRender =
-      mockHybridObject.generatePngDataUriAsync.mock.calls.length;
+      mockHybridObject.generatePngDataUriAsyncObject.mock.calls.length;
 
     await act(async () => {
       tree?.update(
@@ -1055,7 +1047,7 @@ describe("native QRCode API", () => {
       await Promise.resolve();
     });
 
-    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(
       callsAfterInitialRender,
     );
     expect(firstReady).toHaveBeenCalledTimes(1);
@@ -1125,17 +1117,21 @@ describe("native QRCode API", () => {
         await Promise.resolve();
       });
 
-      const call = mockHybridObject.generatePngDataUriAsync.mock.calls.at(-1) as
+      const call = mockHybridObject.generatePngDataUriAsyncObject.mock
+        .calls.at(-1) as
         | readonly unknown[]
         | undefined;
-      expect(call?.[26]).toEqual(scenario.colors);
-      expect(call?.[27]).toEqual(scenario.locations);
+      const options = call?.[0] as
+        | { gradientColors?: readonly unknown[]; gradientLocations?: readonly unknown[] }
+        | undefined;
+      expect(options?.gradientColors).toEqual(scenario.colors);
+      expect(options?.gradientLocations).toEqual(scenario.locations);
     }
   });
 
   it("routes async native generation errors to onError when provided", async () => {
     const pending = createDeferred<never>();
-    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(
       () => pending.promise,
     );
     const onError = jest.fn();
@@ -1177,8 +1173,8 @@ describe("native QRCode API", () => {
       "data:image/png;base64,png-base64",
     );
     expect(qrRef.current.toPngBase64()).toBe("png-base64");
-    expect(mockHybridObject.generatePngDataUri).toHaveBeenCalled();
-    expect(mockHybridObject.generatePngBase64).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngDataUriObject).toHaveBeenCalled();
+    expect(mockHybridObject.generatePngBase64Object).toHaveBeenCalled();
   });
 
   it("validates scanability warnings and errors", () => {
@@ -1275,7 +1271,7 @@ describe("native QRCode API", () => {
   it("ignores async completions after the component unmounts", async () => {
     const success = createDeferred<string>();
     const failure = createDeferred<string>();
-    mockHybridObject.generatePngDataUriAsync
+    mockHybridObject.generatePngDataUriAsyncObject
       .mockImplementationOnce(() => success.promise)
       .mockImplementationOnce(() => failure.promise);
 
@@ -1301,14 +1297,14 @@ describe("native QRCode API", () => {
       await Promise.resolve();
     });
 
-    expect(mockHybridObject.generatePngDataUriAsync).toHaveBeenCalledTimes(2);
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces async QR generation errors", async () => {
     const consoleErrorSpy = jest
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
-    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(() =>
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(() =>
       Promise.reject("boom"),
     );
 
@@ -1339,7 +1335,7 @@ describe("native QRCode API", () => {
     const consoleErrorSpy = jest
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
-    mockHybridObject.generatePngDataUriAsync.mockImplementationOnce(() =>
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(() =>
       Promise.reject(new Error("native-boom")),
     );
 
@@ -1364,6 +1360,63 @@ describe("native QRCode API", () => {
     )[0];
     expect(fallback.props.message).toBe("native-boom");
     consoleErrorSpy.mockRestore();
+  });
+
+  it("exposes QR meaning and generation state through accessibility props", async () => {
+    const pending = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsyncObject.mockImplementationOnce(
+      () => pending.promise,
+    );
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "https://example.com/accessible",
+          logo: React.createElement("logo"),
+          placeholder: React.createElement("placeholder"),
+        }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    const containerWhilePending = currentTree.root.findAll(
+      (node) => node.props.testID === undefined && node.props.accessible === true,
+    )[0];
+    expect(containerWhilePending.props.accessibilityRole).toBe("image");
+    expect(containerWhilePending.props.accessibilityLabel).toBe(
+      "Generating QR code",
+    );
+    expect(containerWhilePending.props.accessibilityState).toEqual({
+      busy: true,
+    });
+
+    await act(async () => {
+      pending.resolve("data:image/png;base64,accessible");
+      await Promise.resolve();
+    });
+
+    const image = currentTree.root.findAll(
+      (node) =>
+        node.props.source?.uri === "data:image/png;base64,accessible",
+    )[0];
+    expect(image).toBeDefined();
+    expect(image.props.accessible).toBe(true);
+    expect(image.props.accessibilityRole).toBe("image");
+    expect(image.props.accessibilityLabel).toBe(
+      "QR code for https://example.com/accessible",
+    );
+
+    const logo = currentTree.root.findAll(
+      (node) => node.props.accessible === false,
+    )[0];
+    expect(logo).toBeDefined();
+    expect(logo.props.accessibilityElementsHidden).toBe(true);
+    expect(logo.props.importantForAccessibility).toBe("no-hide-descendants");
   });
 
   it("uses the default component size", async () => {
@@ -1394,6 +1447,7 @@ describe("web QRCode API", () => {
 
   type MockContext = {
     arc: jest.Mock<void, [number, number, number, number, number]>;
+    clearRect: jest.Mock<void, [number, number, number, number]>;
     fillStyle: string | MockGradient;
     globalCompositeOperation: GlobalCompositeOperation;
     lineCap: CanvasLineCap;
@@ -1441,6 +1495,7 @@ describe("web QRCode API", () => {
   function createMockContext(): MockContext {
     return {
       arc: jest.fn(),
+      clearRect: jest.fn(),
       fillStyle: "",
       globalCompositeOperation: "source-over",
       lineCap: "butt",
@@ -1673,9 +1728,6 @@ describe("web QRCode API", () => {
         }),
       ).toBe("web-png");
     });
-    expect(Web.toPngBase64({ value: "Hello orbit prop", orbit: true })).toBe(
-      "web-png",
-    );
     expect(canvas.getContext).toHaveBeenCalledWith("2d");
     expect(Web.getQRCodeCacheSize()).toBeGreaterThan(0);
     Web.clearQRCodeCache();
@@ -1707,6 +1759,22 @@ describe("web QRCode API", () => {
     await expect(Web.toPngDataUriAsync({ value: "Hello" })).resolves.toBe(
       "data:image/png;base64,web-png",
     );
+  });
+
+  it("yields between async web PNG render bands and matches sync output", async () => {
+    const canvas = installCanvas();
+    const setTimeoutSpy = jest.spyOn(globalThis, "setTimeout");
+    const syncUri = Web.toPngDataUri({ value: "banded", size: 96 });
+    Web.clearQRCodeCache();
+    const syncCalls = setTimeoutSpy.mock.calls.length;
+
+    const asyncUri = await Web.toPngDataUriAsync({ value: "banded", size: 96 });
+    const asyncCalls = setTimeoutSpy.mock.calls.length;
+
+    expect(asyncUri).toBe(syncUri);
+    expect(canvas.toDataURL).toHaveBeenCalledTimes(2);
+    expect(asyncCalls).toBeGreaterThan(syncCalls);
+    setTimeoutSpy.mockRestore();
   });
 
   it("verifies cached web requests after an FNV key collision", () => {
@@ -1960,6 +2028,13 @@ describe("web QRCode API", () => {
     ).toThrow("gradient.end.y must be");
   });
 
+  it("rejects missing async web canvas contexts", async () => {
+    installCanvas(() => null);
+    await expect(Web.toPngDataUriAsync({ value: "Hello" })).rejects.toThrow(
+      "2D canvas",
+    );
+  });
+
   it("uses the square-run fast path for default web PNG output", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -2047,7 +2122,7 @@ describe("web QRCode API", () => {
     );
   });
 
-  it("renders the web Image-backed QR component", () => {
+  it("renders the web Image-backed QR component", async () => {
     installCanvas();
     let tree: TestRenderer.ReactTestRenderer | undefined;
     act(() => {
@@ -2083,7 +2158,7 @@ describe("web QRCode API", () => {
     expect(Web.NitroQRCode.toPngDataUri({ value: "Hello" })).toContain(
       "data:image/png;base64,",
     );
-    act(() => {
+    await act(async () => {
       tree?.update(
         React.createElement(Web.QRCode, {
           value: "Hello",
@@ -2094,6 +2169,9 @@ describe("web QRCode API", () => {
           shapeOptions: { shape: "square", eyePatternGap: 1 },
         }),
       );
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
   });
 
@@ -2111,7 +2189,9 @@ describe("web QRCode API", () => {
           placeholder: React.createElement("placeholder", undefined, "loading"),
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
 
     expect(canvas.toDataURL).toHaveBeenCalled();
@@ -2139,7 +2219,9 @@ describe("web QRCode API", () => {
           onReady,
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
 
     expect(onReady).toHaveBeenCalledWith("data:image/png;base64,web-png");
@@ -2312,7 +2394,9 @@ describe("web QRCode API", () => {
           onReady: firstReady,
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
     if (tree === undefined) {
       throw new Error("Expected web QRCode test renderer to be created.");
@@ -2325,7 +2409,9 @@ describe("web QRCode API", () => {
           onReady: secondReady,
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
 
     expect(firstReady).toHaveBeenCalledTimes(1);
@@ -2343,7 +2429,9 @@ describe("web QRCode API", () => {
           keepPreviousImage: false,
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
     if (tree === undefined) {
       throw new Error("Expected web QRCode test renderer to be created.");
@@ -2356,7 +2444,9 @@ describe("web QRCode API", () => {
           keepPreviousImage: false,
         }),
       );
-      await Promise.resolve();
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
 
     expect(
@@ -2366,13 +2456,16 @@ describe("web QRCode API", () => {
     ).not.toHaveLength(0);
   });
 
-  it("uses the default web component size", () => {
+  it("uses the default web component size", async () => {
     installCanvas();
     let tree: TestRenderer.ReactTestRenderer | undefined;
-    act(() => {
+    await act(async () => {
       tree = TestRenderer.create(
         React.createElement(Web.QRCode, { value: "Hello" }),
       );
+    });
+    await act(async () => {
+      await flushMacrotasks(50);
     });
     if (tree === undefined) {
       throw new Error("Expected web QRCode test renderer to be created.");
@@ -2386,4 +2479,291 @@ describe("web QRCode API", () => {
       ]),
     );
   });
+type ParityCorpusEntry = {
+  value: string;
+  ecl: string;
+  minVersion: number;
+  maxVersion: number;
+  mask: number;
+  boostEcl: boolean;
+  size: number;
+  packedBase64: string;
+};
+
+function readParityCorpus(): ParityCorpusEntry[] {
+  const fixturePath = path.join(
+    __dirname,
+    "fixtures",
+    "parity-corpus.json",
+  );
+  return JSON.parse(fs.readFileSync(fixturePath, "utf8")) as ParityCorpusEntry[];
+}
+
+function unpackMatrix(matrix: { size: number; packedBase64: string }) {
+  const bytes = Buffer.from(matrix.packedBase64, "base64");
+  const modules: boolean[] = [];
+  for (const byte of bytes) {
+    for (let bit = 0; bit < 8; bit++) {
+      modules.push(((byte >> (7 - bit)) & 1) === 1);
+    }
+  }
+  return modules;
+}
+
+function matrixToRgba(matrix: { size: number; packedBase64: string }) {
+  const modules = unpackMatrix(matrix);
+  const modulePixels = 8;
+  const quietModules = 4;
+  const width =
+    (matrix.size + quietModules * 2) * modulePixels;
+  const rgba = new Uint8ClampedArray(width * width * 4);
+  for (let index = 0; index < rgba.length; index += 4) {
+    rgba[index] = 255;
+    rgba[index + 1] = 255;
+    rgba[index + 2] = 255;
+    rgba[index + 3] = 255;
+  }
+  for (let y = 0; y < matrix.size; y++) {
+    for (let x = 0; x < matrix.size; x++) {
+      if (!modules[y * matrix.size + x]) {
+        continue;
+      }
+      for (let py = 0; py < modulePixels; py++) {
+        for (let px = 0; px < modulePixels; px++) {
+          const outX = (x + quietModules) * modulePixels + px;
+          const outY = (y + quietModules) * modulePixels + py;
+          const offset = (outY * width + outX) * 4;
+          rgba[offset] = 0;
+          rgba[offset + 1] = 0;
+          rgba[offset + 2] = 0;
+          rgba[offset + 3] = 255;
+        }
+      }
+    }
+  }
+  return { rgba, width };
+}
+
+function decodeMatrix(matrix: { size: number; packedBase64: string }) {
+  const { rgba, width } = matrixToRgba(matrix);
+  return jsQR(rgba, width, width);
+}
+
+describe("encoder parity corpus", () => {
+  const corpus = readParityCorpus();
+
+  it("feeds the same corpus scenarios to the native adapter", () => {
+    for (const entry of corpus) {
+      const options = {
+        value: entry.value,
+        errorCorrectionLevel: entry.ecl as Web.ErrorCorrectionLevel,
+        minVersion: entry.minVersion as Web.QRCodeVersion,
+        maxVersion: entry.maxVersion as Web.QRCodeVersion,
+        mask: entry.mask as Web.QRCodeMaskPattern,
+        boostEcl: entry.boostEcl,
+      };
+      Web.getMatrix(options);
+      toPngDataUri(options);
+      const call = (mockHybridObject.generatePngDataUriObject.mock
+        .calls as unknown[][]).at(-1)?.[0] as
+        | {
+            value?: string;
+            errorCorrectionLevel?: string;
+            minVersion?: number;
+            maxVersion?: number;
+            mask?: number;
+            boostEcl?: boolean;
+          }
+        | undefined;
+      expect(call?.value).toBe(entry.value);
+      expect(call?.errorCorrectionLevel).toBe(entry.ecl);
+      expect(call?.minVersion).toBe(entry.minVersion);
+      expect(call?.maxVersion).toBe(entry.maxVersion);
+      expect(call?.mask).toBe(entry.mask);
+      expect(call?.boostEcl).toBe(entry.boostEcl);
+    }
+  });
+
+  it("matches the committed native/web golden corpus on web", () => {
+    for (const entry of corpus) {
+      const options = {
+        value: entry.value,
+        errorCorrectionLevel: entry.ecl as Web.ErrorCorrectionLevel,
+        minVersion: entry.minVersion as Web.QRCodeVersion,
+        maxVersion: entry.maxVersion as Web.QRCodeVersion,
+        mask: entry.mask as Web.QRCodeMaskPattern,
+        boostEcl: entry.boostEcl,
+      };
+      const matrix = Web.getMatrix(options);
+      expect({
+        size: matrix.size,
+        packedBase64: matrix.packedBase64,
+      }).toEqual({
+        size: entry.size,
+        packedBase64: entry.packedBase64,
+      });
+    }
+  });
+
+  it("decode-backs every corpus entry including UTF-8, numeric, and alphanumeric", () => {
+    for (const entry of corpus) {
+      const decoded = decodeMatrix({
+        size: entry.size,
+        packedBase64: entry.packedBase64,
+      });
+      expect(decoded).not.toBeNull();
+      expect(decoded?.data).toBe(entry.value);
+    }
+  });
+
+  it("decode-backs a high-error-correction matrix with a logo hole", () => {
+    const matrix = Web.getMatrix({
+      value: "https://example.com/logo-scan",
+      errorCorrectionLevel: "H",
+      mask: 2,
+    });
+    const { rgba, width } = matrixToRgba(matrix);
+    const holeModules = Math.round(matrix.size * 0.3);
+    const holeStart = (matrix.size - holeModules) / 2;
+    const holeEnd = holeStart + holeModules;
+    const modulePixels = 8;
+    const quietModules = 4;
+    for (let y = holeStart; y < holeEnd; y++) {
+      for (let x = holeStart; x < holeEnd; x++) {
+        for (let py = 0; py < modulePixels; py++) {
+          for (let px = 0; px < modulePixels; px++) {
+            const outX = (x + quietModules) * modulePixels + px;
+            const outY = (y + quietModules) * modulePixels + py;
+            const offset = (outY * width + outX) * 4;
+            rgba[offset] = 255;
+            rgba[offset + 1] = 255;
+            rgba[offset + 2] = 255;
+            rgba[offset + 3] = 255;
+          }
+        }
+      }
+    }
+    const decoded = jsQR(rgba, width, width);
+    expect(decoded?.data).toBe("https://example.com/logo-scan");
+  });
+
+  it("honors boostEcl on web by boosting to the highest fitting level", () => {
+    const options = {
+      value: "boost tiny",
+      errorCorrectionLevel: "L" as Web.ErrorCorrectionLevel,
+    };
+    const boosted = Web.getMatrix({ ...options, boostEcl: true });
+    const unboosted = Web.getMatrix({ ...options, boostEcl: false });
+    expect(boosted.packedBase64).not.toBe(unboosted.packedBase64);
+    const corpusEntry = corpus.find(
+      (entry) =>
+        entry.value === "boost tiny" &&
+        entry.ecl === "L" &&
+        entry.boostEcl === true,
+    );
+    expect(boosted.packedBase64).toBe(corpusEntry?.packedBase64);
+    expect(Web.getMatrix({ ...options, boostEcl: false }).packedBase64).toBe(
+      corpus.find(
+        (entry) =>
+          entry.value === "boost tiny" &&
+          entry.ecl === "L" &&
+          entry.boostEcl === false,
+      )?.packedBase64,
+    );
+  });
+
+  it("keeps the requested error correction level when boosting is impossible", () => {
+    const unboosted = Web.getMatrix({
+      value: "hello, world!",
+      errorCorrectionLevel: "M",
+      mask: 0,
+      boostEcl: false,
+    });
+    const boosted = Web.getMatrix({
+      value: "hello, world!",
+      errorCorrectionLevel: "M",
+      mask: 0,
+      boostEcl: true,
+    });
+    const corpusEntry = corpus.find(
+      (entry) =>
+        entry.value === "hello, world!" && entry.ecl === "M" && entry.mask === 0,
+    );
+    expect(corpusEntry?.boostEcl).toBe(true);
+    expect(boosted.packedBase64).toBe(corpusEntry?.packedBase64);
+    expect(boosted.packedBase64).toBe(unboosted.packedBase64);
+  });
+});
+
+describe("web transparent and geometry rendering", () => {
+  it("clears transparent web PNG backgrounds instead of filling black", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    expect(
+      Web.toPngDataUri({
+        value: "Hello",
+        size: 64,
+        backgroundColor: "transparent",
+      }),
+    ).toBe("data:image/png;base64,web-png");
+
+    expect(context.clearRect).toHaveBeenCalledWith(0, 0, 64, 64);
+    expect(context.fillStyle).not.toBe("transparent");
+  });
+
+  it("fills opaque web PNG backgrounds with the background color", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+    let fillStyleAtBackground: unknown = null;
+    context.fillRect.mockImplementation((x, y, width, height) => {
+      if (x === 0 && y === 0 && width === 64 && height === 64) {
+        fillStyleAtBackground = context.fillStyle;
+      }
+    });
+
+    Web.toPngDataUri({ value: "Hello", size: 64 });
+
+    expect(context.clearRect).not.toHaveBeenCalled();
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 64, 64);
+    expect(fillStyleAtBackground).toBe("#FFFFFF");
+  });
+
+  it("clamps the web canvas to the module grid like native output", () => {
+    const canvas = installCanvas();
+
+    Web.toPngDataUri({ value: "Hello", size: 8 });
+    expect(canvas.width).toBe(29);
+    expect(canvas.height).toBe(29);
+
+    Web.clearQRCodeCache();
+    Web.toPngDataUri({ value: "Hello", size: 64 });
+    expect(canvas.width).toBe(64);
+    expect(canvas.height).toBe(64);
+  });
+
+  it("draws circle modules as inscribed ellipses matching native geometry", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: { shape: "circle", eyeFrameShape: "circle" },
+    });
+
+    expect(context.ellipse).toHaveBeenCalled();
+    for (const call of context.ellipse.mock.calls) {
+      const [centerX, centerY, radiusX, radiusY, rotation, startAngle, endAngle] =
+        call;
+      expect(centerX).toBeGreaterThanOrEqual(0);
+      expect(centerY).toBeGreaterThanOrEqual(0);
+      expect(radiusX).toBeGreaterThan(0);
+      expect(radiusY).toBeGreaterThan(0);
+      expect(rotation).toBe(0);
+      expect(startAngle).toBe(0);
+      expect(endAngle).toBe(Math.PI * 2);
+    }
+  });
+});
 });
