@@ -1,5 +1,6 @@
 import type {
   ErrorCorrectionLevel,
+  HybridQRCode as NativeHybridQRCode,
   NitroQRCodeApi,
   QRCodeBackgroundColor,
   QRCodeBodyDensity,
@@ -17,6 +18,7 @@ import type {
   QRCodeValidationResult,
   QRCodeVersion,
 } from "../index";
+import * as Web from "../index.web";
 import {
   NitroQRCode,
   getMatrix,
@@ -31,6 +33,10 @@ import {
 type IsAssignable<Source, Target> = [Source] extends [Target] ? true : false;
 
 function expectFalse<Value extends false>(value?: Value): void {
+  void value;
+}
+
+function expectTrue<Value extends true>(value?: Value): void {
   void value;
 }
 
@@ -89,6 +95,9 @@ void asyncPngBase64;
 void asyncPngDataUri;
 void api;
 void ref;
+
+expectTrue<IsAssignable<Web.HybridQRCode, NativeHybridQRCode>>();
+expectTrue<IsAssignable<NativeHybridQRCode, Web.HybridQRCode>>();
 
 // @ts-expect-error foreground colors must be hex colors.
 const badForeground: QRCodeColor = "black";

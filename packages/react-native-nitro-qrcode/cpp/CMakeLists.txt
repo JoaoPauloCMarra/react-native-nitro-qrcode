@@ -23,6 +23,7 @@ target_link_libraries(QRCodeCore PUBLIC ZLIB::ZLIB)
 
 add_executable(QRCodeGeneratorTest
   core/QRCodeGeneratorTest.cpp
+  core/parity-corpus.cpp
   tests/QRCodeBridgeOptionsTest.cpp
 )
 

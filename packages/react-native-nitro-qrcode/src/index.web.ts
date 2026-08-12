@@ -1,8 +1,21 @@
+import { createBoundedCache } from "./cache";
+import {
+  getQRCodeMetrics,
+  isQRCodeMetricsEnabled,
+  nowMilliseconds,
+  recordCacheLookup,
+  recordGenerationRequest,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
+} from "./metrics";
 import {
   DEFAULT_EYE,
   DEFAULT_EYEBALL,
   DEFAULT_EYE_STROKE,
   DEFAULT_STROKE,
+} from "./colors";
+import { createRenderPlan, type RenderPlan } from "./render-plan";
+import {
   normalizeOptions,
   validateOptions,
   type NitroQRCodeApi,
@@ -12,16 +25,15 @@ import {
   type QRCodeOptions,
   type QRCodeShape,
   type QRCodeShapeOptions,
-} from "./shared";
+} from "./validation";
 import { createQRCodeComponent } from "./qrcode-component";
 import * as QRCodeJS from "qrcode";
+export type { QRCode as HybridQRCode } from "./QRCode.nitro";
 export type {
   ErrorCorrectionLevel,
   NitroQRCodeApi,
-  QRCodeBackgroundColor,
   QRCodeBodyDensity,
   QRCodeBodyShape,
-  QRCodeColor,
   QRCodeEyeBallShape,
   QRCodeEyeFrameShape,
   QRCodeEyePatternShape,
@@ -34,19 +46,82 @@ export type {
   QRCodeMaskPattern,
   QRCodeMatrix,
   QRCodeOptions,
-  QRCodePreset,
-  QRCodeProps,
-  QRCodeRef,
-  QRCodeScanabilityWarning,
   QRCodeShape,
   QRCodeShapeOptions,
   QRCodeValidationError,
   QRCodeValidationResult,
   QRCodeVersion,
-} from "./shared";
+} from "./validation";
+export type {
+  QRCodeBackgroundColor,
+  QRCodeColor,
+} from "./colors";
+export type { QRCodeScanabilityWarning } from "./scan-policy";
+export type { QRCodePreset } from "./defaults";
+export type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 export {
   validateOptions,
-} from "./shared";
+} from "./validation";
+export {
+  getQRCodeMetrics,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
+  type QRCodeMetricsSnapshot,
+} from "./metrics";
+
+function measuredSync<T>(async: boolean, generate: () => T): T {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = generate();
+    recordGenerationRequest({
+      async,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
+
+async function measuredAsync<T>(generate: () => Promise<T>): Promise<T> {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = await generate();
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
+
+function webGetQRCodeMetrics() {
+  const snapshot = getQRCodeMetrics();
+  if (!snapshot.enabled) {
+    return snapshot;
+  }
+  return { ...snapshot, cacheBytes: webCache.bytes() };
+}
 
 type QRCodeModuleData = {
   size: number;
@@ -72,13 +147,12 @@ type CanvasFill = string | CanvasGradient;
 
 const MAX_CACHE_ENTRIES = 128;
 const MAX_CACHE_BYTES = 4 * 1024 * 1024;
-type WebCacheEntry = {
-  request: string;
-  value: string;
-  bytes: number;
-};
-const webCache = new Map<string, WebCacheEntry>();
-let webCacheBytes = 0;
+const ASYNC_BAND_ROWS = 8;
+const webCache = createBoundedCache<string>(
+  MAX_CACHE_ENTRIES,
+  MAX_CACHE_BYTES,
+  (key, request, value) => (key.length + request.length + value.length) * 2,
+);
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
 
 export function toPngBase64(options: QRCodeOptions): string {
@@ -89,179 +163,147 @@ export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   const request = cacheRequest(normalized, "png");
   const key = hashCachePart(request);
-  const cached = getCacheEntry(key, request);
+  const cached = webCache.get(key, request);
+  recordCacheLookup(cached !== undefined);
   if (cached !== undefined) {
     return cached;
   }
 
-  const canvas = createCanvas(normalized.size);
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("Unable to create 2D canvas context for QRCode rendering.");
-  }
-
-  const model = createModel(normalized);
-  const totalModules = model.modules.size + normalized.quietZone * 2;
-  const pixelSize = normalized.size;
-  context.fillStyle = normalized.backgroundColor;
-  context.fillRect(0, 0, pixelSize, pixelSize);
-  const foregroundFill = createForegroundFill(context, normalized);
-  const useLayerColors = hasCustomLayerColors(normalized);
-  context.fillStyle = foregroundFill;
-
-  if (
-    canDrawSquareRuns(normalized.shapeOptions) &&
-    !useLayerColors &&
-    normalized.logoAreaSize === 0
-  ) {
-    drawSquareRuns(
-      context,
-      model,
-      normalized.quietZone,
-      totalModules,
-      pixelSize,
-    );
-    clearLogoArea(context, normalized, foregroundFill);
-    const output = canvas.toDataURL("image/png");
-    setCacheEntry(key, request, output);
-    return output;
-  }
-
-  const drawGroupedFinderEyes = shouldDrawGroupedFinderEyes(
-    normalized.shapeOptions,
-    normalized,
-  );
-
-  for (let moduleY = 0; moduleY < model.modules.size; moduleY++) {
-    const y0 = modulePixel(
-      moduleY + normalized.quietZone,
-      pixelSize,
-      totalModules,
-    );
-    const y1 = modulePixel(
-      moduleY + normalized.quietZone + 1,
-      pixelSize,
-      totalModules,
-    );
-    for (let moduleX = 0; moduleX < model.modules.size; moduleX++) {
-      if (isDark(model, moduleX, moduleY)) {
-        const eyeModule = isEyeModule(moduleX, moduleY, model.modules.size);
-        if (drawGroupedFinderEyes && eyeModule) {
-          continue;
-        }
-        const x0 = modulePixel(
-          moduleX + normalized.quietZone,
-          pixelSize,
-          totalModules,
-        );
-        const x1 = modulePixel(
-          moduleX + normalized.quietZone + 1,
-          pixelSize,
-          totalModules,
-        );
-        if (intersectsLogoArea(x0, y0, x1, y1, normalized)) {
-          continue;
-        }
-        const shape: QRCodeShape = isEyeBallModule(
-          moduleX,
-          moduleY,
-          model.modules.size,
-        )
-          ? normalized.shapeOptions.eyeballShape
-          : eyeModule
-            ? normalized.shapeOptions.eyeFrameShape
-            : normalized.shapeOptions.shape;
-        const gap = eyeModule
-          ? normalized.shapeOptions.eyePatternGap
-          : resolveBodyGap(normalized.shapeOptions, x1 - x0, y1 - y0);
-        const cornerRadius = eyeModule
-          ? normalized.shapeOptions.eyePatternCornerRadius
-          : normalized.shapeOptions.cornerRadius;
-        const moduleFill = getModuleFill(
-          normalized,
-          foregroundFill,
-          moduleX,
-          moduleY,
-          model.modules.size,
-        );
-        if (!eyeModule && normalized.strokeColor !== DEFAULT_STROKE) {
-          context.fillStyle = normalized.strokeColor;
-          drawModule(context, x0, y0, x1, y1, shape, gap, cornerRadius);
-          context.fillStyle = moduleFill;
-          drawModule(
-            context,
-            x0,
-            y0,
-            x1,
-            y1,
-            shape,
-            gap + Math.max(1, (x1 - x0) * 0.18),
-            cornerRadius,
-          );
-          continue;
-        }
-        context.fillStyle = moduleFill;
-        drawModule(context, x0, y0, x1, y1, shape, gap, cornerRadius);
-      }
+  return measuredSync(false, () => {
+    const model = createModel(normalized);
+    const pixelSize = renderPixelSize(normalized, model);
+    const canvas = createCanvas(pixelSize);
+    const context = canvas.getContext("2d");
+    if (context === null) {
+      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
     }
-  }
-  if (drawGroupedFinderEyes) {
-    drawGroupedFinders(
+
+    const plan = createRenderPlan(normalized, model, pixelSize);
+    const { foregroundFill, useLayerColors } = preparePngCanvas(
       context,
-      model.modules.size,
-      normalized.quietZone,
-      totalModules,
-      pixelSize,
+      plan,
       normalized,
     );
-  }
-  clearLogoArea(context, normalized, foregroundFill);
+    if (
+      canDrawSquareRuns(normalized.shapeOptions) &&
+      !useLayerColors &&
+      normalized.logoAreaSize === 0
+    ) {
+      drawSquareRuns(
+        context,
+        model,
+        normalized.quietZone,
+        plan.totalModules,
+        plan.pixelSize,
+        0,
+        model.modules.size,
+      );
+    } else {
+      drawPlanRows(context, plan, normalized, foregroundFill, 0, plan.matrixSize);
+    }
+    finishPng(context, plan, normalized, foregroundFill);
 
-  const output = canvas.toDataURL("image/png");
-  setCacheEntry(key, request, output);
-  return output;
+    const output = canvas.toDataURL("image/png");
+    webCache.set(key, request, output);
+    return output;
+  });
 }
 
 export async function toPngBase64Async(
   options: QRCodeOptions,
 ): Promise<string> {
-  return toPngBase64(options);
+  const uri = await toPngDataUriAsync(options);
+  return uri.slice("data:image/png;base64,".length);
 }
 
 export async function toPngDataUriAsync(
   options: QRCodeOptions,
 ): Promise<string> {
-  return toPngDataUri(options);
+  const normalized = normalizeOptions(options);
+  const request = cacheRequest(normalized, "png");
+  const key = hashCachePart(request);
+  const cached = webCache.get(key, request);
+  recordCacheLookup(cached !== undefined);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  return measuredAsync(async () => {
+    const model = createModel(normalized);
+    const pixelSize = renderPixelSize(normalized, model);
+    const canvas = createCanvas(pixelSize);
+    const context = canvas.getContext("2d");
+    if (context === null) {
+      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
+    }
+
+    const plan = createRenderPlan(normalized, model, pixelSize);
+    const { foregroundFill, useLayerColors } = preparePngCanvas(
+      context,
+      plan,
+      normalized,
+    );
+    const moduleCount = model.modules.size;
+    const useSquareRuns =
+      canDrawSquareRuns(normalized.shapeOptions) &&
+      !useLayerColors &&
+      normalized.logoAreaSize === 0;
+    for (let startRow = 0; startRow < moduleCount; startRow += ASYNC_BAND_ROWS) {
+      const endRow = Math.min(startRow + ASYNC_BAND_ROWS, moduleCount);
+      if (useSquareRuns) {
+        drawSquareRuns(
+          context,
+          model,
+          normalized.quietZone,
+          plan.totalModules,
+          plan.pixelSize,
+          startRow,
+          endRow,
+        );
+      } else {
+        drawPlanRows(context, plan, normalized, foregroundFill, startRow, endRow);
+      }
+      await yieldToMainThread();
+    }
+    finishPng(context, plan, normalized, foregroundFill);
+
+    const output = canvas.toDataURL("image/png");
+    webCache.set(key, request, output);
+    return output;
+  });
 }
 
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   const request = cacheRequest(normalized, "svg");
   const key = hashCachePart(request);
-  const cached = getCacheEntry(key, request);
+  const cached = webCache.get(key, request);
+  recordCacheLookup(cached !== undefined);
   if (cached !== undefined) {
     return cached;
   }
 
-  const model = createModel(normalized);
-  const totalSize = model.modules.size + normalized.quietZone * 2;
-  let path = "";
-  for (let y = 0; y < model.modules.size; y++) {
-    for (let x = 0; x < model.modules.size; x++) {
-      if (isDark(model, x, y)) {
-        path += `M${x + normalized.quietZone},${y + normalized.quietZone}h1v1h-1z`;
+  return measuredSync(false, () => {
+    const model = createModel(normalized);
+    const totalSize = model.modules.size + normalized.quietZone * 2;
+    let path = "";
+    for (let y = 0; y < model.modules.size; y++) {
+      for (let x = 0; x < model.modules.size; x++) {
+        if (isDark(model, x, y)) {
+          path += `M${x + normalized.quietZone},${y + normalized.quietZone}h1v1h-1z`;
+        }
       }
     }
-  }
 
-  const gradientMarkup = createSvgGradient(normalized);
-  const foregroundFill =
-    gradientMarkup === ""
-      ? normalized.foregroundColor
-      : "url(#nitro-qrcode-gradient)";
-  const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
-  setCacheEntry(key, request, output);
-  return output;
+    const gradientMarkup = createSvgGradient(normalized);
+    const foregroundFill =
+      gradientMarkup === ""
+        ? normalized.foregroundColor
+        : "url(#nitro-qrcode-gradient)";
+    const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
+    webCache.set(key, request, output);
+    return output;
+  });
 }
 
 export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
@@ -289,16 +331,16 @@ export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
 
 export function clearQRCodeCache(): void {
   webCache.clear();
-  webCacheBytes = 0;
 }
 
 export function getQRCodeCacheSize(): number {
-  return webCache.size;
+  return webCache.size();
 }
 
 export const QRCode = createQRCodeComponent({
   toPngDataUri,
   toPngBase64,
+  toPngDataUriAsync,
 });
 
 export const NitroQRCode: NitroQRCodeApi = {
@@ -311,50 +353,169 @@ export const NitroQRCode: NitroQRCodeApi = {
   validateOptions,
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
+  getQRCodeMetrics: webGetQRCodeMetrics,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
 };
 
-function getCacheEntry(key: string, request: string): string | undefined {
-  const cached = webCache.get(key);
-  if (cached === undefined || cached.request !== request) {
-    return undefined;
+function preparePngCanvas(
+  context: CanvasRenderingContext2D,
+  plan: RenderPlan,
+  options: NormalizedOptions,
+): {
+  foregroundFill: CanvasFill;
+  useLayerColors: boolean;
+} {
+  const pixelSize = plan.pixelSize;
+  if (plan.background.type === "transparent") {
+    context.clearRect(0, 0, pixelSize, pixelSize);
+  } else {
+    context.fillStyle = plan.background.color;
+    context.fillRect(0, 0, pixelSize, pixelSize);
   }
-  webCache.delete(key);
-  webCache.set(key, cached);
-  return cached.value;
+  const foregroundFill = createForegroundFill(
+    context,
+    options,
+    plan.pixelSize,
+  );
+  const useLayerColors = hasCustomLayerColors(options);
+  context.fillStyle = foregroundFill;
+  return { foregroundFill, useLayerColors };
 }
 
-function setCacheEntry(key: string, request: string, value: string): void {
-  const bytes = (key.length + request.length + value.length) * 2;
-  if (bytes > MAX_CACHE_BYTES) {
-    return;
+function finishPng(
+  context: CanvasRenderingContext2D,
+  plan: RenderPlan,
+  options: NormalizedOptions,
+  foregroundFill: CanvasFill,
+): void {
+  if (plan.drawGroupedFinders) {
+    drawGroupedFinders(
+      context,
+      plan.matrixSize,
+      plan.quietZone,
+      plan.totalModules,
+      plan.pixelSize,
+      options,
+    );
   }
+  clearLogoArea(context, plan, foregroundFill);
+}
 
-  const existing = webCache.get(key);
-  if (existing !== undefined) {
-    webCacheBytes -= existing.bytes;
-    webCache.delete(key);
+function drawPlanRows(
+  context: CanvasRenderingContext2D,
+  plan: RenderPlan,
+  options: NormalizedOptions,
+  foregroundFill: CanvasFill,
+  startRow: number,
+  endRow: number,
+): void {
+  for (const row of plan.rows) {
+    if (row.moduleY < startRow || row.moduleY >= endRow) {
+      continue;
+    }
+    for (const module of row.modules) {
+      if (module.stroke !== undefined && module.strokeGap !== undefined) {
+        context.fillStyle = options.strokeColor;
+        drawModule(
+          context,
+          module.x0,
+          module.y0,
+          module.x1,
+          module.y1,
+          module.shape,
+          module.gap,
+          module.cornerRadius,
+        );
+        context.fillStyle = resolvePlanFill(
+          options,
+          foregroundFill,
+          module.layer,
+        );
+        drawModule(
+          context,
+          module.x0,
+          module.y0,
+          module.x1,
+          module.y1,
+          module.shape,
+          module.strokeGap,
+          module.cornerRadius,
+        );
+        continue;
+      }
+      context.fillStyle = resolvePlanFill(
+        options,
+        foregroundFill,
+        module.layer,
+      );
+      drawModule(
+        context,
+        module.x0,
+        module.y0,
+        module.x1,
+        module.y1,
+        module.shape,
+        module.gap,
+        module.cornerRadius,
+      );
+    }
   }
-  webCache.set(key, { request, value, bytes });
-  webCacheBytes += bytes;
+}
 
-  while (
-    webCache.size > MAX_CACHE_ENTRIES ||
-    webCacheBytes > MAX_CACHE_BYTES
-  ) {
-    const firstKey = webCache.keys().next().value as string;
-    const removed = webCache.get(firstKey) as WebCacheEntry;
-    webCacheBytes -= removed.bytes;
-    webCache.delete(firstKey);
+function resolvePlanFill(
+  options: NormalizedOptions,
+  foregroundFill: CanvasFill,
+  layer: "foreground" | "stroke" | "eye" | "eyeball",
+): CanvasFill {
+  if (layer === "eyeball") {
+    return options.eyeballColor;
   }
+  if (layer === "eye") {
+    return options.eyeColor;
+  }
+  return foregroundFill;
+}
+
+function yieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function createModel(options: NormalizedOptions): QRCodeModel {
+  const base = createModelAt(options, options.errorCorrectionLevel);
+  if (!options.boostEcl || options.errorCorrectionLevel === "H") {
+    return base;
+  }
+  const version = (base.modules.size - 17) / 4;
+  let boosted: QRCodeModel | undefined;
+  for (const candidate of ["Q", "H"] as const) {
+    try {
+      boosted = createModelAt(options, candidate, version);
+    } catch {
+      break;
+    }
+  }
+  return boosted ?? base;
+}
+
+function renderPixelSize(
+  options: NormalizedOptions,
+  model: QRCodeModel,
+): number {
+  return Math.max(
+    options.size,
+    model.modules.size + options.quietZone * 2,
+  );
+}
+
+function createModelAt(
+  options: NormalizedOptions,
+  errorCorrectionLevel: "L" | "M" | "Q" | "H",
+  version?: number,
+): QRCodeModel {
   return qrcode.create(options.value, {
-    errorCorrectionLevel: options.errorCorrectionLevel,
-    version:
-      options.minVersion === options.maxVersion
-        ? options.minVersion
-        : undefined,
+    errorCorrectionLevel,
+    version: version ?? (options.minVersion === options.maxVersion ? options.minVersion : undefined),
     maskPattern: options.mask >= 0 ? options.mask : undefined,
   });
 }
@@ -362,20 +523,20 @@ function createModel(options: NormalizedOptions): QRCodeModel {
 function createForegroundFill(
   context: CanvasRenderingContext2D,
   options: NormalizedOptions,
+  pixelSize: number,
 ): CanvasFill {
   if (options.gradient.type === "none") {
     return options.foregroundColor;
   }
 
-  const size = options.size;
   const locations = resolveGradientLocations(options.gradient);
   if (options.gradient.type === "radial") {
-    const centerX = options.gradient.startX * size;
-    const centerY = options.gradient.startY * size;
+    const centerX = options.gradient.startX * pixelSize;
+    const centerY = options.gradient.startY * pixelSize;
     const radius = Math.max(
       Math.hypot(
-        (options.gradient.endX - options.gradient.startX) * size,
-        (options.gradient.endY - options.gradient.startY) * size,
+        (options.gradient.endX - options.gradient.startX) * pixelSize,
+        (options.gradient.endY - options.gradient.startY) * pixelSize,
       ),
       1,
     );
@@ -392,10 +553,10 @@ function createForegroundFill(
   }
 
   const gradient = context.createLinearGradient(
-    options.gradient.startX * size,
-    options.gradient.startY * size,
-    options.gradient.endX * size,
-    options.gradient.endY * size,
+    options.gradient.startX * pixelSize,
+    options.gradient.startY * pixelSize,
+    options.gradient.endX * pixelSize,
+    options.gradient.endY * pixelSize,
   );
   addGradientStops(gradient, options.gradient.colors, locations);
   return gradient;
@@ -408,22 +569,6 @@ function hasCustomLayerColors(options: NormalizedOptions): boolean {
     options.eyeStrokeColor !== DEFAULT_EYE_STROKE ||
     options.eyeballColor !== DEFAULT_EYEBALL
   );
-}
-
-function getModuleFill(
-  options: NormalizedOptions,
-  foregroundFill: CanvasFill,
-  moduleX: number,
-  moduleY: number,
-  matrixSize: number,
-): CanvasFill {
-  if (!isEyeModule(moduleX, moduleY, matrixSize)) {
-    return foregroundFill;
-  }
-  if (isEyeBallModule(moduleX, moduleY, matrixSize)) {
-    return options.eyeballColor;
-  }
-  return options.eyeColor;
 }
 
 function createCanvas(size: number): HTMLCanvasElement {
@@ -448,35 +593,6 @@ function modulePixel(
   return Math.round((moduleIndex * pixelSize) / totalModules);
 }
 
-function isEyeModule(x: number, y: number, matrixSize: number): boolean {
-  const top = y >= 0 && y < 7;
-  const left = x >= 0 && x < 7;
-  const right = x >= matrixSize - 7 && x < matrixSize;
-  const bottom = y >= matrixSize - 7 && y < matrixSize;
-  return (top && left) || (top && right) || (bottom && left);
-}
-
-function getEyeOrigin(
-  x: number,
-  y: number,
-  matrixSize: number,
-): { x: number; y: number } {
-  if (x < 7 && y < 7) {
-    return { x: 0, y: 0 };
-  }
-  if (x >= matrixSize - 7 && y < 7) {
-    return { x: matrixSize - 7, y: 0 };
-  }
-  return { x: 0, y: matrixSize - 7 };
-}
-
-function isEyeBallModule(x: number, y: number, matrixSize: number): boolean {
-  const origin = getEyeOrigin(x, y, matrixSize);
-  const localX = x - origin.x;
-  const localY = y - origin.y;
-  return localX >= 2 && localX <= 4 && localY >= 2 && localY <= 4;
-}
-
 function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
   return (
     options.shape === "square" &&
@@ -488,44 +604,17 @@ function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
   );
 }
 
-function resolveBodyGap(
-  options: Required<QRCodeShapeOptions>,
-  width: number,
-  height: number,
-): number {
-  if (options.bodyDensity === "dense") {
-    return options.gap;
-  }
-  const moduleSize = Math.max(1, Math.min(width, height));
-  const densityGap =
-    options.bodyDensity === "sparse"
-      ? Math.round(moduleSize * 0.22)
-      : Math.round(moduleSize * 0.12);
-  return Math.max(options.gap, densityGap);
-}
-
-function shouldDrawGroupedFinderEyes(
-  options: Required<QRCodeShapeOptions>,
-  normalized: NormalizedOptions,
-): boolean {
-  return (
-    options.eyeFrameShape !== "square" ||
-    options.eyeballShape !== "square" ||
-    normalized.eyeColor !== DEFAULT_EYE ||
-    normalized.eyeStrokeColor !== DEFAULT_EYE_STROKE ||
-    normalized.eyeballColor !== DEFAULT_EYEBALL
-  );
-}
-
 function drawSquareRuns(
   context: CanvasRenderingContext2D,
   model: QRCodeModel,
   quietZone: number,
   totalModules: number,
   pixelSize: number,
+  startRow: number,
+  endRow: number,
 ): void {
   const matrixSize = model.modules.size;
-  for (let moduleY = 0; moduleY < matrixSize; moduleY++) {
+  for (let moduleY = startRow; moduleY < endRow; moduleY++) {
     let runStart = -1;
     const y0 = modulePixel(moduleY + quietZone, pixelSize, totalModules);
     const y1 = modulePixel(moduleY + quietZone + 1, pixelSize, totalModules);
@@ -698,7 +787,7 @@ function drawModule(
   const width = Math.max(0, x1 - x0 - inset * 2);
   const height = Math.max(0, y1 - y0 - inset * 2);
   if (shape === "circle") {
-    drawRoundedRect(context, left, top, width, height, width * 0.36);
+    drawEllipse(context, left, top, width, height);
     return;
   }
   if (shape === "rounded" || cornerRadius >= 0) {
@@ -718,43 +807,40 @@ function drawModule(
 
 function clearLogoArea(
   context: CanvasRenderingContext2D,
-  options: NormalizedOptions,
+  plan: RenderPlan,
   foregroundFill: CanvasFill,
 ): void {
-  if (options.logoAreaSize === 0) {
+  if (plan.logoArea === undefined) {
     return;
   }
-  const areaSize = Math.min(options.logoAreaSize, options.size);
-  const left = (options.size - areaSize) / 2;
-  const top = (options.size - areaSize) / 2;
+  const { size: areaSize, borderRadius } = plan.logoArea;
+  const left = (plan.pixelSize - areaSize) / 2;
+  const top = (plan.pixelSize - areaSize) / 2;
   context.save();
   context.globalCompositeOperation = "destination-out";
-  drawRoundedRect(
-    context,
-    left,
-    top,
-    areaSize,
-    areaSize,
-    options.logoAreaBorderRadius,
-  );
+  drawRoundedRect(context, left, top, areaSize, areaSize, borderRadius);
   context.restore();
   context.fillStyle = foregroundFill;
 }
 
-function intersectsLogoArea(
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  options: NormalizedOptions,
-): boolean {
-  if (options.logoAreaSize === 0) {
-    return false;
-  }
-  const areaSize = Math.min(options.logoAreaSize, options.size);
-  const left = (options.size - areaSize) / 2;
-  const top = (options.size - areaSize) / 2;
-  return x0 < left + areaSize && x1 > left && y0 < top + areaSize && y1 > top;
+function drawEllipse(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  context.beginPath();
+  context.ellipse(
+    x + width / 2,
+    y + height / 2,
+    width / 2,
+    height / 2,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
 }
 
 function drawRoundedRect(

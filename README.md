@@ -4,9 +4,9 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/)
-[![Expo](https://img.shields.io/badge/expo-SDK%2057-000020)](https://docs.expo.dev/)
-[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.36.4-black)](https://nitro.margelo.com/)
+[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/docs/0.86/getting-started-without-a-framework)
+[![Expo](https://img.shields.io/badge/expo-SDK%2057-000020)](https://docs.expo.dev/versions/v57.0.0/)
+[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.36.5%20%3C0.37.0-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
 Typed QR code generation for React Native, Expo development builds, and web.
@@ -52,13 +52,13 @@ bare React Native app.
 | --- | --- |
 | React | `>=18.2.0 <20.0.0` |
 | React Native | `>=0.75.0 <1.0.0` |
-| Nitro Modules | `>=0.36.4 <0.37.0` |
+| Nitro Modules | `>=0.36.5 <0.37.0` |
 | Expo | SDK 57 development builds; Expo Go is not supported |
 | React Native Web | `>=0.19.0 <1.0.0` |
 | Node | `>=18.0.0` |
 
-Version 0.4.3 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
-Modules 0.36.4. The wider ranges above are the package's declared peer
+Version 0.5.0 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
+Modules 0.36.5. The wider ranges above are the package's declared peer
 compatibility.
 
 ## Expo Config
@@ -191,15 +191,82 @@ reached first, and evicts least-recently-used output. An output larger than 4
 MiB is returned without being cached. Use `clearQRCodeCache()` to clear cached
 output and `getQRCodeCacheSize()` to inspect the entry count.
 
-Native matrix export reuses one internally cached generation across its
-existing size and packed-data bridge calls. No new HybridObject method is
-required, preserving compatibility with existing native binaries.
+Native matrix export reuses a small bounded least-recently-used cache (32
+entries) across its existing size and packed-data bridge calls. No new
+HybridObject method is required, preserving compatibility with existing native
+binaries.
+
+Development builds expose opt-in generation metrics through
+`getQRCodeMetrics()`, `resetQRCodeMetrics()`, and
+`setQRCodeMetricsEnabled()`. Metrics are enabled by default in development and
+disabled in production builds; when disabled they return a zeroed snapshot.
+The snapshot counts requests, async requests, failed generations, cache
+hits/misses and cache bytes (web only), plus total and last generation
+milliseconds. No production logging is performed.
+
+## Encoding Parity And Limits
+
+Native (Project Nayuki encoder) and web (`qrcode` encoder) output identical
+matrices for inputs that are entirely numeric, entirely alphanumeric, or
+entirely byte-mode without digits, uppercase letters, or `$%*+-./:` characters,
+when version, error correction level, and mask are fixed. This contract is
+enforced by a committed parity corpus (`src/__tests__/fixtures/parity-corpus.json`,
+regenerable with `bun scripts/generate-parity-corpus.js`) plus decode-back
+tests. Automatic mask selection (`mask: -1`) can pick different but equally
+valid masks because the two encoders interpret the ISO N4 penalty rounding
+differently; fixed masks always match.
+
+`boostEcl` is honored on both platforms. On web the encoder tries the same
+version at higher error correction levels and keeps the highest level that
+fits, mirroring the native behavior.
+
+Generation input bounds:
+
+| Input | Accepted values |
+| --- | --- |
+| `value` | Non-empty string; maximum length is limited by QR version 40 capacity (about 2953 bytes, 4296 alphanumeric characters, or 7089 numeric digits) |
+| `size` | Integer from 1 through 4096; synchronous native PNG helpers accept up to 2048 and reject larger sizes with a message directing to the async helpers |
+| `quietZone` | Integer from 0 through 32 |
+| `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion` |
+| `mask` | `-1` for automatic selection, or integer 0 through 7 |
+| `logoAreaSize` | Integer from 0 through 4096 and no larger than `size` |
+| `logoAreaBorderRadius` | Integer from 0 through 2048 and no larger than half of `size` |
+| Shape gaps and radii | Integers from 0 through 256 |
+| Gradient colors | 2 through 8 valid hex colors |
+| Gradient locations | Same count as colors, finite values from 0 through 1 in non-decreasing order |
+| Gradient points | Finite `x` and `y` values from 0 through 1 |
+
+Option loss and platform differences:
+
+- **SVG output** encodes the matrix with quiet zone, background, foreground,
+  and gradient only. Body shape, gaps, density, stroke, eye, and eyeball
+  colors do not apply to the SVG path.
+- **Web PNG transparency** uses an alpha-cleared background; transparent
+  pixels are truly transparent instead of black.
+- **Circle geometry** is defined as an ellipse inscribed in the module cell on
+  both platforms; web rasterization uses the canvas ellipse primitive and the
+  native renderer uses distance evaluation, so edge pixels can differ by at
+  most one pixel per module (documented golden tolerance).
+- **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
+  shorthand expand to full hex before the native bridge). The native ABI
+  itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the
+  background.
+- **Web async PNG helpers** render in row bands and yield to the main thread
+  between bands so large canvas work does not block the UI in one step.
+- **Native sync PNG helpers** are intended for small outputs (up to 2048
+  pixels); prefer `toPngBase64Async`/`toPngDataUriAsync` for larger rasters.
 
 ## Rendering, Logos, And Errors
 
 `QRCode` generates a PNG data URI and renders it through React Native `Image`
 on iOS, Android, and web. Web PNG rendering requires a browser canvas. SVG is
 available through `toSvgString`; the component itself remains PNG-backed.
+
+The The component exposes accessible semantics: the generated image is
+announced as an image with the label `QR code for <value>`, the container
+reports a busy state while generation is pending, and the logo overlay is
+hidden from the accessibility tree. Screen readers announce the QR meaning
+and its generation state on iOS and Android.
 
 The `logo` prop is a React node layered above the generated image. Only
 `logoAreaSize` clears QR pixels and reserves room in the encoded image.
@@ -248,21 +315,12 @@ console.log(result.warnings);
 warnings. With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
 
-Direct generation helpers enforce these input bounds:
-
-| Input | Accepted values |
-| --- | --- |
-| `value` | Non-empty string |
-| `size` | Integer from 1 through 4096 |
-| `quietZone` | Integer from 0 through 32 |
-| `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion` |
-| `mask` | `-1` for automatic selection, or integer 0 through 7 |
-| `logoAreaSize` | Integer from 0 through 4096 and no larger than `size` |
-| `logoAreaBorderRadius` | Integer from 0 through 2048 and no larger than half of `size` |
-| Shape gaps and radii | Integers from 0 through 256 |
-| Gradient colors | 2 through 8 valid hex colors |
-| Gradient locations | Same count as colors, finite values from 0 through 1 in non-decreasing order |
-| Gradient points | Finite `x` and `y` values from 0 through 1 |
+Errors are deterministic: validation returns typed `QRCodeValidationResult`
+entries with stable codes (`invalid` plus the scanability warning codes under
+strict mode). Generation failures throw (or reject with) `Error` instances;
+message text is never used for control flow. The JavaScript layer validates
+all options before the native boundary, so the native side surfaces unexpected
+failures as ordinary exceptions rather than a separate error envelope.
 
 ## TypeScript Guardrails
 
@@ -300,7 +358,7 @@ Main exports:
 | Option | Description |
 | --- | --- |
 | `value` | Non-empty QR payload string. Required. |
-| `size` | Positive component layout size up to 2048 points; rasterized internally at a minimum of 512 pixels and at least 2x. |
+| `size` | Positive component layout size up to 2048 points; rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels). |
 | `quietZone` | Quiet-zone width in QR modules; integer 0 through 32. |
 | `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases. |
 | `scanSafe` | Raises unsafe defaults; `"strict"` turns scanability warnings into errors. |
@@ -332,8 +390,11 @@ Main exports:
 | Web | JavaScript fallback through React Native Web. |
 | Expo | Development builds; Expo Go is not supported for native Nitro code. |
 
-`qrcode` is bundled for the web fallback. Consumers do not need
-`react-native-svg`, Skia, canvas packages, or another QR package.
+The `qrcode` npm package powers only the web entry
+(`src/index.web.ts`). Native iOS and Android builds resolve the
+platform-specific entry and never bundle it; web bundlers include it only for
+web targets. Consumers do not need `react-native-svg`, Skia, canvas packages,
+or another QR package.
 
 ## Troubleshooting
 
@@ -361,8 +422,15 @@ bun run example:ios
 ```
 
 Run native example builds before release when changing plugin, native, Nitro, or
-packaging files. Use `bun run example:smoke -- --strict` when a release must
-fail if no Android device or booted iOS simulator is available.
+packaging files. `bun run example:smoke` reports each platform as executed,
+skipped (with a reason), or failed and never passes silently; use
+`bun run example:smoke -- --strict` when a release must fail if no Android
+device or booted iOS simulator is available. `bun run example:smoke:ci`
+verifies the terminal-state reporting without devices and runs in `check`.
+
+When changing encoder behavior, regenerate and verify the parity corpus with
+`bun scripts/generate-parity-corpus.js` (and `--write` after the native side
+is proven by `bun run --cwd packages/react-native-nitro-qrcode test:cpp`).
 
 ## Links
 

@@ -171,6 +171,10 @@ export default function DemoScreen() {
   const [exportPreview, setExportPreview] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<Error | null>(null);
   const qrRef = useRef<QRCodeRef>(null);
+  const hasPayload = value.trim().length > 0;
+  const displayError = hasPayload
+    ? (metricsError?.message ?? qrError)
+    : "Enter a payload to generate a QR code.";
 
   const shapeOptions = useMemo<QRCodeShapeOptions>(
     () =>
@@ -198,6 +202,10 @@ export default function DemoScreen() {
   const logoPaddingSize = showLogo ? LOGO_PADDING_CONFIG[logoPadding] : 0;
 
   useEffect(() => {
+    if (!hasPayload) {
+      return;
+    }
+
     let isMounted = true;
     const timeoutId = setTimeout(() => {
       const startedAt = now();
@@ -260,6 +268,7 @@ export default function DemoScreen() {
     eyeStrokeColor,
     foregroundColor,
     gradient,
+    hasPayload,
     logoAreaBorderRadius,
     logoAreaSize,
     shapeOptions,
@@ -267,10 +276,6 @@ export default function DemoScreen() {
     strokeColor,
     value,
   ]);
-
-  if (metricsError !== null) {
-    throw metricsError;
-  }
 
   return (
     <ScrollView
@@ -305,51 +310,69 @@ export default function DemoScreen() {
             <Tag>{showLogo ? "Logo on" : "Logo off"}</Tag>
           </View>
 
-          <View style={styles.stage}>
-            <View style={[styles.qrShell, { backgroundColor }]}>
-              <QRCode
-                ref={qrRef}
-                value={value}
-                size={PREVIEW_SIZE}
-                placeholder={
-                  <View style={styles.qrPlaceholder}>
-                    <Text style={styles.qrPlaceholderText}>Generating QR…</Text>
-                  </View>
-                }
-                hideLogoUntilReady
-                onReady={(uri) => {
-                  setReadyUri(uri);
-                  setQrError(null);
-                }}
-                onError={(error) => {
-                  setQrError(error.message);
-                }}
-                scanSafe
-                errorCorrectionLevel={showLogo ? "H" : "M"}
-                foregroundColor={foregroundColor}
-                backgroundColor={backgroundColor}
-                strokeColor={strokeColor}
-                eyeColor={eyeColor}
-                eyeStrokeColor={eyeStrokeColor}
-                eyeballColor={eyeballColor}
-                gradient={gradient}
-                shapeOptions={shapeOptions}
-                logoAreaSize={logoAreaSize}
-                logoAreaBorderRadius={logoAreaBorderRadius}
-                logoPadding={logoPaddingSize}
-                logo={showLogo ? <LogoMark /> : undefined}
-                testID="nitro-qrcode-preview"
-              />
+            <View style={styles.stage}>
+              <View style={[styles.qrShell, { backgroundColor }]}>
+                {hasPayload ? (
+                  <QRCode
+                    ref={qrRef}
+                    value={value}
+                    size={PREVIEW_SIZE}
+                    placeholder={
+                      <View style={styles.qrPlaceholder}>
+                        <Text style={styles.qrPlaceholderText}>
+                          Generating QR…
+                        </Text>
+                      </View>
+                    }
+                    hideLogoUntilReady
+                    onReady={(uri) => {
+                      setReadyUri(uri);
+                      setQrError(null);
+                    }}
+                    onError={(error) => {
+                      setQrError(error.message);
+                    }}
+                    scanSafe
+                    errorCorrectionLevel={showLogo ? "H" : "M"}
+                    foregroundColor={foregroundColor}
+                    backgroundColor={backgroundColor}
+                    strokeColor={strokeColor}
+                    eyeColor={eyeColor}
+                    eyeStrokeColor={eyeStrokeColor}
+                    eyeballColor={eyeballColor}
+                    gradient={gradient}
+                    shapeOptions={shapeOptions}
+                    logoAreaSize={logoAreaSize}
+                    logoAreaBorderRadius={logoAreaBorderRadius}
+                    logoPadding={logoPaddingSize}
+                    logo={showLogo ? <LogoMark /> : undefined}
+                    testID="nitro-qrcode-preview"
+                  />
+                ) : (
+                  <Text style={styles.qrPlaceholderText}>Enter a payload</Text>
+                )}
             </View>
 
             <View style={styles.stageMeta}>
               <Tag>{capitalize(bodyShape)}</Tag>
               <Tag>{gradient === undefined ? "Single" : "Gradient"}</Tag>
-              <Tag>{readyUri === "" ? "Pending" : "Ready"}</Tag>
-              {qrError !== null ? <Tag>{qrError}</Tag> : null}
+              <Tag>
+                {!hasPayload
+                  ? "Needs payload"
+                  : readyUri === ""
+                    ? "Pending"
+                    : "Ready"}
+              </Tag>
             </View>
+            {displayError !== null ? (
+              <Text style={styles.errorText}>{displayError}</Text>
+            ) : null}
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{
+                disabled: !hasPayload || readyUri === "",
+              }}
+              disabled={!hasPayload || readyUri === ""}
               onPress={() => {
                 const data = qrRef.current?.toPngBase64();
                 setExportPreview(
@@ -358,9 +381,20 @@ export default function DemoScreen() {
                     : `Base64: ${data.slice(0, 14)}…`,
                 );
               }}
-              style={styles.selectButton}
+              style={[
+                styles.selectButton,
+                (!hasPayload || readyUri === "") &&
+                  styles.selectButtonDisabled,
+              ]}
             >
-              <Text style={styles.selectButtonText}>Export PNG base64</Text>
+              <Text
+                style={[
+                  styles.selectButtonText,
+                  (!hasPayload || readyUri === "") && styles.textDisabledDark,
+                ]}
+              >
+                Export PNG base64
+              </Text>
             </Pressable>
             {exportPreview !== null ? (
               <Text style={styles.label}>{exportPreview}</Text>
@@ -371,7 +405,22 @@ export default function DemoScreen() {
             <Text style={styles.label}>Payload</Text>
             <TextInput
               value={value}
-              onChangeText={setValue}
+              accessibilityLabel="QR payload"
+              onChangeText={(nextValue) => {
+                setValue(nextValue);
+                setReadyUri("");
+                setExportPreview(null);
+                setMetricsError(null);
+                setQrError(null);
+                if (nextValue.trim().length === 0) {
+                  setMetrics({
+                    elapsed: 0,
+                    bytes: 0,
+                    matrixSize: 0,
+                    cacheSize: getQRCodeCacheSize(),
+                  });
+                }
+              }}
               onFocus={() => {
                 setPayloadTouched(true);
               }}
@@ -793,6 +842,7 @@ function LogoConfigPanel({
     <View style={styles.builderPanel}>
       <ControlGroup label="Demo logo">
         <Pressable
+          accessibilityLabel="Show demo logo"
           accessibilityRole="switch"
           aria-checked={showLogo}
           accessibilityState={{ checked: showLogo }}
@@ -1325,13 +1375,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   qrShell: {
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
+    height: PREVIEW_SIZE + 32,
+    justifyContent: "center",
     padding: 16,
+    width: PREVIEW_SIZE + 32,
     boxShadow: "0 14px 34px rgba(0,0,0,0.32)",
   },
   qrPlaceholder: {
     alignItems: "center",
+    flex: 1,
     height: "100%",
     justifyContent: "center",
     width: "100%",
@@ -1372,6 +1427,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0,
     textTransform: "uppercase",
+  },
+  errorText: {
+    color: "#FDA4AF",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
   input: {
     minHeight: 48,

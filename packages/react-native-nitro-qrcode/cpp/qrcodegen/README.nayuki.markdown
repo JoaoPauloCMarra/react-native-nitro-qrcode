@@ -10,6 +10,31 @@ This project aims to be the best, clearest QR Code generator library. The primar
 Home page with live JavaScript demo, extensive descriptions, and competitor comparisons: https://www.nayuki.io/page/qr-code-generator-library
 
 
+Vendored Provenance
+-------------------
+
+The `qrcodegen.hpp` and `qrcodegen.cpp` files in this directory are vendored
+from Project Nayuki's QR Code generator library, upstream repository
+`nayuki/QR-Code-generator`:
+
+- Pinned upstream commit: `8329a7108fc22be3e1eec0a9f9318978579e3621`
+  (2024-09-01, "Slightly simplified the calculation of alignment pattern
+  spacing in a non-obvious way in C, C++, and Rust versions.")
+- SHA-256 of `qrcodegen.hpp`: `b779c3b156cf7a57ce789d6fee4fc991ccc2913774d26c909d22bb8f26b2a793`
+- SHA-256 of `qrcodegen.cpp`: `8948b57053deb5d132bfc675ca2688b7abef9f03ec633c0de59770c945a66fc9`
+- License: MIT (see the license header in `qrcodegen.hpp`).
+
+Synchronization policy:
+
+- These files are copied verbatim from upstream; never edit them in place.
+- To update, diff the local files against the upstream commit above, apply the
+  same changes in the package's own `cpp/core` and `cpp/bindings` code where
+  needed, then bump the pinned commit and both checksums in this section.
+- Upstream changes that alter encoder output (segmentation, mask selection,
+  error correction) must re-run `scripts/generate-parity-corpus.js` and the
+  native/web parity corpus tests before the update is accepted.
+
+
 Features
 --------
 

@@ -1,4 +1,5 @@
 #include "QRCodeGenerator.hpp"
+#include "parity-corpus.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -13,6 +14,7 @@
 using NitroQRCode::base64Encode;
 using NitroQRCode::encodePngRgba;
 using NitroQRCode::GenerateOptions;
+using NitroQRCode::parityCorpus;
 using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
 
@@ -109,6 +111,70 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
               rgba.begin() + static_cast<std::ptrdiff_t>(rgbaRow));
   }
   return rgba;
+}
+
+std::vector<uint8_t> decodeIndexedAlphaPng(const std::string &encoded,
+                                           int &width, int &height) {
+  const std::vector<uint8_t> png = base64Decode(encoded);
+  assert(png.size() > 8);
+  std::vector<uint8_t> palette;
+  std::vector<uint8_t> trns;
+  std::vector<uint8_t> compressed;
+  size_t offset = 8;
+  while (offset + 12 <= png.size()) {
+    const uint32_t chunkSize = readU32(png, offset);
+    const size_t typeOffset = offset + 4;
+    const size_t dataOffset = typeOffset + 4;
+    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
+    assert(dataOffset + chunkSize + 4 <= png.size());
+    if (type == "IHDR") {
+      width = static_cast<int>(readU32(png, dataOffset));
+      height = static_cast<int>(readU32(png, dataOffset + 4));
+      assert(png[dataOffset + 8] == 1);
+      assert(png[dataOffset + 9] == 3);
+    } else if (type == "PLTE") {
+      palette.assign(png.begin() + dataOffset,
+                     png.begin() + dataOffset + chunkSize);
+    } else if (type == "tRNS") {
+      trns.assign(png.begin() + dataOffset,
+                  png.begin() + dataOffset + chunkSize);
+    } else if (type == "IDAT") {
+      compressed.insert(compressed.end(), png.begin() + dataOffset,
+                        png.begin() + dataOffset + chunkSize);
+    } else if (type == "IEND") {
+      break;
+    }
+    offset = dataOffset + chunkSize + 4;
+  }
+  assert(palette.size() >= 6);
+  assert(trns.size() >= 2);
+
+  const size_t rowBytes = (static_cast<size_t>(width) + 7) / 8;
+  std::vector<uint8_t> raw((rowBytes + 1) * static_cast<size_t>(height));
+  uLongf rawSize = static_cast<uLongf>(raw.size());
+  const int result = uncompress(raw.data(), &rawSize, compressed.data(),
+                                static_cast<uLong>(compressed.size()));
+  assert(result == Z_OK);
+  assert(rawSize == raw.size());
+
+  std::vector<uint8_t> alpha(static_cast<size_t>(width) *
+                             static_cast<size_t>(height));
+  for (int y = 0; y < height; y++) {
+    const size_t rawRow = static_cast<size_t>(y) * (rowBytes + 1);
+    assert(raw[rawRow] == 0);
+    for (int x = 0; x < width; x++) {
+      const uint8_t byte = raw[rawRow + 1 + static_cast<size_t>(x / 8)];
+      const uint8_t bit = static_cast<uint8_t>(
+          (byte >> (7U - static_cast<unsigned>(x % 8))) & 1U);
+      const size_t entry = static_cast<size_t>(bit) * 3;
+      assert(entry + 2 < palette.size());
+      const uint8_t alphaValue = bit < trns.size() ? trns[bit] : 255;
+      alpha[static_cast<size_t>(y) * static_cast<size_t>(width) +
+            static_cast<size_t>(x)] = alphaValue;
+      (void)palette[entry];
+    }
+  }
+  return alpha;
 }
 
 void testPngGeneration() {
@@ -261,14 +327,6 @@ void testStyledPngGeneration() {
       generator.generatePngBase64("https://example.com/sparse", options));
 
   options.moduleShape = "circle";
-  options.eyePatternShape = "circle-border";
-  options.gap = 1;
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/circle-border-eyes", options));
-
-  options = GenerateOptions{};
-  options.size = 160;
-  options.moduleShape = "circle";
   options.eyePatternShape = "square";
   options.eyeballShape = "circle";
   options.eyeStrokeColor = "#222222";
@@ -276,52 +334,17 @@ void testStyledPngGeneration() {
   assertPngHeader(generator.generatePngBase64(
       "https://example.com/circle-body-square-frame-circle-eye", options));
 
-  const std::vector<std::string> decorativeShapes = {
-      "diamond", "hexagon", "octagon", "star",
-      "heart",   "scallop", "leaf",    "clover"};
-  for (const auto &shape : decorativeShapes) {
-    options = GenerateOptions{};
-    options.size = 160;
-    options.moduleShape = shape;
-    options.eyePatternShape = "rounded";
-    options.eyeballShape = shape;
-    options.gap = 1;
-    assertPngHeader(generator.generatePngBase64(
-        "https://example.com/shape-" + shape, options));
-  }
-
   options = GenerateOptions{};
   options.size = 160;
-  options.layout = "radial";
-  options.moduleShape = "rounded";
-  options.gap = 2;
-  options.logoAreaSize = 32;
-  options.logoAreaBorderRadius = 16;
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/radial-layout", options));
-
-  options.logoAreaSize = options.size;
-  options.logoAreaBorderRadius = options.size / 2;
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/radial-logo-only", options));
-
-  options = GenerateOptions{};
-  options.size = 96;
-  options.layout = "radial";
-  options.moduleShape = "rounded";
-  options.eyePatternShape = "circle-border";
-  options.gap = 3;
-  options.cornerRadius = 8;
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/radial-small-rounded-modules", options));
-
   options.moduleShape = "circle";
+  options.eyePatternShape = "rounded";
+  options.eyeballShape = "rounded";
+  options.gap = 1;
+  options.bodyDensity = "sparse";
+  options.cornerRadius = 4;
+  options.eyePatternCornerRadius = 6;
   assertPngHeader(generator.generatePngBase64(
-      "https://example.com/radial-dot-modules", options));
-
-  options.moduleShape = "square";
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/radial-arc-modules", options));
+      "https://example.com/circle-styled", options));
 
   options = GenerateOptions{};
   options.size = 160;
@@ -385,10 +408,6 @@ void testStyledPngGeneration() {
   assertPngHeader(generator.generatePngBase64(
       "https://example.com/layer-square-eye-stroke", options));
 
-  options.eyePatternShape = "circle-border";
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/layer-circle-border", options));
-
   options = GenerateOptions{};
   options.size = 160;
   const std::string squareModules =
@@ -406,20 +425,98 @@ void testStyledPngGeneration() {
   const std::string roundedSquareEyes =
       generator.generatePngBase64("https://example.com/eye-radius", options);
   assert(squareEyes != roundedSquareEyes);
+}
 
-  options.layout = "radial";
-  options.moduleShape = "rounded";
-  options.gap = 2;
-  options.strokeColor = "#FF0000FF";
-  options.eyeStrokeColor = "#333333";
-  options.stroke = parseColor(options.strokeColor);
-  options.eyeStroke = parseColor(options.eyeStrokeColor);
-  assertPngHeader(
-      generator.generatePngBase64("https://example.com/layer-radial", options));
+void testCircleGeometryTolerance() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 160;
+  options.quietZone = 4;
+  options.minVersion = 3;
+  options.maxVersion = 3;
+  options.mask = 0;
+  options.boostEcl = false;
+  options.moduleShape = "circle";
+  options.eyePatternShape = "square";
+  options.eyeballShape = "square";
+  options.gap = 0;
+  options.eyePatternGap = 0;
+  options.bodyDensity = "dense";
+  options.gradient.type = "linear";
+  options.gradient.colors = {parseColor("#000000"), parseColor("#000000")};
+  options.gradient.locations = {0.0, 1.0};
 
-  options.eyePatternShape = "rounded";
-  assertPngHeader(generator.generatePngBase64(
-      "https://example.com/layer-radial-eyes", options));
+  const std::string value = "https://example.com/circle-tolerance";
+  const std::string encoded = generator.generatePngBase64(value, options);
+
+  int width = 0;
+  int height = 0;
+  const std::vector<uint8_t> rgba = decodeRgbaPng(encoded, width, height);
+  assert(width == 160);
+  assert(height == 160);
+
+  const int matrixSize = generator.getMatrixSize(value, options);
+  const int totalModules = matrixSize + options.quietZone * 2;
+  const int imageSize = std::max(options.size, totalModules);
+
+  const auto cellStart = [=](int module) {
+    return (module + options.quietZone) * imageSize / totalModules;
+  };
+  const auto cellEnd = [=](int module) {
+    return (module + options.quietZone + 1) * imageSize / totalModules;
+  };
+  const auto isEyeRegion = [=](int x, int y) {
+    return (y < 7 && x < 7) || (y < 7 && x >= matrixSize - 7) ||
+           (y >= matrixSize - 7 && x < 7);
+  };
+  const auto isDarkPixel = [&](int x, int y) {
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) +
+         static_cast<size_t>(x)) *
+        4;
+    return rgba[offset] == 0 && rgba[offset + 1] == 0 &&
+           rgba[offset + 2] == 0 && rgba[offset + 3] == 255;
+  };
+
+  int checkedModules = 0;
+  for (int moduleY = 0; moduleY < matrixSize; moduleY++) {
+    const int y0 = cellStart(moduleY);
+    const int y1 = cellEnd(moduleY);
+    const double centerY = static_cast<double>(y0 + y1 - 1) / 2.0;
+    const double radiusY = static_cast<double>(y1 - y0) / 2.0;
+    for (int moduleX = 0; moduleX < matrixSize; moduleX++) {
+      if (isEyeRegion(moduleX, moduleY)) {
+        continue;
+      }
+      const int x0 = cellStart(moduleX);
+      const int x1 = cellEnd(moduleX);
+      const double centerX = static_cast<double>(x0 + x1 - 1) / 2.0;
+      const double radiusX = static_cast<double>(x1 - x0) / 2.0;
+      if (!isDarkPixel((x0 + x1 - 1) / 2, (y0 + y1 - 1) / 2)) {
+        continue;
+      }
+      checkedModules++;
+      for (int y = y0; y < y1; y++) {
+        const double dy = (static_cast<double>(y) - centerY) / radiusY;
+        const double scale = std::sqrt(std::max(0.0, 1.0 - dy * dy));
+        const double left = centerX - radiusX * scale;
+        const double right = centerX + radiusX * scale;
+        int minX = -1;
+        int maxX = -1;
+        for (int x = x0; x < x1; x++) {
+          if (!isDarkPixel(x, y)) {
+            continue;
+          }
+          minX = minX < 0 ? x : std::min(minX, x);
+          maxX = std::max(maxX, x);
+        }
+        assert(minX >= 0);
+        assert(std::abs(static_cast<double>(minX) - left) <= 1.0);
+        assert(std::abs(static_cast<double>(maxX) - right) <= 1.0);
+      }
+    }
+  }
+  assert(checkedModules > 10);
 }
 
 void testLogoAreaIsTransparent() {
@@ -448,6 +545,117 @@ void testLogoAreaIsTransparent() {
   assert(alphaAt(width / 2 - 10, height / 2) == 0);
   assert(alphaAt(width / 2 + 10, height / 2) == 0);
   assert(alphaAt(0, 0) == 255);
+}
+
+void testTransparentBackgroundPng() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 128;
+  options.quietZone = 4;
+  options.backgroundColor = "transparent";
+  options.background = parseColor("transparent");
+  const std::string encoded =
+      generator.generatePngBase64("https://example.com/transparent", options);
+
+  int width = 0;
+  int height = 0;
+  const std::vector<uint8_t> alpha =
+      decodeIndexedAlphaPng(encoded, width, height);
+  assert(width == 128);
+  assert(height == 128);
+
+  const auto alphaAt = [&](int x, int y) {
+    return alpha[static_cast<size_t>(y) * static_cast<size_t>(width) +
+                 static_cast<size_t>(x)];
+  };
+
+  // Quiet-zone corners stay fully transparent.
+  assert(alphaAt(0, 0) == 0);
+  assert(alphaAt(width - 1, height - 1) == 0);
+  // Dark finder modules are fully opaque.
+  assert(alphaAt(16, 16) == 255);
+  assert(alphaAt(24, 16) == 255);
+}
+
+void testParityCorpus() {
+  QRCodeGenerator generator;
+  for (const auto &entry : parityCorpus()) {
+    GenerateOptions options;
+    options.errorCorrectionLevel = entry.errorCorrectionLevel;
+    options.minVersion = entry.minVersion;
+    options.maxVersion = entry.maxVersion;
+    options.mask = entry.mask;
+    options.boostEcl = entry.boostEcl;
+    assert(generator.getMatrixSize(entry.value, options) == entry.size);
+    assert(generator.getMatrixPackedBase64(entry.value, options) ==
+           entry.packedBase64);
+  }
+}
+
+void testMatrixCacheLru() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.errorCorrectionLevel = "M";
+  for (int index = 0; index < 40; index++) {
+    const std::string value = "matrix-lru-" + std::to_string(index);
+    const int size = generator.getMatrixSize(value, options);
+    const std::string packed =
+        generator.getMatrixPackedBase64(value, options);
+    assert(size > 0);
+    assert(!packed.empty());
+  }
+
+  // Alternating matrix requests must stay correct after eviction cycles.
+  for (int round = 0; round < 3; round++) {
+    for (int index = 0; index < 40; index++) {
+      const std::string value = "matrix-lru-" + std::to_string(index);
+      const int size = generator.getMatrixSize(value, options);
+      const std::string packed =
+          generator.getMatrixPackedBase64(value, options);
+      const std::string recheck =
+          generator.getMatrixPackedBase64(value, options);
+      assert(size == generator.getMatrixSize(value, options));
+      assert(packed == recheck);
+    }
+  }
+}
+
+void testShapeLimits() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 160;
+  const auto assertThrows = [](const auto &callback) {
+    bool didThrow = false;
+    try {
+      callback();
+    } catch (const std::invalid_argument &) {
+      didThrow = true;
+    }
+    assert(didThrow);
+  };
+
+  for (const auto &shape : {"diamond", "hexagon", "octagon", "star",
+                            "heart",   "scallop", "leaf",    "clover",
+                            "triangle"}) {
+    options.moduleShape = shape;
+    assertThrows([&]() {
+      generator.generatePngBase64("https://example.com/shape", options);
+    });
+  }
+
+  options = GenerateOptions{};
+  options.size = 160;
+  options.eyePatternShape = "circle-border";
+  assertThrows([&]() {
+    generator.generatePngBase64("https://example.com/eye-shape", options);
+  });
+
+  options = GenerateOptions{};
+  options.size = 160;
+  options.layout = "radial";
+  assertThrows([&]() {
+    generator.generatePngBase64("https://example.com/layout", options);
+  });
 }
 
 void testSvgGeneration() {
@@ -706,7 +914,12 @@ int main() {
   testByteBoundedCache();
   testConcurrentGeneration();
   testStyledPngGeneration();
+  testCircleGeometryTolerance();
   testLogoAreaIsTransparent();
+  testTransparentBackgroundPng();
+  testParityCorpus();
+  testShapeLimits();
+  testMatrixCacheLru();
   testSvgGeneration();
   testMatrixPacking();
   testColorAndBase64Helpers();

@@ -38,13 +38,16 @@ jobs:
       - name: Setup LLVM
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm
+          sudo apt-get install -y clang-18 llvm-18
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Verify generated Nitro bindings
         run: bun run codegen:check
+
+      - name: Verify smoke reporting
+        run: bun run example:smoke:ci
 
       - name: Verify release preflight
         run: bun run release:preflight

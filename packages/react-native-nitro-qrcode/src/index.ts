@@ -1,22 +1,31 @@
 import {
+  isQRCodeMetricsEnabled,
+  nowMilliseconds,
+  recordGenerationRequest,
+  getQRCodeMetrics,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
+} from "./metrics";
+import {
   normalizeOptions,
   validateOptions,
   type NitroQRCodeApi,
   type NormalizedOptions,
   type QRCodeMatrix,
   type QRCodeOptions,
-} from "./shared";
+} from "./validation";
 import { Platform } from "react-native";
 import { NitroModules } from "react-native-nitro-modules";
-import type { QRCode as HybridQRCode } from "./QRCode.nitro";
+import type {
+  GenerateOptions as NativeGenerateOptions,
+  QRCode as HybridQRCode,
+} from "./QRCode.nitro";
 import { createQRCodeComponent } from "./qrcode-component";
 export type {
   ErrorCorrectionLevel,
   NitroQRCodeApi,
-  QRCodeBackgroundColor,
   QRCodeBodyDensity,
   QRCodeBodyShape,
-  QRCodeColor,
   QRCodeEyeBallShape,
   QRCodeEyeFrameShape,
   QRCodeEyePatternShape,
@@ -29,63 +38,128 @@ export type {
   QRCodeMaskPattern,
   QRCodeMatrix,
   QRCodeOptions,
-  QRCodePreset,
-  QRCodeProps,
-  QRCodeRef,
-  QRCodeScanabilityWarning,
   QRCodeShape,
   QRCodeShapeOptions,
   QRCodeValidationError,
   QRCodeValidationResult,
   QRCodeVersion,
-} from "./shared";
+} from "./validation";
+export type {
+  QRCodeBackgroundColor,
+  QRCodeColor,
+} from "./colors";
+export type { QRCodeScanabilityWarning } from "./scan-policy";
+export type { QRCodePreset } from "./defaults";
+export type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 export {
   validateOptions,
-} from "./shared";
+} from "./validation";
+export {
+  getQRCodeMetrics,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
+  type QRCodeMetricsSnapshot,
+} from "./metrics";
 
 const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 
-type NativeGenerateArgs = Parameters<HybridQRCode["generatePngBase64"]>;
+const MAX_SYNC_GENERATION_SIZE = 2048;
+
+function guardSyncGenerationSize(size: number): void {
+  if (size > MAX_SYNC_GENERATION_SIZE) {
+    throw new Error(
+      `Synchronous native PNG generation supports sizes up to ${MAX_SYNC_GENERATION_SIZE} pixels; ` +
+        `use toPngBase64Async or toPngDataUriAsync for larger outputs (up to 4096 pixels).`,
+    );
+  }
+}
+
+function measuredSync<T>(async: boolean, generate: () => T): T {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = generate();
+    recordGenerationRequest({
+      async,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
+
+async function measuredAsync<T>(generate: () => Promise<T>): Promise<T> {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = await generate();
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
+
 type NativeSvgArgs = Parameters<HybridQRCode["generateSvgString"]>;
 type NativeMatrixArgs = Parameters<HybridQRCode["getMatrixSize"]>;
 
-function toNativeGenerateArgs(
+function toNativeGenerateOptions(
   normalized: NormalizedOptions,
-): NativeGenerateArgs {
-  return [
-    normalized.value,
-    normalized.size,
-    normalized.quietZone,
-    normalized.errorCorrectionLevel,
-    normalized.foregroundColor,
-    normalized.backgroundColor,
-    normalized.strokeColor,
-    normalized.eyeColor,
-    normalized.eyeStrokeColor,
-    normalized.eyeballColor,
-    normalized.minVersion,
-    normalized.maxVersion,
-    normalized.mask,
-    normalized.boostEcl,
-    normalized.shapeOptions.shape,
-    normalized.shapeOptions.eyeFrameShape,
-    normalized.shapeOptions.eyeballShape,
-    normalized.shapeOptions.gap,
-    normalized.shapeOptions.eyePatternGap,
-    normalized.shapeOptions.bodyDensity,
-    normalized.shapeOptions.cornerRadius,
-    normalized.shapeOptions.eyePatternCornerRadius,
-    normalized.shapeOptions.layout,
-    normalized.logoAreaSize,
-    normalized.logoAreaBorderRadius,
-    normalized.gradient.type,
-    normalized.gradient.colors,
-    normalized.gradient.locations,
-    normalized.gradient.startX,
-    normalized.gradient.startY,
-    normalized.gradient.endX,
-    normalized.gradient.endY,
-  ];
+): NativeGenerateOptions {
+  return {
+    value: normalized.value,
+    size: normalized.size,
+    quietZone: normalized.quietZone,
+    errorCorrectionLevel: normalized.errorCorrectionLevel,
+    foregroundColor: normalized.foregroundColor,
+    backgroundColor: normalized.backgroundColor,
+    strokeColor: normalized.strokeColor,
+    eyeColor: normalized.eyeColor,
+    eyeStrokeColor: normalized.eyeStrokeColor,
+    eyeballColor: normalized.eyeballColor,
+    minVersion: normalized.minVersion,
+    maxVersion: normalized.maxVersion,
+    mask: normalized.mask,
+    boostEcl: normalized.boostEcl,
+    moduleShape: normalized.shapeOptions.shape,
+    eyePatternShape: normalized.shapeOptions.eyeFrameShape,
+    eyeballShape: normalized.shapeOptions.eyeballShape,
+    gap: normalized.shapeOptions.gap,
+    eyePatternGap: normalized.shapeOptions.eyePatternGap,
+    bodyDensity: normalized.shapeOptions.bodyDensity,
+    cornerRadius: normalized.shapeOptions.cornerRadius,
+    eyePatternCornerRadius: normalized.shapeOptions.eyePatternCornerRadius,
+    layout: normalized.shapeOptions.layout,
+    logoAreaSize: normalized.logoAreaSize,
+    logoAreaBorderRadius: normalized.logoAreaBorderRadius,
+    gradientType: normalized.gradient.type,
+    gradientColors: normalized.gradient.colors,
+    gradientLocations: normalized.gradient.locations,
+    gradientStartX: normalized.gradient.startX,
+    gradientStartY: normalized.gradient.startY,
+    gradientEndX: normalized.gradient.endX,
+    gradientEndY: normalized.gradient.endY,
+  };
 }
 
 function toNativeSvgArgs(normalized: NormalizedOptions): NativeSvgArgs {
@@ -122,20 +196,28 @@ function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
 
 export function toPngBase64(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return NativeQRCode.generatePngBase64(...toNativeGenerateArgs(normalized));
+  guardSyncGenerationSize(normalized.size);
+  return measuredSync(false, () =>
+    NativeQRCode.generatePngBase64Object(toNativeGenerateOptions(normalized)),
+  );
 }
 
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return NativeQRCode.generatePngDataUri(...toNativeGenerateArgs(normalized));
+  guardSyncGenerationSize(normalized.size);
+  return measuredSync(false, () =>
+    NativeQRCode.generatePngDataUriObject(toNativeGenerateOptions(normalized)),
+  );
 }
 
 export async function toPngBase64Async(
   options: QRCodeOptions,
 ): Promise<string> {
   const normalized = normalizeOptions(options);
-  return NativeQRCode.generatePngBase64Async(
-    ...toNativeGenerateArgs(normalized),
+  return measuredAsync(() =>
+    NativeQRCode.generatePngBase64AsyncObject(
+      toNativeGenerateOptions(normalized),
+    ),
   );
 }
 
@@ -143,22 +225,28 @@ export async function toPngDataUriAsync(
   options: QRCodeOptions,
 ): Promise<string> {
   const normalized = normalizeOptions(options);
-  return NativeQRCode.generatePngDataUriAsync(
-    ...toNativeGenerateArgs(normalized),
+  return measuredAsync(() =>
+    NativeQRCode.generatePngDataUriAsyncObject(
+      toNativeGenerateOptions(normalized),
+    ),
   );
 }
 
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return NativeQRCode.generateSvgString(...toNativeSvgArgs(normalized));
+  return measuredSync(false, () =>
+    NativeQRCode.generateSvgString(...toNativeSvgArgs(normalized)),
+  );
 }
 
 export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
   const normalized = normalizeOptions(options);
   const nativeArgs = toNativeMatrixArgs(normalized);
-  const size = NativeQRCode.getMatrixSize(...nativeArgs);
-  const packedBase64 = NativeQRCode.getMatrixPackedBase64(...nativeArgs);
-  return { size, packedBase64 };
+  return measuredSync(false, () => {
+    const size = NativeQRCode.getMatrixSize(...nativeArgs);
+    const packedBase64 = NativeQRCode.getMatrixPackedBase64(...nativeArgs);
+    return { size, packedBase64 };
+  });
 }
 
 export function clearQRCodeCache(): void {
@@ -186,6 +274,9 @@ export const NitroQRCode: NitroQRCodeApi = {
   validateOptions,
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
+  getQRCodeMetrics,
+  resetQRCodeMetrics,
+  setQRCodeMetricsEnabled,
 };
 
 export type { HybridQRCode };

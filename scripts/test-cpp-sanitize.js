@@ -12,17 +12,26 @@ const cppDir = path.join(packageDir, "cpp");
 const buildDir = path.join(cppDir, "build-sanitize");
 const outputFile = path.join(buildDir, "qrcode_generator_test_sanitize");
 
-function resolveTool(name) {
-  try {
-    return execSync(`command -v ${name}`, { encoding: "utf8" }).trim();
-  } catch {
-    if (process.platform !== "darwin") {
-      throw new Error(`${name} was not found on PATH.`);
-    }
+const PINNED_LLVM_VERSION = 18;
 
-    return execFileSync("xcrun", ["--find", name], {
-      encoding: "utf8",
-    }).trim();
+function resolveTool(name) {
+  const pinnedName = `${name}-${PINNED_LLVM_VERSION}`;
+  try {
+    return execSync(`command -v ${pinnedName}`, { encoding: "utf8" }).trim();
+  } catch {
+    try {
+      return execSync(`command -v ${name}`, { encoding: "utf8" }).trim();
+    } catch {
+      if (process.platform !== "darwin") {
+        throw new Error(
+          `${name} was not found on PATH; install LLVM ${PINNED_LLVM_VERSION} (${pinnedName}).`,
+        );
+      }
+
+      return execFileSync("xcrun", ["--find", name], {
+        encoding: "utf8",
+      }).trim();
+    }
   }
 }
 
@@ -37,6 +46,7 @@ fs.mkdirSync(buildDir, { recursive: true });
 
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
+  path.join(cppDir, "core", "parity-corpus.cpp"),
   path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
   path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
   path.join(cppDir, "core", "QRCodeGenerator.cpp"),

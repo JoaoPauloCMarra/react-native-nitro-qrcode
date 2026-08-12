@@ -24,7 +24,7 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const skipChecks = args.includes("--skip-checks");
 const skipGitCheck = args.includes("--skip-git-check");
-const tag = getArgValue("--tag") || "latest";
+const requestedTag = getArgValue("--tag");
 const otp = getArgValue("--otp");
 
 function getArgValue(name) {
@@ -147,6 +147,8 @@ function ask(question) {
 
 async function main() {
   const packageJson = readPackageJson();
+  const isPrerelease = packageJson.version.includes("-");
+  const tag = requestedTag || (isPrerelease ? "next" : "latest");
   const publishArgs = ["publish", "--tag", tag, "--access", "public"];
 
   if (dryRun) {

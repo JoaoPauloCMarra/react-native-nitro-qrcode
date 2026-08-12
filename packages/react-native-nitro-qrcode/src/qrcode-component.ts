@@ -1,41 +1,72 @@
 import React, {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useMemo,
-  useRef,
-  useState,
 } from "react";
 import { Image, View } from "react-native";
 import {
   COMPONENT_RASTER_MULTIPLIER,
-  DEFAULT_BACKGROUND,
   DEFAULT_HIDE_LOGO_UNTIL_READY,
   DEFAULT_KEEP_PREVIOUS_IMAGE,
   DEFAULT_LOGO_AREA_BORDER_RADIUS,
   MIN_COMPONENT_RASTER_SIZE,
   mergePresetShapeOptions,
-  scaleShapeOptions,
-  styles,
-  toError,
+} from "./defaults";
+import {
+  DEFAULT_BACKGROUND,
+  type QRCodeBackgroundColor,
   type QRCodeColor,
+} from "./colors";
+import type { QRCodePreset } from "./defaults";
+import { styles } from "./styles";
+import { useQRCodeGeneration } from "./use-qrcode-generation";
+import {
+  scaleShapeOptions,
   type QRCodeGradient,
   type QRCodeGradientColors,
   type QRCodeGradientLocations,
   type QRCodeOptions,
-  type QRCodeProps,
-  type QRCodeRef,
   type QRCodeShapeOptions,
-} from "./shared";
+} from "./validation";
+import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
+import type { ReactNode } from "react";
+
+export type QRCodeProps = QRCodeOptions & {
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
+  logo?: ReactNode;
+  placeholder?: ReactNode;
+  preset?: QRCodePreset;
+  keepPreviousImage?: boolean;
+  hideLogoUntilReady?: boolean;
+  onReady?: (uri: string) => void;
+  onError?: (error: Error) => void;
+  logoPadding?: number;
+  logoBackgroundColor?: QRCodeBackgroundColor;
+  testID?: string;
+};
+
+export type QRCodeRef = {
+  toPngDataUri: () => string;
+  toPngBase64: () => string;
+};
 
 export type QRCodeComponentGenerators = {
   toPngDataUri: (options: QRCodeOptions) => string;
   toPngBase64: (options: QRCodeOptions) => string;
-  toPngDataUriAsync?: (options: QRCodeOptions) => Promise<string>;
+  toPngDataUriAsync: (options: QRCodeOptions) => Promise<string>;
   accessibilityIgnoresInvertColors?: boolean;
 };
 
 const MAX_COMPONENT_SIZE = 2048;
+
+function qrCodeAccessibilityLabel(value: string): string {
+  return `QR code for ${value}`;
+}
+
+function generatingAccessibilityLabel(): string {
+  return "Generating QR code";
+}
 
 function validateComponentSize(size: number): void {
   if (
@@ -168,7 +199,6 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       maxVersion,
       mask,
       boostEcl,
-      orbit,
       shapeOptions,
       logoAreaSize,
       logoAreaBorderRadius,
@@ -189,14 +219,6 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
   ) {
     validateComponentSize(size);
 
-    const [result, setResult] = useState<{
-      options: QRCodeOptions;
-      uri: string;
-    }>();
-    const [generationError, setGenerationError] = useState<Error>();
-    const generationId = useRef(0);
-    const onReadyRef = useRef(onReady);
-    const onErrorRef = useRef(onError);
     const rasterSize = Math.max(
       Math.ceil(size * COMPONENT_RASTER_MULTIPLIER),
       MIN_COMPONENT_RASTER_SIZE,
@@ -350,7 +372,6 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         maxVersion,
         mask,
         boostEcl,
-        orbit,
         shapeOptions: scaleShapeOptions(
           mergePresetShapeOptions(stableShapeOptions, preset),
           rasterScale,
@@ -378,7 +399,6 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         maxVersion,
         mask,
         boostEcl,
-        orbit,
         preset,
         stableShapeOptions,
         rasterScale,
@@ -387,60 +407,13 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       ],
     );
 
-    useEffect(() => {
-      onReadyRef.current = onReady;
-      onErrorRef.current = onError;
-    }, [onError, onReady]);
-
-    useEffect(() => {
-      const generateAsync = generators.toPngDataUriAsync;
-      if (generateAsync === undefined) {
-        try {
-          const nextUri = generators.toPngDataUri(options);
-          setGenerationError(undefined);
-          setResult({ options, uri: nextUri });
-          onReadyRef.current?.(nextUri);
-        } catch (error: unknown) {
-          const nextError = toError(error);
-          const onErrorCallback = onErrorRef.current;
-          if (onErrorCallback === undefined) {
-            setGenerationError(nextError);
-            return;
-          }
-          onErrorCallback(nextError);
-        }
-        return;
-      }
-
-      let isMounted = true;
-      const request = ++generationId.current;
-      void generateAsync(options).then(
-        (nextUri) => {
-          if (!isMounted || request !== generationId.current) {
-            return;
-          }
-          setGenerationError(undefined);
-          setResult({ options, uri: nextUri });
-          onReadyRef.current?.(nextUri);
-        },
-        (error: unknown) => {
-          if (!isMounted || request !== generationId.current) {
-            return;
-          }
-          const nextError = toError(error);
-          const onErrorCallback = onErrorRef.current;
-          if (onErrorCallback === undefined) {
-            setGenerationError(nextError);
-            return;
-          }
-          onErrorCallback(nextError);
-        },
-      );
-
-      return () => {
-        isMounted = false;
-      };
-    }, [options]);
+    const { uri, error: generationError } = useQRCodeGeneration(
+      options,
+      generators,
+      keepPreviousImage,
+      onReady,
+      onError,
+    );
 
     useImperativeHandle(
       ref,
@@ -451,10 +424,6 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       [options],
     );
 
-    const uri =
-      keepPreviousImage || result?.options === options
-        ? result?.uri
-        : undefined;
     const showLogo =
       logo !== undefined && (!hideLogoUntilReady || uri !== undefined);
 
@@ -467,6 +436,14 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       {
         style: [styles.frame, { width: size, height: size }, style],
         testID,
+        ...(uri === undefined
+          ? {
+              accessible: true,
+              accessibilityRole: "image" as const,
+              accessibilityLabel: generatingAccessibilityLabel(),
+              accessibilityState: { busy: true },
+            }
+          : {}),
       },
       uri === undefined && placeholder,
       uri !== undefined &&
@@ -474,6 +451,9 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
           source: { uri },
           resizeMode: "contain",
           style: [styles.image, imageStyle],
+          accessible: true,
+          accessibilityRole: "image",
+          accessibilityLabel: qrCodeAccessibilityLabel(value),
           ...(generators.accessibilityIgnoresInvertColors !== undefined
             ? {
                 accessibilityIgnoresInvertColors:
@@ -499,6 +479,9 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
                 padding: Math.max(0, logoPadding ?? 0),
               },
             ],
+            accessible: false,
+            accessibilityElementsHidden: true,
+            importantForAccessibility: "no-hide-descendants",
           },
           logo,
         ),
