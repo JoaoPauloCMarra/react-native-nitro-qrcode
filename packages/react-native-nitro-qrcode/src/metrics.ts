@@ -88,9 +88,8 @@ export function recordCacheLookup(hit: boolean): void {
 }
 
 export function nowMilliseconds(): number {
-  const performanceNow = globalThis.performance?.now;
-  if (typeof performanceNow === "function") {
-    return performanceNow();
+  if (typeof globalThis.performance?.now === "function") {
+    return globalThis.performance.now();
   }
   return Date.now();
 }

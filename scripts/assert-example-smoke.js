@@ -50,6 +50,52 @@ function assertVisible(output, platform) {
   }
 }
 
+function waitForAndroidUi() {
+  const dumpPath = "/sdcard/nitro-qrcode-ui.xml";
+  let lastError = "UI dump was unavailable";
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    spawnSync("adb", ["shell", "rm", "-f", dumpPath], { stdio: "ignore" });
+    const dump = spawnSync(
+      "adb",
+      ["shell", "uiautomator", "dump", dumpPath],
+      { encoding: "utf8" },
+    );
+
+    if (dump.status === 0) {
+      const output = run("adb", ["shell", "cat", dumpPath]);
+      try {
+        assertVisible(output, "Android");
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    } else {
+      lastError = `uiautomator dump exited with ${dump.status ?? "no status"}`;
+    }
+
+    run("sleep", ["0.5"]);
+  }
+
+  throw new Error(`Android UI did not become ready: ${lastError}`);
+}
+
+function waitForAndroidProcess() {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const process = spawnSync(
+      "adb",
+      ["shell", "pidof", ANDROID_PACKAGE],
+      { encoding: "utf8" },
+    );
+    if (process.status === 0 && process.stdout.trim() !== "") {
+      return;
+    }
+    run("sleep", ["0.5"]);
+  }
+
+  throw new Error("Android app process did not start.");
+}
+
 function smokeAndroid() {
   if (!commandExists("adb")) {
     recordResult("android", "skipped", "adb is unavailable");
@@ -70,11 +116,10 @@ function smokeAndroid() {
     return;
   }
 
+  run("adb", ["shell", "am", "force-stop", ANDROID_PACKAGE]);
   run("adb", ["shell", "monkey", "-p", ANDROID_PACKAGE, "1"]);
-  run("adb", ["shell", "pidof", ANDROID_PACKAGE]);
-  run("adb", ["shell", "uiautomator", "dump", "/sdcard/nitro-qrcode-ui.xml"]);
-  const output = run("adb", ["shell", "cat", "/sdcard/nitro-qrcode-ui.xml"]);
-  assertVisible(output, "Android");
+  waitForAndroidProcess();
+  waitForAndroidUi();
   recordResult("android", "passed");
 }
 

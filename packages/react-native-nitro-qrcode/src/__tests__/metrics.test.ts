@@ -111,6 +111,28 @@ describe("generation metrics", () => {
     expect(getQRCodeMetrics().cacheBytes).toBe(0);
   });
 
+  it("calls the browser performance clock with its receiver", () => {
+    const originalPerformance = globalThis.performance;
+    const now = jest.fn(function (this: Performance) {
+      if (this !== globalThis.performance) {
+        throw new TypeError("Illegal invocation");
+      }
+      return 42;
+    });
+    Object.defineProperty(globalThis, "performance", {
+      configurable: true,
+      value: { now },
+    });
+
+    expect(nowMilliseconds()).toBe(42);
+    expect(now).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(globalThis, "performance", {
+      configurable: true,
+      value: originalPerformance,
+    });
+  });
+
   it("tracks cache lookups and byte counts on web", () => {
     clearQRCodeCache();
     setQRCodeMetricsEnabled(true);

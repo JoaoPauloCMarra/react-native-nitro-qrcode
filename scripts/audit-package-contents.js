@@ -12,7 +12,7 @@ const packageDir = path.join(
 // The real publish injects the repository README and LICENSE through the
 // prepack lifecycle. Stage them exactly like prepack does so the dry-run
 // contents match the published artifact, then restore the package directory.
-const stagedFiles = ["README.md", "LICENSE"];
+const stagedFiles = ["README.md", "CHANGELOG.md", "SECURITY.md", "LICENSE"];
 const stagedCopies = [];
 for (const file of stagedFiles) {
   const source = path.join(projectRoot, file);
@@ -63,6 +63,8 @@ const requiredFiles = [
   ".watchmanconfig",
   "LICENSE",
   "README.md",
+  "CHANGELOG.md",
+  "SECURITY.md",
   "package.json",
   "react-native-nitro-qrcode.podspec",
   "android/CMakeLists.txt",
