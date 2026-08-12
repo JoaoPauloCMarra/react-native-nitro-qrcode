@@ -19,4 +19,3 @@ const std::vector<ParityCorpusEntry>& parityCorpus() {
   return entries;
 }
 } // namespace NitroQRCode
-
