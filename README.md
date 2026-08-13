@@ -57,7 +57,7 @@ bare React Native app.
 | React Native Web | `>=0.19.0 <1.0.0` |
 | Node | `>=18.0.0` |
 
-Version 0.5.0 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
+Version 0.5.1 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
 Modules 0.36.5. The wider ranges above are the package's declared peer
 compatibility.
 
@@ -188,8 +188,10 @@ center area for a logo added by another tool.
 Native and web output caches verify the full normalized request after hashed
 lookup. Each cache retains at most 128 entries or 4 MiB, whichever limit is
 reached first, and evicts least-recently-used output. An output larger than 4
-MiB is returned without being cached. Use `clearQRCodeCache()` to clear cached
-output and `getQRCodeCacheSize()` to inspect the entry count.
+MiB is returned without being cached. Remounting `<QRCode>` with the same
+normalized options is a cache hit; apps should not keep a second in-memory URI
+map for that. Use `clearQRCodeCache()` to clear cached output and
+`getQRCodeCacheSize()` to inspect the entry count.
 
 Native matrix export reuses a small bounded least-recently-used cache (32
 entries) across its existing size and packed-data bridge calls. No new
@@ -284,7 +286,8 @@ Generation starts when normalized render options change. While it runs,
 `placeholder` is shown if no current image is available. `keepPreviousImage`
 keeps the prior QR visible, and `hideLogoUntilReady` delays the overlay.
 `onReady` receives the successful PNG data URI. Stale or unmounted async
-completions are ignored.
+completions are ignored. Identical options on a later mount reuse the package
+cache, so `onReady` can fire with the cached URI without a second encode.
 
 Synchronous export helpers throw validation or generation errors. Async helpers
 reject with them. The component calls `onError` when supplied; otherwise it

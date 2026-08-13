@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 - 2026-08-13
+
+### Changes
+
+- **Breaking changes:** None.
+- Documented that remounting `<QRCode>` with the same normalized options hits
+  the native/web LRU cache. `onReady` still receives the PNG data URI. Apps
+  should not keep a second in-memory URI map for that.
+
 ## 0.5.0 - 2026-08-12
 
 ### Changes
