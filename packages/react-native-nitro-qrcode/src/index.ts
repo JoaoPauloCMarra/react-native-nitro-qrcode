@@ -16,11 +16,13 @@ import {
 } from "./validation";
 import { Platform } from "react-native";
 import { NitroModules } from "react-native-nitro-modules";
+import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import type {
   GenerateOptions as NativeGenerateOptions,
   QRCode as HybridQRCode,
 } from "./QRCode.nitro";
 import { createQRCodeComponent } from "./qrcode-component";
+import type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 export type {
   ErrorCorrectionLevel,
   NitroQRCodeApi,
@@ -41,6 +43,7 @@ export type {
   QRCodeShape,
   QRCodeShapeOptions,
   QRCodeValidationError,
+  QRCodeValidationErrorCode,
   QRCodeValidationResult,
   QRCodeVersion,
 } from "./validation";
@@ -244,7 +247,9 @@ export function getQRCodeCacheSize(): number {
   return NativeQRCode.getCacheSize();
 }
 
-export const QRCode = createQRCodeComponent({
+export const QRCode: ForwardRefExoticComponent<
+  QRCodeProps & RefAttributes<QRCodeRef>
+> = createQRCodeComponent({
   toPngDataUri,
   toPngBase64,
   toPngDataUriAsync,

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.0 - 2026-08-20
+
+### Breaking changes
+
+- `react-native-nitro-modules` now requires
+  `>=0.37.0 <0.38.0`; upgrade the Nitro peer before upgrading this package.
+
+### Changed
+
+- Updated the package compatibility baseline to Nitro Modules 0.37.0 while
+  preserving the existing QR rendering and export APIs.
+- Tightened the public validation-error code type to match the stable values
+  returned by runtime validation.
+- Declared the `QRCode` component with explicit public props and ref types so
+  emitted declarations remain portable under React Native 0.87's Strict
+  TypeScript API. The consumer-facing QRCode API is unchanged.
+
+### Fixed
+
+- Aligned the iOS pod module name with Nitro's `NitroQRCode` generated Swift
+  bridge so CocoaPods consumers receive a stable native module import.
+- Aligned the podspec source tag with the repository's `v<version>` release tag
+  convention.
+- Expanded the example app's developer API demonstration to cover validation,
+  SVG export, PNG data-URI export, and packed matrix helpers.
+
 ## 0.5.0 - 2026-08-12
 
 ### Changes
@@ -8,7 +34,7 @@
   accepted for source compatibility, synchronous PNG helpers retain the
   established 4096-pixel bound, and hidden native-only shapes remain outside
   the public contract.
-- Updated package compatibility to Nitro Modules 0.36.4, Expo SDK 57, and
+- Updated package compatibility to Nitro Modules 0.36.5, Expo SDK 57, and
   React Native 0.86.
 - Made native and web cache hits verify the full normalized request after
   hashed lookup, with limits of 128 entries or 4 MiB.

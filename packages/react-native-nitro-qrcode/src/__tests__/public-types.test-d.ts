@@ -16,6 +16,7 @@ import type {
   QRCodeProps,
   QRCodeRef,
   QRCodeValidationResult,
+  QRCodeValidationErrorCode,
   QRCodeVersion,
 } from "../index";
 import * as Web from "../index.web";
@@ -165,6 +166,7 @@ expectFalse<IsAssignable<"solid", QRCodeBodyDensity>>();
 expectFalse<IsAssignable<"diamond", QRCodeBodyShape>>();
 expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
+expectFalse<IsAssignable<"unknown", QRCodeValidationErrorCode>>();
 expectFalse<
   IsAssignable<
     (uri: number) => void,

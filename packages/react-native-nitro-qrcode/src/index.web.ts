@@ -27,7 +27,9 @@ import {
   type QRCodeShapeOptions,
 } from "./validation";
 import { createQRCodeComponent } from "./qrcode-component";
+import type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 import * as QRCodeJS from "qrcode";
+import type { ForwardRefExoticComponent, RefAttributes } from "react";
 export type { QRCode as HybridQRCode } from "./QRCode.nitro";
 export type {
   ErrorCorrectionLevel,
@@ -49,6 +51,7 @@ export type {
   QRCodeShape,
   QRCodeShapeOptions,
   QRCodeValidationError,
+  QRCodeValidationErrorCode,
   QRCodeValidationResult,
   QRCodeVersion,
 } from "./validation";
@@ -337,7 +340,9 @@ export function getQRCodeCacheSize(): number {
   return webCache.size();
 }
 
-export const QRCode = createQRCodeComponent({
+export const QRCode: ForwardRefExoticComponent<
+  QRCodeProps & RefAttributes<QRCodeRef>
+> = createQRCodeComponent({
   toPngDataUri,
   toPngBase64,
   toPngDataUriAsync,

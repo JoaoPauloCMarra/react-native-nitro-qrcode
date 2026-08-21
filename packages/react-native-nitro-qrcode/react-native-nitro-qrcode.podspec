@@ -11,7 +11,8 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
 
   s.platforms    = { :ios => "16.4" }
-  s.source       = { :git => "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode.git", :tag => "v#{s.version}" }
+  s.module_name  = "NitroQRCode"
 
   s.source_files = [
     "ios/**/*.{h,m,mm,swift}",
@@ -24,6 +25,7 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
     "CLANG_CXX_LIBRARY" => "libc++",
+    "DEFINES_MODULE" => "YES",
     "HEADER_SEARCH_PATHS" => [
       "\"$(PODS_TARGET_SRCROOT)/cpp/core\"",
       "\"$(PODS_TARGET_SRCROOT)/cpp/bindings\"",

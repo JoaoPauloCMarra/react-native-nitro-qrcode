@@ -175,8 +175,12 @@ export type QRCodeMatrix = {
   packedBase64: string;
 };
 
+export type QRCodeValidationErrorCode =
+  | "invalid"
+  | QRCodeScanabilityWarning["code"];
+
 export type QRCodeValidationError = {
-  code: string;
+  code: QRCodeValidationErrorCode;
   message: string;
 };
 

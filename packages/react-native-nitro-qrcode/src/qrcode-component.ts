@@ -1,7 +1,12 @@
-import React, {
+import {
+  createElement,
   forwardRef,
   useImperativeHandle,
   useMemo,
+  type ForwardRefExoticComponent,
+  type Ref,
+  type RefAttributes,
+  type ReactNode,
 } from "react";
 import { Image, View } from "react-native";
 import {
@@ -29,7 +34,6 @@ import {
   type QRCodeShapeOptions,
 } from "./validation";
 import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
-import type { ReactNode } from "react";
 
 export type QRCodeProps = QRCodeOptions & {
   style?: StyleProp<ViewStyle>;
@@ -180,7 +184,9 @@ function createGradientLocations(
   ];
 }
 
-export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
+export function createQRCodeComponent(
+  generators: QRCodeComponentGenerators,
+): ForwardRefExoticComponent<QRCodeProps & RefAttributes<QRCodeRef>> {
   return forwardRef<QRCodeRef, QRCodeProps>(function QRCode(
     {
       value,
@@ -216,7 +222,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       logoBackgroundColor,
       testID,
     }: QRCodeProps,
-    ref: React.Ref<QRCodeRef>,
+    ref: Ref<QRCodeRef>,
   ) {
     validateComponentSize(size);
 
@@ -292,45 +298,8 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         shapeOptionsEyePatternCornerRadius,
       ],
     );
-    const stableGradient = useMemo<QRCodeGradient | undefined>(
-      () => {
-        const colors = createGradientColors(
-          gradientColor0,
-          gradientColor1,
-          gradientColor2,
-          gradientColor3,
-          gradientColor4,
-          gradientColor5,
-          gradientColor6,
-          gradientColor7,
-        );
-
-        return colors === undefined
-          ? undefined
-          : {
-              type: gradientType,
-              colors,
-              locations: createGradientLocations(
-                gradientLocation0,
-                gradientLocation1,
-                gradientLocation2,
-                gradientLocation3,
-                gradientLocation4,
-                gradientLocation5,
-                gradientLocation6,
-                gradientLocation7,
-              ),
-              start:
-                gradientStartX === undefined || gradientStartY === undefined
-                  ? undefined
-                  : { x: gradientStartX, y: gradientStartY },
-              end:
-                gradientEndX === undefined || gradientEndY === undefined
-                  ? undefined
-                  : { x: gradientEndX, y: gradientEndY },
-            };
-      },
-      [
+    const stableGradient = useMemo<QRCodeGradient | undefined>(() => {
+      const colors = createGradientColors(
         gradientColor0,
         gradientColor1,
         gradientColor2,
@@ -339,21 +308,55 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
         gradientColor5,
         gradientColor6,
         gradientColor7,
-        gradientEndX,
-        gradientEndY,
-        gradientLocation0,
-        gradientLocation1,
-        gradientLocation2,
-        gradientLocation3,
-        gradientLocation4,
-        gradientLocation5,
-        gradientLocation6,
-        gradientLocation7,
-        gradientStartX,
-        gradientStartY,
-        gradientType,
-      ],
-    );
+      );
+
+      return colors === undefined
+        ? undefined
+        : {
+            type: gradientType,
+            colors,
+            locations: createGradientLocations(
+              gradientLocation0,
+              gradientLocation1,
+              gradientLocation2,
+              gradientLocation3,
+              gradientLocation4,
+              gradientLocation5,
+              gradientLocation6,
+              gradientLocation7,
+            ),
+            start:
+              gradientStartX === undefined || gradientStartY === undefined
+                ? undefined
+                : { x: gradientStartX, y: gradientStartY },
+            end:
+              gradientEndX === undefined || gradientEndY === undefined
+                ? undefined
+                : { x: gradientEndX, y: gradientEndY },
+          };
+    }, [
+      gradientColor0,
+      gradientColor1,
+      gradientColor2,
+      gradientColor3,
+      gradientColor4,
+      gradientColor5,
+      gradientColor6,
+      gradientColor7,
+      gradientEndX,
+      gradientEndY,
+      gradientLocation0,
+      gradientLocation1,
+      gradientLocation2,
+      gradientLocation3,
+      gradientLocation4,
+      gradientLocation5,
+      gradientLocation6,
+      gradientLocation7,
+      gradientStartX,
+      gradientStartY,
+      gradientType,
+    ]);
 
     const options = useMemo<QRCodeOptions>(
       () => ({
@@ -434,7 +437,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       throw generationError;
     }
 
-    return React.createElement(
+    return createElement(
       View,
       {
         style: [styles.frame, { width: size, height: size }, style],
@@ -450,7 +453,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
       },
       uri === undefined && placeholder,
       uri !== undefined &&
-        React.createElement(Image, {
+        createElement(Image, {
           source: { uri },
           resizeMode: "contain",
           style: [styles.image, imageStyle],
@@ -465,7 +468,7 @@ export function createQRCodeComponent(generators: QRCodeComponentGenerators) {
             : {}),
         }),
       showLogo &&
-        React.createElement(
+        createElement(
           View,
           {
             style: [

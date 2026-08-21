@@ -43,6 +43,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify core versions
+        run: bun run verify:core-versions
+
+      - name: Verify RN 0.87 strict TypeScript compatibility
+        run: bun run typecheck:rn087
+
       - name: Verify generated Nitro bindings
         run: bun run codegen:check
 
