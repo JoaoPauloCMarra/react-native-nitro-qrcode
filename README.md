@@ -4,9 +4,9 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-%3E%3D0.75-61dafb)](https://reactnative.dev/docs/0.86/getting-started-without-a-framework)
-[![Expo](https://img.shields.io/badge/expo-SDK%2057-000020)](https://docs.expo.dev/versions/v57.0.0/)
-[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.36.5%20%3C0.37.0-black)](https://nitro.margelo.com/)
+[![React Native](https://img.shields.io/badge/react--native-0.87.0-61dafb)](https://reactnative.dev/docs/0.87/getting-started-without-a-framework)
+[![Expo](https://img.shields.io/badge/expo-SDK%2057%20%28RN%200.86.2%29-000020)](https://docs.expo.dev/versions/v57.0.0/)
+[![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.37.0%20%3C0.38.0-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
 Typed QR code generation for React Native, Expo development builds, and web.
@@ -52,14 +52,23 @@ bare React Native app.
 | --- | --- |
 | React | `>=18.2.0 <20.0.0` |
 | React Native | `>=0.75.0 <1.0.0` |
-| Nitro Modules | `>=0.36.5 <0.37.0` |
+| Nitro Modules | `>=0.37.0 <0.38.0` |
 | Expo | SDK 57 development builds; Expo Go is not supported |
 | React Native Web | `>=0.19.0 <1.0.0` |
 | Node | `>=18.0.0` |
 
-Version 0.5.0 targets React 19.2, React Native 0.86, Expo SDK 57, and Nitro
-Modules 0.36.5. The wider ranges above are the package's declared peer
-compatibility.
+Version 0.6.0 uses React Native `0.87.0` for the standalone package gate and
+React Native `0.86.2` in the Expo SDK 57 example. Expo SDK 57 is the latest
+stable Expo line and selects RN `0.86.2`; do not override that version. Both
+baselines use React `19.2.3` and Nitro Modules `0.37.0`. The wider ranges above
+are the package's declared peer compatibility.
+
+### Upgrade from 0.5.x
+
+Version 0.6.0 requires `react-native-nitro-modules` `>=0.37.0 <0.38.0`.
+Upgrade the Nitro peer before upgrading this package; Nitro Modules 0.36.x is
+not compatible with the 0.6.0 native bindings. The QR rendering and export
+APIs remain unchanged.
 
 ## Expo Config
 
@@ -264,7 +273,7 @@ Option loss and platform differences:
 on iOS, Android, and web. Web PNG rendering requires a browser canvas. SVG is
 available through `toSvgString`; the component itself remains PNG-backed.
 
-The The component exposes accessible semantics: the generated image is
+The component exposes accessible semantics: the generated image is
 announced as an image with the label `QR code for <value>`, the container
 reports a busy state while generation is pending, and the logo overlay is
 hidden from the accessibility tree. Screen readers announce the QR meaning
@@ -353,7 +362,8 @@ Main exports:
 - `validateOptions`.
 - `clearQRCodeCache` and `getQRCodeCacheSize`.
 - TypeScript types including `QRCodeOptions`, `QRCodeProps`, `QRCodeRef`,
-  `QRCodeMatrix`, `QRCodeValidationResult`, `QRCodeColor`,
+  `QRCodeMatrix`, `QRCodeValidationResult`, `QRCodeValidationErrorCode`,
+  `QRCodeColor`,
   `QRCodeBackgroundColor`, `QRCodeGradient`, and `QRCodeShapeOptions`.
 
 ## Component Options

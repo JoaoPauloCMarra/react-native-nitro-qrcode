@@ -15,6 +15,9 @@ import {
   getQRCodeCacheSize,
   NitroQRCode,
   QRCode,
+  toPngDataUri,
+  toSvgString,
+  validateOptions,
   type QRCodeRef,
   type QRCodeBackgroundColor,
   type QRCodeBodyDensity,
@@ -169,6 +172,7 @@ export default function DemoScreen() {
   const [readyUri, setReadyUri] = useState("");
   const [qrError, setQrError] = useState<string | null>(null);
   const [exportPreview, setExportPreview] = useState<string | null>(null);
+  const [apiPreview, setApiPreview] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<Error | null>(null);
   const qrRef = useRef<QRCodeRef>(null);
   const hasPayload = value.trim().length > 0;
@@ -399,6 +403,42 @@ export default function DemoScreen() {
             {exportPreview !== null ? (
               <Text style={styles.label}>{exportPreview}</Text>
             ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !hasPayload }}
+              disabled={!hasPayload}
+              onPress={() => {
+                const options = { value, size: PREVIEW_SIZE } as const;
+                const validation = validateOptions(options);
+                if (!validation.valid) {
+                  setApiPreview(
+                    `Invalid options: ${validation.errors[0]?.message ?? "unknown error"}`,
+                  );
+                  return;
+                }
+
+                try {
+                  const matrix = getMatrix(options);
+                  const png = toPngDataUri(options);
+                  const svg = toSvgString(options);
+                  setApiPreview(
+                    `Valid · ${matrix.size}×${matrix.size} matrix · PNG ${png.length} chars · SVG ${svg.length} chars`,
+                  );
+                } catch (error: unknown) {
+                  setApiPreview(
+                    `Helper error: ${error instanceof Error ? error.message : String(error)}`,
+                  );
+                }
+              }}
+              style={styles.selectButton}
+            >
+              <Text style={styles.selectButtonText}>
+                Verify helpers + validation
+              </Text>
+            </Pressable>
+            {apiPreview !== null ? (
+              <Text style={styles.label}>{apiPreview}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputPanel}>
@@ -410,6 +450,7 @@ export default function DemoScreen() {
                 setValue(nextValue);
                 setReadyUri("");
                 setExportPreview(null);
+                setApiPreview(null);
                 setMetricsError(null);
                 setQrError(null);
                 if (nextValue.trim().length === 0) {
