@@ -11,6 +11,7 @@ const packageDir = path.join(
 const cppDir = path.join(packageDir, "cpp");
 const buildDir = path.join(cppDir, "build");
 const outputFile = path.join(buildDir, "qrcode_generator_benchmark");
+const smoke = process.argv.includes("--smoke");
 
 const PINNED_LLVM_VERSION = 18;
 
@@ -57,6 +58,7 @@ const compileArgs = [
   "-Werror",
   "-O3",
   "-DNDEBUG",
+  ...(smoke ? ["-DNITRO_BENCHMARK_SMOKE"] : []),
   `-I${path.join(cppDir, "core")}`,
   `-I${path.join(cppDir, "qrcodegen")}`,
   ...sources,
@@ -70,4 +72,24 @@ console.log("Compiling optimized C++ QRCode benchmark...");
 runCommand(resolveTool("clang++"), compileArgs);
 
 console.log("Running C++ QRCode benchmark...");
-runCommand(outputFile, []);
+if (!smoke) {
+  runCommand(outputFile, []);
+} else {
+  const output = execFileSync(outputFile, [], { encoding: "utf8" });
+  process.stdout.write(output);
+  const ceilingMicros = 1_000_000;
+  const regressions = output
+    .trim()
+    .split("\n")
+    .slice(1)
+    .map((line) => line.split(","))
+    .filter((parts) => parts.length === 4)
+    .filter((parts) => Number(parts[3]) > ceilingMicros);
+  if (regressions.length > 0) {
+    throw new Error(
+      `C++ benchmark smoke exceeded ${ceilingMicros} average microseconds: ${regressions
+        .map((parts) => `${parts[0]}=${parts[3]}`)
+        .join(", ")}`,
+    );
+  }
+}

@@ -70,6 +70,11 @@ public:
     return entries_.size();
   }
 
+  size_t bytes() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return bytes_;
+  }
+
 private:
   void touch(const std::string &key) {
     const auto order = std::find(order_.begin(), order_.end(), key);

@@ -44,6 +44,65 @@ export function sanitizeHexColor(value: string, name: string): QRCodeColor {
   return value.toUpperCase() as QRCodeColor;
 }
 
+export type ParsedRgbaColor = {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+};
+
+export function parseRgbaColor(value: string): ParsedRgbaColor {
+  if (value.toLowerCase() === "transparent") {
+    return { red: 0, green: 0, blue: 0, alpha: 0 };
+  }
+  const rawHex = value.slice(1);
+  const hex =
+    rawHex.length === 3 || rawHex.length === 4
+      ? rawHex
+          .split("")
+          .map((character) => character + character)
+          .join("")
+      : rawHex;
+  return {
+    red: Number.parseInt(hex.slice(0, 2), 16),
+    green: Number.parseInt(hex.slice(2, 4), 16),
+    blue: Number.parseInt(hex.slice(4, 6), 16),
+    alpha: hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) : 255,
+  };
+}
+
+export function areRgbaColorsEqual(first: string, second: string): boolean {
+  const firstColor = parseRgbaColor(first);
+  const secondColor = parseRgbaColor(second);
+  return (
+    firstColor.red === secondColor.red &&
+    firstColor.green === secondColor.green &&
+    firstColor.blue === secondColor.blue &&
+    firstColor.alpha === secondColor.alpha
+  );
+}
+
+export function isFullyTransparent(value: string): boolean {
+  return parseRgbaColor(value).alpha === 0;
+}
+
+export function rgbaColorBytes(value: string): [number, number, number, number] {
+  const color = parseRgbaColor(value);
+  return [color.red, color.green, color.blue, color.alpha];
+}
+
+function toHexByte(value: number): string {
+  return value.toString(16).padStart(2, "0").toUpperCase();
+}
+
+export function toSvgColor(value: string): string {
+  const color = parseRgbaColor(value);
+  const rgb = `#${toHexByte(color.red)}${toHexByte(color.green)}${toHexByte(
+    color.blue,
+  )}`;
+  return color.alpha === 255 ? rgb : `${rgb}${toHexByte(color.alpha)}`;
+}
+
 export function parseHexColor(color: string): {
   red: number;
   green: number;

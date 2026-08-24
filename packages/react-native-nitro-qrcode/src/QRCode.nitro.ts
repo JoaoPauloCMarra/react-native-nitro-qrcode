@@ -35,6 +35,11 @@ export interface GenerateOptions {
   gradientEndY: number;
 }
 
+export interface MatrixObject {
+  size: number;
+  packedBase64: string;
+}
+
 export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
   generatePngBase64Object(options: GenerateOptions): string;
 
@@ -43,146 +48,6 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
   generatePngDataUriObject(options: GenerateOptions): string;
 
   generatePngDataUriAsyncObject(options: GenerateOptions): Promise<string>;
-
-  generatePngBase64(
-    value: string,
-    size: number,
-    quietZone: number,
-    errorCorrectionLevel: string,
-    foregroundColor: string,
-    backgroundColor: string,
-    strokeColor: string,
-    eyeColor: string,
-    eyeStrokeColor: string,
-    eyeballColor: string,
-    minVersion: number,
-    maxVersion: number,
-    mask: number,
-    boostEcl: boolean,
-    moduleShape: string,
-    eyePatternShape: string,
-    eyeballShape: string,
-    gap: number,
-    eyePatternGap: number,
-    bodyDensity: string,
-    cornerRadius: number,
-    eyePatternCornerRadius: number,
-    layout: string,
-    logoAreaSize: number,
-    logoAreaBorderRadius: number,
-    gradientType: string,
-    gradientColors: string[],
-    gradientLocations: number[],
-    gradientStartX: number,
-    gradientStartY: number,
-    gradientEndX: number,
-    gradientEndY: number,
-  ): string;
-
-  generatePngBase64Async(
-    value: string,
-    size: number,
-    quietZone: number,
-    errorCorrectionLevel: string,
-    foregroundColor: string,
-    backgroundColor: string,
-    strokeColor: string,
-    eyeColor: string,
-    eyeStrokeColor: string,
-    eyeballColor: string,
-    minVersion: number,
-    maxVersion: number,
-    mask: number,
-    boostEcl: boolean,
-    moduleShape: string,
-    eyePatternShape: string,
-    eyeballShape: string,
-    gap: number,
-    eyePatternGap: number,
-    bodyDensity: string,
-    cornerRadius: number,
-    eyePatternCornerRadius: number,
-    layout: string,
-    logoAreaSize: number,
-    logoAreaBorderRadius: number,
-    gradientType: string,
-    gradientColors: string[],
-    gradientLocations: number[],
-    gradientStartX: number,
-    gradientStartY: number,
-    gradientEndX: number,
-    gradientEndY: number,
-  ): Promise<string>;
-
-  generatePngDataUri(
-    value: string,
-    size: number,
-    quietZone: number,
-    errorCorrectionLevel: string,
-    foregroundColor: string,
-    backgroundColor: string,
-    strokeColor: string,
-    eyeColor: string,
-    eyeStrokeColor: string,
-    eyeballColor: string,
-    minVersion: number,
-    maxVersion: number,
-    mask: number,
-    boostEcl: boolean,
-    moduleShape: string,
-    eyePatternShape: string,
-    eyeballShape: string,
-    gap: number,
-    eyePatternGap: number,
-    bodyDensity: string,
-    cornerRadius: number,
-    eyePatternCornerRadius: number,
-    layout: string,
-    logoAreaSize: number,
-    logoAreaBorderRadius: number,
-    gradientType: string,
-    gradientColors: string[],
-    gradientLocations: number[],
-    gradientStartX: number,
-    gradientStartY: number,
-    gradientEndX: number,
-    gradientEndY: number,
-  ): string;
-
-  generatePngDataUriAsync(
-    value: string,
-    size: number,
-    quietZone: number,
-    errorCorrectionLevel: string,
-    foregroundColor: string,
-    backgroundColor: string,
-    strokeColor: string,
-    eyeColor: string,
-    eyeStrokeColor: string,
-    eyeballColor: string,
-    minVersion: number,
-    maxVersion: number,
-    mask: number,
-    boostEcl: boolean,
-    moduleShape: string,
-    eyePatternShape: string,
-    eyeballShape: string,
-    gap: number,
-    eyePatternGap: number,
-    bodyDensity: string,
-    cornerRadius: number,
-    eyePatternCornerRadius: number,
-    layout: string,
-    logoAreaSize: number,
-    logoAreaBorderRadius: number,
-    gradientType: string,
-    gradientColors: string[],
-    gradientLocations: number[],
-    gradientStartX: number,
-    gradientStartY: number,
-    gradientEndX: number,
-    gradientEndY: number,
-  ): Promise<string>;
 
   generateSvgString(
     value: string,
@@ -221,6 +86,16 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     boostEcl: boolean,
   ): number;
 
+  getMatrixObject(
+    value: string,
+    errorCorrectionLevel: string,
+    minVersion: number,
+    maxVersion: number,
+    mask: number,
+    boostEcl: boolean,
+  ): MatrixObject;
+
   clearCache(): void;
   getCacheSize(): number;
+  getCacheBytes(): number;
 }

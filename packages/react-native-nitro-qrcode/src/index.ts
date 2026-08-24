@@ -113,7 +113,7 @@ async function measuredAsync<T>(generate: () => Promise<T>): Promise<T> {
 }
 
 type NativeSvgArgs = Parameters<HybridQRCode["generateSvgString"]>;
-type NativeMatrixArgs = Parameters<HybridQRCode["getMatrixSize"]>;
+type NativeMatrixArgs = Parameters<HybridQRCode["getMatrixObject"]>;
 
 function toNativeGenerateOptions(
   normalized: NormalizedOptions,
@@ -232,11 +232,7 @@ export function toSvgString(options: QRCodeOptions): string {
 export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
   const normalized = normalizeOptions(options);
   const nativeArgs = toNativeMatrixArgs(normalized);
-  return measuredSync(false, () => {
-    const size = NativeQRCode.getMatrixSize(...nativeArgs);
-    const packedBase64 = NativeQRCode.getMatrixPackedBase64(...nativeArgs);
-    return { size, packedBase64 };
-  });
+  return measuredSync(false, () => NativeQRCode.getMatrixObject(...nativeArgs));
 }
 
 export function clearQRCodeCache(): void {
@@ -245,6 +241,10 @@ export function clearQRCodeCache(): void {
 
 export function getQRCodeCacheSize(): number {
   return NativeQRCode.getCacheSize();
+}
+
+export function getQRCodeCacheBytes(): number {
+  return NativeQRCode.getCacheBytes();
 }
 
 export const QRCode: ForwardRefExoticComponent<
@@ -266,6 +266,7 @@ export const NitroQRCode: NitroQRCodeApi = {
   validateOptions,
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
+  getCacheBytes: getQRCodeCacheBytes,
   getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,

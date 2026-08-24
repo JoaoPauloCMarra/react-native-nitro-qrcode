@@ -9,23 +9,19 @@ import {
 } from "../metrics";
 
 const mockHybridObject = {
-  generatePngBase64: jest.fn(() => "png-base64"),
   generatePngBase64Object: jest.fn(() => "png-base64"),
-  generatePngBase64Async: jest.fn(async () => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
-  generatePngDataUri: jest.fn(() => "data:image/png;base64,png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
-  generatePngDataUriAsync: jest.fn(
-    async () => "data:image/png;base64,png-base64",
-  ),
   generatePngDataUriAsyncObject: jest.fn(
     async () => "data:image/png;base64,png-base64",
   ),
   generateSvgString: jest.fn(() => "<svg />"),
+  getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
   getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
   getMatrixSize: jest.fn(() => 21),
   clearCache: jest.fn(),
   getCacheSize: jest.fn(() => 2),
+  getCacheBytes: jest.fn(() => 256),
 };
 
 jest.mock("react-native-nitro-modules", () => ({
@@ -193,6 +189,7 @@ describe("generation metrics", () => {
 
     expect(nativeGetQRCodeMetrics().requests).toBe(1);
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(1);
+    expect(NitroQRCode.getCacheBytes()).toBe(256);
     NitroQRCode.resetQRCodeMetrics();
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(0);
     NitroQRCode.setQRCodeMetricsEnabled(false);
@@ -226,6 +223,7 @@ describe("generation metrics", () => {
     Web.resetQRCodeMetrics();
     Web.toSvgString({ value: "web-entry-metrics" });
     expect(Web.getQRCodeMetrics().requests).toBe(1);
+    expect(Web.NitroQRCode.getCacheBytes()).toBeGreaterThan(0);
     Web.setQRCodeMetricsEnabled(false);
   });
 

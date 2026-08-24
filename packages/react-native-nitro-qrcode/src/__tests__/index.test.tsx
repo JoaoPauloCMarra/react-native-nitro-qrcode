@@ -5,23 +5,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const mockHybridObject = {
-  generatePngBase64: jest.fn(() => "png-base64"),
   generatePngBase64Object: jest.fn(() => "png-base64"),
-  generatePngBase64Async: jest.fn(async () => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
-  generatePngDataUri: jest.fn(() => "data:image/png;base64,png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
-  generatePngDataUriAsync: jest.fn(
-    async () => "data:image/png;base64,png-base64",
-  ),
   generatePngDataUriAsyncObject: jest.fn(
     async () => "data:image/png;base64,png-base64",
   ),
   generateSvgString: jest.fn(() => "<svg />"),
+  getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
   getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
   getMatrixSize: jest.fn(() => 21),
   clearCache: jest.fn(),
   getCacheSize: jest.fn(() => 2),
+  getCacheBytes: jest.fn(() => 256),
 };
 
 jest.mock("react-native-nitro-modules", () => ({
@@ -80,6 +76,7 @@ import {
   clearQRCodeCache,
   type ErrorCorrectionLevel,
   getMatrix,
+  getQRCodeCacheBytes,
   getQRCodeCacheSize,
   NitroQRCode,
   QRCode,
@@ -92,6 +89,7 @@ import {
   validateOptions,
 } from "../index";
 import * as Web from "../index.web";
+import { validateLogoDimensions } from "../validation";
 
 function nativeOptions(options: unknown): Parameters<typeof toPngBase64>[0] {
   return options as Parameters<typeof toPngBase64>[0];
@@ -123,14 +121,8 @@ describe("entrypoint export parity", () => {
 describe("native QRCode API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHybridObject.generatePngBase64Async.mockImplementation(
-      async () => "png-base64",
-    );
     mockHybridObject.generatePngBase64AsyncObject.mockImplementation(
       async () => "png-base64",
-    );
-    mockHybridObject.generatePngDataUriAsync.mockImplementation(
-      async () => "data:image/png;base64,png-base64",
     );
     mockHybridObject.generatePngDataUriAsyncObject.mockImplementation(
       async () => "data:image/png;base64,png-base64",
@@ -381,8 +373,9 @@ describe("native QRCode API", () => {
       size: 21,
       packedBase64: "matrix-base64",
     });
-    expect(mockHybridObject.getMatrixSize).toHaveBeenCalledTimes(1);
-    expect(mockHybridObject.getMatrixPackedBase64).toHaveBeenCalledTimes(1);
+    expect(mockHybridObject.getMatrixObject).toHaveBeenCalledTimes(1);
+    expect(mockHybridObject.getMatrixSize).not.toHaveBeenCalled();
+    expect(mockHybridObject.getMatrixPackedBase64).not.toHaveBeenCalled();
   });
 
   it("normalizes native error-correction aliases and colors", () => {
@@ -416,6 +409,8 @@ describe("native QRCode API", () => {
     clearQRCodeCache();
     expect(mockHybridObject.clearCache).toHaveBeenCalled();
     expect(getQRCodeCacheSize()).toBe(2);
+    expect(getQRCodeCacheBytes()).toBe(256);
+    expect(mockHybridObject.getCacheBytes).toHaveBeenCalled();
     expect(NitroQRCode.toPngBase64({ value: "Hello" })).toBe("png-base64");
     expect(NitroQRCode.getCacheSize()).toBe(2);
   });
@@ -500,6 +495,12 @@ describe("native QRCode API", () => {
     expect(() =>
       toPngBase64({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
     ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
+    expect(() =>
+      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
+    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
     expect(() =>
       toPngBase64(nativeOptions({
         value: "x",
@@ -598,6 +599,16 @@ describe("native QRCode API", () => {
         },
       })),
     ).toThrow("gradient.colors[1] must be");
+  });
+
+  it("keeps the absolute and relative logo radius bounds aligned", () => {
+    expect(() => validateLogoDimensions(0, 2048, 4096)).not.toThrow();
+    expect(() => validateLogoDimensions(0, 2049, 4096)).toThrow(
+      "logoAreaBorderRadius must be an integer between 0 and 2048",
+    );
+    expect(() => validateLogoDimensions(0, 65, 128)).toThrow(
+      "logoAreaBorderRadius must be between 0 and half the size",
+    );
   });
 
   it("renders an Image-backed QR component", async () => {
@@ -720,7 +731,9 @@ describe("native QRCode API", () => {
       ).toBe(
         "QRCode component size must be an integer between 1 and 2048 points.",
       );
-      expect(mockHybridObject.generatePngDataUriAsync).not.toHaveBeenCalled();
+      expect(
+        mockHybridObject.generatePngDataUriAsyncObject,
+      ).not.toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     },
   );
@@ -1579,7 +1592,7 @@ describe("web QRCode API", () => {
       .toContain("#11223344");
     expect(
       Web.toSvgString({ value: "Hello", backgroundColor: "transparent" }),
-    ).toContain('fill="transparent"');
+    ).toContain('fill="#00000000"');
     expect(
       Web.toSvgString({
         value: "Hello",
@@ -1787,27 +1800,67 @@ describe("web QRCode API", () => {
 
   it("verifies cached web options after an FNV key collision", () => {
     const first = Web.toSvgString({
-      value: "option-collision",
-      foregroundColor: "#664982",
+      value: "option-collision-new",
+      foregroundColor: "#0B8E79",
     });
     const second = Web.toSvgString({
-      value: "option-collision",
-      foregroundColor: "#D347BA",
+      value: "option-collision-new",
+      foregroundColor: "#D9F104",
     });
 
     expect(second).not.toBe(first);
     expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 
+  it("uses parsed RGBA bytes as the web cache color identity", () => {
+    const first = Web.toSvgString({
+      value: "color-identity",
+      backgroundColor: "transparent",
+    });
+    const second = Web.toSvgString({
+      value: "color-identity",
+      backgroundColor: "#00000000",
+    });
+
+    expect(second).toBe(first);
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+  });
+
+  it("canonicalizes SVG color spellings before rendering and caching", () => {
+    const sixDigit = Web.toSvgString({
+      value: "svg-color-identity",
+      foregroundColor: "#000000",
+      backgroundColor: "#FFFFFF",
+    });
+    const eightDigit = Web.toSvgString({
+      value: "svg-color-identity",
+      foregroundColor: "#000000FF",
+      backgroundColor: "#FFFFFFFF",
+    });
+
+    expect(eightDigit).toBe(sixDigit);
+    expect(sixDigit).toContain('<path fill="#FFFFFF"');
+    expect(sixDigit).toContain('<path fill="#000000"');
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+
+    const alpha = Web.toSvgString({
+      value: "svg-alpha-color",
+      foregroundColor: "#11223344",
+    });
+    expect(alpha).toContain('<path fill="#11223344"');
+  });
+
   it("bounds the web cache by output bytes", () => {
+    const canvas = installCanvas();
+    canvas.toDataURL.mockReturnValue(
+      `data:image/png;base64,${"A".repeat(150_000)}`,
+    );
     for (let index = 0; index < 40; index++) {
-      Web.toSvgString({
-        value: `${"A".repeat(1_000)}-${index}`,
-        errorCorrectionLevel: "L",
-      });
+      Web.toPngDataUri({ value: `large-cache-entry-${index}` });
     }
 
     expect(Web.getQRCodeCacheSize()).toBeLessThan(40);
+    expect(Web.getQRCodeCacheBytes()).toBeLessThanOrEqual(4 * 1024 * 1024);
   });
 
   it("does not retain a web cache entry larger than the byte budget", () => {
@@ -1930,6 +1983,12 @@ describe("web QRCode API", () => {
     expect(() =>
       Web.toSvgString({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
     ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
+    expect(() =>
+      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
+    ).not.toThrow();
+    expect(() =>
+      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
+    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
     expect(() =>
       Web.toSvgString(webOptions({
         value: "x",

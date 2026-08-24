@@ -71,10 +71,11 @@
     "test:cpp": "bun ../../scripts/test-cpp.js",
     "test:cpp:sanitize": "bun ../../scripts/test-cpp-sanitize.js",
     "benchmark:cpp": "bun ../../scripts/benchmark-cpp.js",
+    "benchmark:cpp:smoke": "bun ../../scripts/benchmark-cpp.js --smoke",
     "verify": "bun run lint:check && bun run typecheck && bun run test:types && bun run test:coverage && bun run test:cpp && bun run test:cpp:sanitize && bun run build",
     "prepublishOnly": "bun run clean && bun run codegen && bun run verify",
-    "prepack": "node -e \"const fs=require('fs'); for(const name of ['README.md','CHANGELOG.md','SECURITY.md','LICENSE'])fs.copyFileSync('../../'+name,'./'+name)\"",
-    "postpack": "node -e \"const fs=require('fs'); for(const name of ['README.md','CHANGELOG.md','SECURITY.md','LICENSE'])if(fs.existsSync('./'+name))fs.unlinkSync('./'+name)\"",
+    "prepack": "node scripts/sync-package-docs.js prepare",
+    "postpack": "node scripts/sync-package-docs.js cleanup",
     "pack:dry-run": "bun pm pack --dry-run",
     "publish:dry-run": "bun publish --dry-run --access public"
   },

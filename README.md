@@ -48,14 +48,14 @@ bare React Native app.
 
 ## Compatibility
 
-| Package | Supported range |
-| --- | --- |
-| React | `>=18.2.0 <20.0.0` |
-| React Native | `>=0.75.0 <1.0.0` |
-| Nitro Modules | `>=0.37.0 <0.38.0` |
-| Expo | SDK 57 development builds; Expo Go is not supported |
-| React Native Web | `>=0.19.0 <1.0.0` |
-| Node | `>=18.0.0` |
+| Package          | Supported range                                     |
+| ---------------- | --------------------------------------------------- |
+| React            | `>=18.2.0 <20.0.0`                                  |
+| React Native     | `>=0.75.0 <1.0.0`                                   |
+| Nitro Modules    | `>=0.37.0 <0.38.0`                                  |
+| Expo             | SDK 57 development builds; Expo Go is not supported |
+| React Native Web | `>=0.19.0 <1.0.0`                                   |
+| Node             | `>=18.0.0`                                          |
 
 Version 0.6.0 uses React Native `0.87.0` for the standalone package gate and
 React Native `0.86.2` in the Expo SDK 57 example. Expo SDK 57 is the latest
@@ -160,6 +160,7 @@ export function BrandedCode() {
 ```ts
 import {
   getMatrix,
+  getQRCodeCacheBytes,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -199,13 +200,18 @@ lookup. Each cache retains at most 128 entries or 4 MiB, whichever limit is
 reached first, and evicts least-recently-used output. An output larger than 4
 MiB is returned without being cached. Remounting `<QRCode>` with the same
 normalized options is a cache hit; apps should not keep a second in-memory URI
-map for that. Use `clearQRCodeCache()` to clear cached output and
-`getQRCodeCacheSize()` to inspect the entry count.
+map for that. Use `clearQRCodeCache()` to clear cached output,
+`getQRCodeCacheSize()` to inspect the entry count, and
+`getQRCodeCacheBytes()` to inspect retained output bytes.
 
 Native matrix export reuses a small bounded least-recently-used cache (32
-entries) across its existing size and packed-data bridge calls. No new
-HybridObject method is required, preserving compatibility with existing native
-binaries.
+entries or 512 KiB, whichever comes first) and returns the size and packed data
+through one `getMatrixObject` bridge call. The native output cache retains at
+most 4 MiB, so the default combined native output and matrix cache bound is
+4.5 MiB. The native cache memory report includes both output and matrix cache
+bytes. SVG colors use canonical uppercase `#RRGGBB` values when opaque and
+`#RRGGBBAA` values when alpha is present, so equivalent spellings share output
+and cache entries across native and web.
 
 Development builds expose opt-in generation metrics through
 `getQRCodeMetrics()`, `resetQRCodeMetrics()`, and
@@ -233,19 +239,19 @@ fits, mirroring the native behavior.
 
 Generation input bounds:
 
-| Input | Accepted values |
-| --- | --- |
-| `value` | Non-empty string; maximum length is limited by QR version 40 capacity (about 2953 bytes, 4296 alphanumeric characters, or 7089 numeric digits) |
-| `size` | Integer from 1 through 4096 for synchronous and asynchronous helpers |
-| `quietZone` | Integer from 0 through 32 |
-| `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion` |
-| `mask` | `-1` for automatic selection, or integer 0 through 7 |
-| `logoAreaSize` | Integer from 0 through 4096 and no larger than `size` |
-| `logoAreaBorderRadius` | Integer from 0 through 2048 and no larger than half of `size` |
-| Shape gaps and radii | Integers from 0 through 256 |
-| Gradient colors | 2 through 8 valid hex colors |
-| Gradient locations | Same count as colors, finite values from 0 through 1 in non-decreasing order |
-| Gradient points | Finite `x` and `y` values from 0 through 1 |
+| Input                      | Accepted values                                                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`                    | Non-empty string; maximum length is limited by QR version 40 capacity (about 2953 bytes, 4296 alphanumeric characters, or 7089 numeric digits) |
+| `size`                     | Integer from 1 through 4096 for synchronous and asynchronous helpers                                                                           |
+| `quietZone`                | Integer from 0 through 32                                                                                                                      |
+| `minVersion`, `maxVersion` | Integers from 1 through 40, with `minVersion <= maxVersion`                                                                                    |
+| `mask`                     | `-1` for automatic selection, or integer 0 through 7                                                                                           |
+| `logoAreaSize`             | Integer from 0 through 4096 and no larger than `size`                                                                                          |
+| `logoAreaBorderRadius`     | Integer from 0 through 2048 and no larger than half of `size`                                                                                  |
+| Shape gaps and radii       | Integers from 0 through 256                                                                                                                    |
+| Gradient colors            | 2 through 8 valid hex colors                                                                                                                   |
+| Gradient locations         | Same count as colors, finite values from 0 through 1 in non-decreasing order                                                                   |
+| Gradient points            | Finite `x` and `y` values from 0 through 1                                                                                                     |
 
 Option loss and platform differences:
 
@@ -360,7 +366,7 @@ Main exports:
 - `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
 - `toPngBase64Async` and `toPngDataUriAsync`.
 - `validateOptions`.
-- `clearQRCodeCache` and `getQRCodeCacheSize`.
+- `clearQRCodeCache`, `getQRCodeCacheSize`, and `getQRCodeCacheBytes`.
 - TypeScript types including `QRCodeOptions`, `QRCodeProps`, `QRCodeRef`,
   `QRCodeMatrix`, `QRCodeValidationResult`, `QRCodeValidationErrorCode`,
   `QRCodeColor`,
@@ -368,41 +374,57 @@ Main exports:
 
 ## Component Options
 
-| Option | Description |
-| --- | --- |
-| `value` | Non-empty QR payload string. Required. |
-| `size` | Positive component layout size up to 2048 points; rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels). |
-| `quietZone` | Quiet-zone width in QR modules; integer 0 through 32. |
-| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases. |
-| `scanSafe` | Raises unsafe defaults; `"strict"` turns scanability warnings into errors. |
-| `foregroundColor` | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color. |
-| `backgroundColor` | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`. |
-| `strokeColor` | Optional body-module stroke color. |
-| `eyeColor` | Finder frame fill color. |
-| `eyeStrokeColor` | Finder frame stroke color. |
-| `eyeballColor` | Finder center color. |
-| `gradient` | Linear or radial foreground gradient with 2 through 8 colors. |
-| `orbit` | Deprecated no-op retained for source compatibility. |
-| `shapeOptions` | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
-| `preset` | `default`, `rounded`, `dots`, or `branded`. |
-| `logo` | React node overlaid above the generated image; not embedded in exports. |
-| `logoAreaSize` | Cleared center area in points; integer 0 through `size`. |
-| `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`. |
-| `logoPadding` | Visual padding inside the logo overlay; does not enlarge the reserved area. |
-| `logoBackgroundColor` | Overlay background color; does not change the generated PNG. |
-| `keepPreviousImage` | Keeps the previous image visible while the next image generates. |
-| `hideLogoUntilReady` | Delays logo rendering until the QR image is ready. |
-| `onReady` | Called with the generated PNG data URI. |
-| `onError` | Called when generation fails. |
+| Option                 | Description                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `value`                | Non-empty QR payload string. Required.                                                                                               |
+| `size`                 | Positive component layout size up to 2048 points; rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels).   |
+| `quietZone`            | Quiet-zone width in QR modules; integer 0 through 32.                                                                                |
+| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases.                                                                                      |
+| `scanSafe`             | Raises unsafe defaults; `"strict"` turns scanability warnings into errors.                                                           |
+| `foregroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color.                                                                         |
+| `backgroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`.                                                                         |
+| `strokeColor`          | Optional body-module stroke color.                                                                                                   |
+| `eyeColor`             | Finder frame fill color.                                                                                                             |
+| `eyeStrokeColor`       | Finder frame stroke color.                                                                                                           |
+| `eyeballColor`         | Finder center color.                                                                                                                 |
+| `gradient`             | Linear or radial foreground gradient with 2 through 8 colors.                                                                        |
+| `orbit`                | Deprecated no-op retained for source compatibility.                                                                                  |
+| `shapeOptions`         | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
+| `preset`               | `default`, `rounded`, `dots`, or `branded`.                                                                                          |
+| `logo`                 | React node overlaid above the generated image; not embedded in exports.                                                              |
+| `logoAreaSize`         | Cleared center area in points; integer 0 through `size`.                                                                             |
+| `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`.                                                                              |
+| `logoPadding`          | Visual padding inside the logo overlay; does not enlarge the reserved area.                                                          |
+| `logoBackgroundColor`  | Overlay background color; does not change the generated PNG.                                                                         |
+| `keepPreviousImage`    | Keeps the previous image visible while the next image generates.                                                                     |
+| `hideLogoUntilReady`   | Delays logo rendering until the QR image is ready.                                                                                   |
+| `onReady`              | Called with the generated PNG data URI.                                                                                              |
+| `onError`              | Called when generation fails.                                                                                                        |
+
+## Error Handling
+
+Validation failures are typed and deterministic on every platform. Options are
+validated before generation and surfaced as `QRCodeValidationError` entries
+with stable string codes; scanability findings arrive as typed
+`QRCodeScanabilityWarning` entries rather than boolean flags. The same bounds
+are enforced again in native code for direct HybridObject consumers, so a
+value rejected by the React component is rejected by the native bridge with an
+equivalent error. Invalid numeric inputs (`NaN`, `Infinity`, fractional
+sizes) are rejected at the bridge instead of being coerced. The React
+component reports asynchronous generation failures through `onError` and keeps
+the last successful image when `keepPreviousImage` is set. See
+[Validation And Scanability](#validation-and-scanability) and
+[Rendering, Logos, And Errors](#rendering-logos-and-errors) for the full
+option-by-option rules.
 
 ## Platform Support
 
-| Platform | Status |
-| --- | --- |
-| iOS | Native Nitro module with shared C++ QR engine. |
-| Android | Native Nitro module with shared C++ QR engine. |
-| Web | JavaScript fallback through React Native Web. |
-| Expo | Development builds; Expo Go is not supported for native Nitro code. |
+| Platform | Status                                                              |
+| -------- | ------------------------------------------------------------------- |
+| iOS      | Native Nitro module with shared C++ QR engine.                      |
+| Android  | Native Nitro module with shared C++ QR engine.                      |
+| Web      | JavaScript fallback through React Native Web.                       |
+| Expo     | Development builds; Expo Go is not supported for native Nitro code. |
 
 The `qrcode` npm package powers only the web entry
 (`src/index.web.ts`). Native iOS and Android builds resolve the
