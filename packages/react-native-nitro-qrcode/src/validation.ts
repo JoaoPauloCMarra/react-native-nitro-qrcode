@@ -182,7 +182,7 @@ export type QRCodeKnownValidationErrorCode =
 export type QRCodeValidationErrorCode = QRCodeKnownValidationErrorCode;
 
 export type QRCodeValidationError = {
-  code: string;
+  code: QRCodeValidationErrorCode;
   message: string;
 };
 

@@ -27,9 +27,9 @@ Breaking changes are always listed first in each release section.
 - Added `getMatrixObject()` returning `{ size, packedBase64 }` in a single
   bridge crossing and `getCacheBytes()` for byte-accurate cache accounting;
   `getMatrixSize()` + `getMatrixPackedBase64()` remain available.
-- Exposed `QRCodeKnownValidationErrorCode` for stable package-known codes while
-  allowing `QRCodeValidationError.code` to remain a string for forward-compatible
-  native validation codes.
+- Exposed the additive `QRCodeKnownValidationErrorCode` alias while preserving
+  the established `QRCodeValidationError.code` and `QRCodeValidationErrorCode`
+  literal union for strict TypeScript consumers.
 
 ## [0.6.0] - 2026-08-20
 

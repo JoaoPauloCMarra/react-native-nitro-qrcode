@@ -172,8 +172,9 @@ expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
 expectFalse<IsAssignable<"unknown", QRCodeKnownValidationErrorCode>>();
 expectFalse<IsAssignable<"unknown", QRCodeValidationErrorCode>>();
-const extensibleValidationCode: string = validation.errors[0]?.code ?? "";
-void extensibleValidationCode;
+const knownValidationCode: QRCodeValidationErrorCode =
+  validation.errors[0]?.code ?? "invalid";
+void knownValidationCode;
 expectFalse<
   IsAssignable<
     (uri: number) => void,

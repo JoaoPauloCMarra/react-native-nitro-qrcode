@@ -344,10 +344,10 @@ warnings. With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
 
 Errors are deterministic: validation returns typed `QRCodeValidationResult`
-entries with string codes. `invalid` and the scanability warning codes are the
-package-known values exposed by `QRCodeKnownValidationErrorCode`; consumers
-should keep handling unknown codes defensively because native integrations can
-introduce additional codes. Generation failures throw (or reject with) `Error` instances;
+entries with `QRCodeValidationErrorCode` values. `invalid` and the scanability
+warning codes are the package-known values exposed by
+`QRCodeKnownValidationErrorCode`. Generation failures throw (or reject with)
+`Error` instances;
 message text is never used for control flow. The JavaScript layer validates
 all options before the native boundary, so the native side surfaces unexpected
 failures as ordinary exceptions rather than a separate error envelope.
