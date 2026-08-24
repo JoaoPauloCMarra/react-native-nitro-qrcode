@@ -25,8 +25,10 @@ namespace margelo::nitro::NitroQRCode {
       prototype.registerHybridMethod("generateSvgString", &HybridQRCodeSpec::generateSvgString);
       prototype.registerHybridMethod("getMatrixPackedBase64", &HybridQRCodeSpec::getMatrixPackedBase64);
       prototype.registerHybridMethod("getMatrixSize", &HybridQRCodeSpec::getMatrixSize);
+      prototype.registerHybridMethod("getMatrixObject", &HybridQRCodeSpec::getMatrixObject);
       prototype.registerHybridMethod("clearCache", &HybridQRCodeSpec::clearCache);
       prototype.registerHybridMethod("getCacheSize", &HybridQRCodeSpec::getCacheSize);
+      prototype.registerHybridMethod("getCacheBytes", &HybridQRCodeSpec::getCacheBytes);
     });
   }
 

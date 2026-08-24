@@ -1,5 +1,4 @@
 const { spawnSync } = require("child_process");
-const fs = require("fs");
 const path = require("path");
 
 const projectRoot = path.resolve(__dirname, "..");
@@ -9,41 +8,38 @@ const packageDir = path.join(
   "react-native-nitro-qrcode"
 );
 
-// The real publish injects the repository README and LICENSE through the
-// prepack lifecycle. Stage them exactly like prepack does so the dry-run
-// contents match the published artifact, then restore the package directory.
-const stagedFiles = ["README.md", "CHANGELOG.md", "SECURITY.md", "LICENSE"];
-const stagedCopies = [];
-for (const file of stagedFiles) {
-  const source = path.join(projectRoot, file);
-  const target = path.join(packageDir, file);
-  if (fs.existsSync(source)) {
-    if (fs.existsSync(target)) {
-      const backup = path.join(packageDir, `.audit-${file}`);
-      fs.copyFileSync(target, backup);
-      stagedCopies.push({ target, backup, hadOriginal: true });
-    } else {
-      stagedCopies.push({ target, backup: null, hadOriginal: false });
-    }
-    fs.copyFileSync(source, target);
+const docsSyncScript = path.join(
+  packageDir,
+  "scripts",
+  "sync-package-docs.js",
+);
+
+function runDocsSync(mode) {
+  const result = spawnSync("node", [docsSyncScript, mode], {
+    cwd: packageDir,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `${mode} docs sync failed`);
   }
 }
 
-function restoreStagedFiles() {
-  for (const copy of stagedCopies) {
-    fs.rmSync(copy.target, { force: true });
-    if (copy.hadOriginal) {
-      fs.copyFileSync(copy.backup, copy.target);
-      fs.rmSync(copy.backup, { force: true });
-    }
+let result;
+try {
+  try {
+    runDocsSync("prepare");
+    result = spawnSync("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
+      cwd: packageDir,
+      encoding: "utf8",
+    });
+  } finally {
+    runDocsSync("cleanup");
   }
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
 }
-
-const result = spawnSync("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
-  cwd: packageDir,
-  encoding: "utf8",
-});
-restoreStagedFiles();
 
 process.stdout.write(result.stdout);
 process.stderr.write(result.stderr);
@@ -123,6 +119,7 @@ const requiredFiles = [
   "nitrogen/generated/android/NitroQRCode+autolinking.cmake",
   "nitrogen/generated/ios/NitroQRCode+autolinking.rb",
   "nitrogen/generated/shared/c++/GenerateOptions.hpp",
+  "nitrogen/generated/shared/c++/MatrixObject.hpp",
   "nitrogen/generated/shared/c++/HybridQRCodeSpec.hpp",
   "src/index.ts",
   "src/index.web.ts",

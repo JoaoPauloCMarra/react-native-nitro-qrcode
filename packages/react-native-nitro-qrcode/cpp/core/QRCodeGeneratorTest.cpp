@@ -20,6 +20,9 @@ using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
 
 void runQRCodeBridgeOptionsTests();
+#ifdef NITRO_HYBRID_BINDING_TEST
+void runHybridQRCodeTests();
+#endif
 
 namespace {
 
@@ -183,12 +186,12 @@ void testPngGeneration() {
   GenerateOptions options;
   options.size = 128;
   const std::string base64 =
-      generator.generatePngBase64("https://example.com", options);
+      generator.renderPngBase64("https://example.com", options);
   assert(!base64.empty());
   assertPngHeader(base64);
 
   const std::string cached =
-      generator.generatePngBase64("https://example.com", options);
+      generator.renderPngBase64("https://example.com", options);
   assert(cached == base64);
 
   options.size = 1;
@@ -196,11 +199,11 @@ void testPngGeneration() {
   options.errorCorrectionLevel = "L";
   options.foreground = parseColor("#12345678");
   options.background = parseColor("#ABCDEF");
-  assertPngHeader(generator.generatePngBase64("small", options));
+  assertPngHeader(generator.renderPngBase64("small", options));
 
   options = GenerateOptions{};
   options.size = 800;
-  assertPngHeader(generator.generatePngBase64("large-output", options));
+  assertPngHeader(generator.renderPngBase64("large-output", options));
 }
 
 void testDataUriAndCache() {
@@ -208,19 +211,21 @@ void testDataUriAndCache() {
   GenerateOptions options;
   options.size = 96;
   const std::string first =
-      generator.generatePngDataUri("https://example.com", options);
+      generator.renderPngDataUri("https://example.com", options);
   const std::string second =
-      generator.generatePngDataUri("https://example.com", options);
+      generator.renderPngDataUri("https://example.com", options);
   assert(first == second);
   assert(first.rfind("data:image/png;base64,", 0) == 0);
   assert(generator.getCacheSize() == 1);
+  assert(generator.getCacheBytes() > 0);
   generator.clearCache();
   assert(generator.getCacheSize() == 0);
+  assert(generator.getCacheBytes() == 0);
 
   options.size = 32;
   options.quietZone = 0;
   for (int index = 0; index < 140; index++) {
-    generator.generatePngBase64("cache-entry-" + std::to_string(index),
+    generator.renderPngBase64("cache-entry-" + std::to_string(index),
                                 options);
   }
   assert(generator.getCacheSize() == 128);
@@ -263,6 +268,35 @@ void testByteBoundedCache() {
   assert(oversized.getCacheSize() == 0);
 }
 
+void testBoundedCacheAccounting() {
+  NitroQRCode::BoundedCache<std::string> cache(2, 10);
+  cache.store("first", "first-request", "1234", 4);
+  cache.store("second", "second-request", "5678", 4);
+  assert(cache.size() == 2);
+  assert(cache.bytes() == 8);
+
+  cache.store("first", "first-request", "1", 1);
+  assert(cache.size() == 2);
+  assert(cache.bytes() == 5);
+  assert(cache.get("first", "first-request") == "1");
+
+  cache.store("oversized", "oversized-request", "01234567890", 11);
+  assert(cache.size() == 2);
+  assert(cache.bytes() == 5);
+  assert(!cache.get("oversized", "oversized-request").has_value());
+
+  cache.store("third", "third-request", "123456", 6);
+  assert(cache.size() == 2);
+  assert(cache.bytes() == 7);
+  assert(!cache.get("second", "second-request").has_value());
+  assert(cache.get("first", "first-request") == "1");
+  assert(cache.get("third", "third-request") == "123456");
+
+  cache.store("third", "third-request", "2", 1);
+  assert(cache.size() == 2);
+  assert(cache.bytes() == 2);
+}
+
 void testConcurrentGeneration() {
   QRCodeGenerator generator;
   GenerateOptions baseOptions;
@@ -278,7 +312,7 @@ void testConcurrentGeneration() {
             baseOptions.gradient.colors = {parseColor("#111111"),
                                            parseColor("#F5A623")};
           }
-          return generator.generatePngBase64(
+          return generator.renderPngBase64(
               "parallel-entry-" + std::to_string(index % 12), baseOptions);
         }));
   }
@@ -304,7 +338,7 @@ void testStyledPngGeneration() {
   options.logoAreaSize = 42;
   options.logoAreaBorderRadius = 8;
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/styled", options));
+      generator.renderPngBase64("https://example.com/styled", options));
 
   options.moduleShape = "rounded";
   options.eyePatternShape = "circle";
@@ -314,25 +348,25 @@ void testStyledPngGeneration() {
   options.logoAreaSize = 40;
   options.logoAreaBorderRadius = 0;
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/styled-2", options));
+      generator.renderPngBase64("https://example.com/styled-2", options));
 
   options.moduleShape = "square";
   options.eyePatternShape = "square";
   options.gap = 0;
   options.logoAreaSize = 0;
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/styled-3", options));
+      generator.renderPngBase64("https://example.com/styled-3", options));
 
   options.bodyDensity = "sparse";
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/sparse", options));
+      generator.renderPngBase64("https://example.com/sparse", options));
 
   options.moduleShape = "circle";
   options.eyePatternShape = "square";
   options.eyeballShape = "circle";
   options.eyeStrokeColor = "#222222";
   options.eyeStroke = parseColor(options.eyeStrokeColor);
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/circle-body-square-frame-circle-eye", options));
 
   options = GenerateOptions{};
@@ -344,7 +378,7 @@ void testStyledPngGeneration() {
   options.bodyDensity = "sparse";
   options.cornerRadius = 4;
   options.eyePatternCornerRadius = 6;
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/circle-styled", options));
 
   options = GenerateOptions{};
@@ -357,10 +391,10 @@ void testStyledPngGeneration() {
   options.gradient.endX = 0.9;
   options.gradient.endY = 0.8;
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/gradient", options));
+      generator.renderPngBase64("https://example.com/gradient", options));
 
   options.gradient.locations = {0.0, 0.5};
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/gradient-tail", options));
 
   options.gradient.type = "radial";
@@ -369,14 +403,14 @@ void testStyledPngGeneration() {
   options.gradient.startY = 0.5;
   options.gradient.endX = 1.0;
   options.gradient.endY = 0.5;
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/radial-gradient", options));
 
   options.gradient.startX = 0.5;
   options.gradient.startY = 0.5;
   options.gradient.endX = 0.5;
   options.gradient.endY = 0.5;
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/radial-zero-radius", options));
 
   options.gradient.type = "linear";
@@ -384,7 +418,7 @@ void testStyledPngGeneration() {
   options.gradient.startY = 0.4;
   options.gradient.endX = 0.4;
   options.gradient.endY = 0.4;
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/linear-zero-length", options));
 
   options = GenerateOptions{};
@@ -402,29 +436,29 @@ void testStyledPngGeneration() {
   options.eyeStroke = parseColor(options.eyeStrokeColor);
   options.eyeball = parseColor(options.eyeballColor);
   assertPngHeader(
-      generator.generatePngBase64("https://example.com/layer-colors", options));
+      generator.renderPngBase64("https://example.com/layer-colors", options));
 
   options.eyePatternShape = "square";
   options.eyeballShape = "square";
-  assertPngHeader(generator.generatePngBase64(
+  assertPngHeader(generator.renderPngBase64(
       "https://example.com/layer-square-eye-stroke", options));
 
   options = GenerateOptions{};
   options.size = 160;
   const std::string squareModules =
-      generator.generatePngBase64("https://example.com/square-radius", options);
+      generator.renderPngBase64("https://example.com/square-radius", options);
   options.cornerRadius = 4;
   const std::string roundedSquareModules =
-      generator.generatePngBase64("https://example.com/square-radius", options);
+      generator.renderPngBase64("https://example.com/square-radius", options);
   assert(squareModules != roundedSquareModules);
 
   options = GenerateOptions{};
   options.size = 160;
   const std::string squareEyes =
-      generator.generatePngBase64("https://example.com/eye-radius", options);
+      generator.renderPngBase64("https://example.com/eye-radius", options);
   options.eyePatternCornerRadius = 4;
   const std::string roundedSquareEyes =
-      generator.generatePngBase64("https://example.com/eye-radius", options);
+      generator.renderPngBase64("https://example.com/eye-radius", options);
   assert(squareEyes != roundedSquareEyes);
 }
 
@@ -448,7 +482,7 @@ void testCircleGeometryTolerance() {
   options.gradient.locations = {0.0, 1.0};
 
   const std::string value = "https://example.com/circle-tolerance";
-  const std::string encoded = generator.generatePngBase64(value, options);
+  const std::string encoded = generator.renderPngBase64(value, options);
 
   int width = 0;
   int height = 0;
@@ -527,7 +561,7 @@ void testLogoAreaIsTransparent() {
   options.logoAreaSize = 32;
   options.logoAreaBorderRadius = 4;
   const std::string encoded =
-      generator.generatePngBase64("https://example.com/logo-hole", options);
+      generator.renderPngBase64("https://example.com/logo-hole", options);
 
   int width = 0;
   int height = 0;
@@ -556,7 +590,7 @@ void testTransparentBackgroundPng() {
   options.backgroundColor = "transparent";
   options.background = parseColor("transparent");
   const std::string encoded =
-      generator.generatePngBase64("https://example.com/transparent", options);
+      generator.renderPngBase64("https://example.com/transparent", options);
 
   int width = 0;
   int height = 0;
@@ -619,6 +653,69 @@ void testMatrixCacheLru() {
       assert(packed == recheck);
     }
   }
+
+  const auto matrix = generator.getMatrixObject("matrix-object", options);
+  assert(matrix.size == generator.getMatrixSize("matrix-object", options));
+  assert(matrix.packedBase64 ==
+         generator.getMatrixPackedBase64("matrix-object", options));
+  assert(generator.memorySize() <= QRCodeGenerator::MaxMatrixCacheBytes);
+}
+
+void testCacheIdentityAndMemoryAccounting() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.foregroundColor = "#000000";
+  options.foreground = parseColor(options.foregroundColor);
+  const std::string sixDigit =
+      generator.generateSvgString("equivalent-colors", options);
+
+  GenerateOptions equivalent = options;
+  equivalent.foregroundColor = "#000000FF";
+  equivalent.foreground = parseColor(equivalent.foregroundColor);
+  const std::string eightDigit =
+      generator.generateSvgString("equivalent-colors", equivalent);
+  assert(eightDigit != sixDigit);
+  assert(sixDigit.find("<path fill=\"#FFFFFF\"") != std::string::npos);
+  assert(sixDigit.find("<path fill=\"#000000\"") != std::string::npos);
+  assert(eightDigit.find("<path fill=\"#000000FF\"") !=
+         std::string::npos);
+  assert(generator.getCacheSize() == 2);
+
+  GenerateOptions transparent = options;
+  transparent.backgroundColor = "transparent";
+  transparent.background = parseColor("transparent");
+  const std::string transparentSvg =
+      generator.generateSvgString("transparent-color", transparent);
+  GenerateOptions transparentHex = transparent;
+  transparentHex.backgroundColor = "#00000000";
+  transparentHex.background = parseColor("#00000000");
+  const std::string transparentHexSvg =
+      generator.generateSvgString("transparent-color", transparentHex);
+  assert(transparentHexSvg != transparentSvg);
+  assert(transparentSvg.find("<path fill=\"transparent\"") !=
+         std::string::npos);
+  assert(transparentHexSvg.find("<path fill=\"#00000000\"") !=
+         std::string::npos);
+
+  GenerateOptions alpha = options;
+  alpha.foregroundColor = "#11223344";
+  alpha.foreground = parseColor(alpha.foregroundColor);
+  const std::string alphaSvg =
+      generator.generateSvgString("alpha-color", alpha);
+  assert(alphaSvg.find("<path fill=\"#11223344\"") !=
+         std::string::npos);
+
+  const auto matrix = generator.getMatrixObject("matrix-memory", options);
+  assert(matrix.size > 0);
+  assert(generator.getCacheBytes() > 0);
+  assert(generator.memorySize() >= generator.getCacheBytes());
+  assert(generator.memorySize() > generator.getCacheBytes());
+  assert(generator.memorySize() <= QRCodeGenerator::MaxCombinedCacheBytes);
+
+  generator.clearCache();
+  assert(generator.getCacheSize() == 0);
+  assert(generator.getCacheBytes() == 0);
+  assert(generator.memorySize() == 0);
 }
 
 void testShapeLimits() {
@@ -640,7 +737,7 @@ void testShapeLimits() {
                             "triangle"}) {
     options.moduleShape = shape;
     assertThrows([&]() {
-      generator.generatePngBase64("https://example.com/shape", options);
+      generator.renderPngBase64("https://example.com/shape", options);
     });
   }
 
@@ -648,14 +745,14 @@ void testShapeLimits() {
   options.size = 160;
   options.eyePatternShape = "circle-border";
   assertThrows([&]() {
-    generator.generatePngBase64("https://example.com/eye-shape", options);
+    generator.renderPngBase64("https://example.com/eye-shape", options);
   });
 
   options = GenerateOptions{};
   options.size = 160;
   options.layout = "radial";
   assertThrows([&]() {
-    generator.generatePngBase64("https://example.com/layout", options);
+    generator.renderPngBase64("https://example.com/layout", options);
   });
 }
 
@@ -668,6 +765,7 @@ void testSvgGeneration() {
   assert(svg.find("<svg") != std::string::npos);
   assert(svg.find("shape-rendering=\"crispEdges\"") != std::string::npos);
   assert(svg.find("<path") != std::string::npos);
+  assert(svg.find("h1v1h-1z") != std::string::npos);
 
   options.gradient.type = "radial";
   options.gradient.colors = {parseColor("#4AA8FF"), parseColor("#28D17C")};
@@ -754,146 +852,163 @@ void testValidation() {
     assert(didThrow);
   };
 
-  assertThrows([&]() { generator.generatePngBase64("", options); });
+  assertThrows([&]() { generator.renderPngBase64("", options); });
 
   options.size = 0;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.size = 4097;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.quietZone = -1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.quietZone = 33;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.minVersion = 0;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.minVersion = 41;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.maxVersion = 0;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.maxVersion = 41;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.minVersion = 2;
   options.maxVersion = 1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.mask = -2;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.mask = 8;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.errorCorrectionLevel = "bad";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
   assertThrows([&]() { generator.getMatrixSize("Hello", options); });
 
   options = GenerateOptions{};
   options.layout = "spiral";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.moduleShape = "triangle";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.eyePatternShape = "triangle";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.eyeballShape = "triangle";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.bodyDensity = "crowded";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gap = -1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.gap = 257;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.eyePatternGap = -1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.eyePatternGap = 257;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.cornerRadius = -2;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.cornerRadius = 257;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.eyePatternCornerRadius = -2;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.eyePatternCornerRadius = 257;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.logoAreaSize = -1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.logoAreaSize = options.size + 1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.logoAreaBorderRadius = -1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options.logoAreaBorderRadius = options.size / 2 + 1;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
+
+  options = GenerateOptions{};
+  options.size = 4096;
+  options.logoAreaBorderRadius = 2048;
+  generator.generateSvgString("maximum-logo-radius", options);
+
+  options.logoAreaBorderRadius = 2049;
+  assertThrows([&]() {
+    generator.generateSvgString("absolute-logo-radius", options);
+  });
+
+  options = GenerateOptions{};
+  options.size = 128;
+  options.logoAreaBorderRadius = 65;
+  assertThrows([&]() {
+    generator.generateSvgString("relative-logo-radius", options);
+  });
 
   options = GenerateOptions{};
   options.gradient.type = "bad";
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#000000")};
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#000000"), parseColor("#FFFFFF")};
   options.gradient.locations = {0.0};
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#000000"), parseColor("#FFFFFF")};
   options.gradient.startX = 2.0;
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#000000"), parseColor("#FFFFFF")};
   options.gradient.locations = {0.8, 0.2};
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   options = GenerateOptions{};
   options.gradient.type = "linear";
   options.gradient.colors = {parseColor("#000000"), parseColor("#FFFFFF")};
   options.gradient.locations = {0.0, 2.0};
-  assertThrows([&]() { generator.generatePngBase64("Hello", options); });
+  assertThrows([&]() { generator.renderPngBase64("Hello", options); });
 
   assertThrows([&]() { parseColor("#12345"); });
   assertThrows([&]() { parseColor("1234567"); });
@@ -913,6 +1028,7 @@ int main() {
   testDataUriAndCache();
   testCollisionSafeCache();
   testByteBoundedCache();
+  testBoundedCacheAccounting();
   testConcurrentGeneration();
   testStyledPngGeneration();
   testCircleGeometryTolerance();
@@ -921,11 +1037,15 @@ int main() {
   testParityCorpus();
   testShapeLimits();
   testMatrixCacheLru();
+  testCacheIdentityAndMemoryAccounting();
   testSvgGeneration();
   testMatrixPacking();
   testColorAndBase64Helpers();
   testValidation();
   runQRCodeBridgeOptionsTests();
+#ifdef NITRO_HYBRID_BINDING_TEST
+  runHybridQRCodeTests();
+#endif
   std::cout << "QRCodeGenerator tests passed" << std::endl;
   return 0;
 }

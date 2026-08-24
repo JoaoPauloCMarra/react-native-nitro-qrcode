@@ -16,6 +16,8 @@ struct Color {
   uint8_t g = 0;
   uint8_t b = 0;
   uint8_t a = 255;
+
+  constexpr bool operator==(const Color &) const = default;
 };
 
 struct GradientOptions {
@@ -71,36 +73,45 @@ class QRCodeGenerator {
 public:
   using CacheKeyHasher = std::function<std::string(const std::string &)>;
 
+  static constexpr size_t DefaultMaxCacheBytes = 4 * 1024 * 1024;
+  static constexpr size_t MaxMatrixCacheBytes = 512 * 1024;
+  static constexpr size_t MaxCombinedCacheBytes =
+      DefaultMaxCacheBytes + MaxMatrixCacheBytes;
+
+  struct MatrixObject {
+    int size = 0;
+    std::string packedBase64;
+  };
+
   explicit QRCodeGenerator(CacheKeyHasher cacheKeyHasher = {},
-                           size_t maxCacheBytes = 4 * 1024 * 1024);
-  std::string generatePngBase64(const std::string &value,
+                           size_t maxCacheBytes = DefaultMaxCacheBytes);
+  std::string renderPngBase64(const std::string &value,
                                 const GenerateOptions &options);
-  std::string generatePngDataUri(const std::string &value,
+  std::string renderPngDataUri(const std::string &value,
                                  const GenerateOptions &options);
   std::string generateSvgString(const std::string &value,
                                 const GenerateOptions &options);
+  MatrixObject getMatrixObject(const std::string &value,
+                               const GenerateOptions &options);
   std::string getMatrixPackedBase64(const std::string &value,
                                     const GenerateOptions &options);
   int getMatrixSize(const std::string &value, const GenerateOptions &options);
   void clearCache();
   size_t getCacheSize() const;
+  size_t getCacheBytes() const;
+  size_t memorySize() const noexcept;
 
 private:
   static constexpr size_t MaxCacheEntries = 128;
   static constexpr size_t MaxMatrixCacheEntries = 32;
 
-  struct PackedMatrix {
-    int size = 0;
-    std::string packedBase64;
-  };
-
   CacheKeyHasher cacheKeyHasher_;
   BoundedCache<std::string> outputCache_;
-  BoundedCache<PackedMatrix> matrixCache_;
+  BoundedCache<MatrixObject> matrixCache_;
 
   Matrix createMatrix(const std::string &value,
                       const GenerateOptions &options) const;
-  PackedMatrix getMatrix(const std::string &value,
+  MatrixObject getMatrix(const std::string &value,
                          const GenerateOptions &options);
   std::string cacheRequest(const std::string &value,
                            const GenerateOptions &options,

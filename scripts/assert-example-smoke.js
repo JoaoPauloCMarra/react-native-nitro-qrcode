@@ -117,7 +117,13 @@ function smokeAndroid() {
   }
 
   run("adb", ["shell", "am", "force-stop", ANDROID_PACKAGE]);
-  run("adb", ["shell", "monkey", "-p", ANDROID_PACKAGE, "1"]);
+  run("adb", [
+    "shell",
+    "am",
+    "start",
+    "-n",
+    `${ANDROID_PACKAGE}/.MainActivity`,
+  ]);
   waitForAndroidProcess();
   waitForAndroidUi();
   recordResult("android", "passed");

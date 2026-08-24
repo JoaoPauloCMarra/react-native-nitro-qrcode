@@ -15,11 +15,14 @@
 
 // Forward declaration of `GenerateOptions` to properly resolve imports.
 namespace margelo::nitro::NitroQRCode { struct GenerateOptions; }
+// Forward declaration of `MatrixObject` to properly resolve imports.
+namespace margelo::nitro::NitroQRCode { struct MatrixObject; }
 
 #include <string>
 #include "GenerateOptions.hpp"
 #include <NitroModules/Promise.hpp>
 #include <vector>
+#include "MatrixObject.hpp"
 
 namespace margelo::nitro::NitroQRCode {
 
@@ -63,8 +66,10 @@ namespace margelo::nitro::NitroQRCode {
       virtual std::string generateSvgString(const std::string& value, double quietZone, const std::string& errorCorrectionLevel, const std::string& foregroundColor, const std::string& backgroundColor, double minVersion, double maxVersion, double mask, bool boostEcl, const std::string& gradientType, const std::vector<std::string>& gradientColors, const std::vector<double>& gradientLocations, double gradientStartX, double gradientStartY, double gradientEndX, double gradientEndY) = 0;
       virtual std::string getMatrixPackedBase64(const std::string& value, const std::string& errorCorrectionLevel, double minVersion, double maxVersion, double mask, bool boostEcl) = 0;
       virtual double getMatrixSize(const std::string& value, const std::string& errorCorrectionLevel, double minVersion, double maxVersion, double mask, bool boostEcl) = 0;
+      virtual MatrixObject getMatrixObject(const std::string& value, const std::string& errorCorrectionLevel, double minVersion, double maxVersion, double mask, bool boostEcl) = 0;
       virtual void clearCache() = 0;
       virtual double getCacheSize() = 0;
+      virtual double getCacheBytes() = 0;
 
     protected:
       // Hybrid Setup

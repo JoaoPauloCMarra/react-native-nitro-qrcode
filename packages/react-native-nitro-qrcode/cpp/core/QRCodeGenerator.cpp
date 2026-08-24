@@ -8,6 +8,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <zlib.h>
 
@@ -151,9 +152,9 @@ double gradientProgressAt(const GradientOptions &gradient, int imageSize, int x,
 }
 
 bool hasCustomLayerColors(const GenerateOptions &options) {
-  return options.strokeColor != "#000000" || options.eyeColor != "#000000" ||
-         options.eyeStrokeColor != "#000000" ||
-         options.eyeballColor != "#000000";
+  constexpr Color defaultColor = {0, 0, 0, 255};
+  return options.stroke != defaultColor || options.eye != defaultColor ||
+         options.eyeStroke != defaultColor || options.eyeball != defaultColor;
 }
 
 Color colorForLayer(uint8_t layer, const GenerateOptions &options,
@@ -351,7 +352,7 @@ void validateOptions(const std::string &value, const GenerateOptions &options) {
   if (options.logoAreaSize < 0 || options.logoAreaSize > options.size) {
     throw std::invalid_argument("logoAreaSize must be between 0 and size.");
   }
-  if (options.logoAreaBorderRadius < 0 ||
+  if (options.logoAreaBorderRadius < 0 || options.logoAreaBorderRadius > 2048 ||
       options.logoAreaBorderRadius > options.size / 2) {
     throw std::invalid_argument(
         "logoAreaBorderRadius must be between 0 and half the size.");
@@ -706,8 +707,7 @@ QRCodeGenerator::QRCodeGenerator(CacheKeyHasher cacheKeyHasher,
                                  size_t maxCacheBytes)
     : cacheKeyHasher_(std::move(cacheKeyHasher)),
       outputCache_(MaxCacheEntries, maxCacheBytes),
-      matrixCache_(MaxMatrixCacheEntries,
-                   std::numeric_limits<size_t>::max()) {}
+      matrixCache_(MaxMatrixCacheEntries, MaxMatrixCacheBytes) {}
 
 Color parseColor(const std::string &value) {
   if (value == "transparent") {
@@ -809,7 +809,7 @@ Matrix QRCodeGenerator::createMatrix(const std::string &value,
   return matrix;
 }
 
-std::string QRCodeGenerator::generatePngBase64(const std::string &value,
+std::string QRCodeGenerator::renderPngBase64(const std::string &value,
                                                const GenerateOptions &options) {
   const std::string request = cacheRequest(value, options, "png-base64");
   const std::string key = cacheKey(request);
@@ -827,9 +827,10 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
   const ModuleShape eyePatternShape =
       parseEyePatternShape(options.eyePatternShape);
   const ModuleShape eyeballShape = parseEyeballShape(options.eyeballShape);
-  const bool useCustomFinderColors =
-      options.eyeColor != "#000000" || options.eyeStrokeColor != "#000000" ||
-      options.eyeballColor != "#000000";
+  constexpr Color defaultColor = {0, 0, 0, 255};
+  const bool useCustomFinderColors = options.eye != defaultColor ||
+                                     options.eyeStroke != defaultColor ||
+                                     options.eyeball != defaultColor;
   const bool drawGroupedFinderEyes =
       eyePatternShape != ModuleShape::Square ||
       eyeballShape != ModuleShape::Square || useCustomFinderColors;
@@ -873,7 +874,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
           layer = 3;
         }
       }
-      if (!eyeModule && options.strokeColor != "#000000") {
+      if (!eyeModule && options.stroke != defaultColor) {
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap + strokeInset,
@@ -887,7 +888,7 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
     drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
                        totalModules, eyePatternShape, eyeballShape,
                        options.eyePatternCornerRadius,
-                       options.eyeStrokeColor != "#000000");
+                       options.eyeStroke != defaultColor);
   }
   clearLogoArea(indices, imageSize, options.logoAreaSize,
                 options.logoAreaBorderRadius);
@@ -908,9 +909,15 @@ std::string QRCodeGenerator::generatePngBase64(const std::string &value,
 }
 
 std::string
-QRCodeGenerator::generatePngDataUri(const std::string &value,
+QRCodeGenerator::renderPngDataUri(const std::string &value,
                                     const GenerateOptions &options) {
-  return "data:image/png;base64," + generatePngBase64(value, options);
+  const std::string encoded = renderPngBase64(value, options);
+  constexpr std::string_view prefix = "data:image/png;base64,";
+  std::string output;
+  output.reserve(prefix.size() + encoded.size());
+  output.append(prefix);
+  output.append(encoded);
+  return output;
 }
 
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
@@ -952,7 +959,7 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
   return output;
 }
 
-QRCodeGenerator::PackedMatrix
+QRCodeGenerator::MatrixObject
 QRCodeGenerator::getMatrix(const std::string &value,
                            const GenerateOptions &options) {
   const std::string request = cacheRequest(value, options, "matrix");
@@ -968,7 +975,7 @@ QRCodeGenerator::getMatrix(const std::string &value,
           static_cast<uint8_t>(packed[i / 8] | (1U << (7U - (i % 8U))));
     }
   }
-  PackedMatrix result = {matrix.size, base64Encode(packed)};
+  MatrixObject result = {matrix.size, base64Encode(packed)};
   const std::string key = cacheKey(request);
   const size_t entryBytes = key.size() + request.size() + result.packedBase64.size();
   matrixCache_.store(key, request, result, entryBytes);
@@ -979,6 +986,12 @@ std::string
 QRCodeGenerator::getMatrixPackedBase64(const std::string &value,
                                        const GenerateOptions &options) {
   return getMatrix(value, options).packedBase64;
+}
+
+QRCodeGenerator::MatrixObject
+QRCodeGenerator::getMatrixObject(const std::string &value,
+                                 const GenerateOptions &options) {
+  return getMatrix(value, options);
 }
 
 int QRCodeGenerator::getMatrixSize(const std::string &value,
@@ -995,49 +1008,51 @@ size_t QRCodeGenerator::getCacheSize() const {
   return outputCache_.size();
 }
 
+size_t QRCodeGenerator::getCacheBytes() const {
+  return outputCache_.bytes();
+}
+
+size_t QRCodeGenerator::memorySize() const noexcept {
+  return outputCache_.bytes() + matrixCache_.bytes();
+}
+
 std::string QRCodeGenerator::cacheRequest(const std::string &value,
                                           const GenerateOptions &options,
                                           const std::string &output) const {
   std::string request;
   appendCachePart(request, output);
   appendCachePart(request, value);
-  appendCachePart(request, std::to_string(options.size));
-  appendCachePart(request, std::to_string(options.quietZone));
   appendCachePart(request, options.errorCorrectionLevel);
-  appendCachePart(request, options.foregroundColor);
-  appendCachePart(request, std::to_string(options.foreground.r));
-  appendCachePart(request, std::to_string(options.foreground.g));
-  appendCachePart(request, std::to_string(options.foreground.b));
-  appendCachePart(request, std::to_string(options.foreground.a));
-  appendCachePart(request, options.backgroundColor);
-  appendCachePart(request, std::to_string(options.background.r));
-  appendCachePart(request, std::to_string(options.background.g));
-  appendCachePart(request, std::to_string(options.background.b));
-  appendCachePart(request, std::to_string(options.background.a));
-  appendCachePart(request, options.strokeColor);
-  appendCachePart(request, std::to_string(options.stroke.r));
-  appendCachePart(request, std::to_string(options.stroke.g));
-  appendCachePart(request, std::to_string(options.stroke.b));
-  appendCachePart(request, std::to_string(options.stroke.a));
-  appendCachePart(request, options.eyeColor);
-  appendCachePart(request, std::to_string(options.eye.r));
-  appendCachePart(request, std::to_string(options.eye.g));
-  appendCachePart(request, std::to_string(options.eye.b));
-  appendCachePart(request, std::to_string(options.eye.a));
-  appendCachePart(request, options.eyeStrokeColor);
-  appendCachePart(request, std::to_string(options.eyeStroke.r));
-  appendCachePart(request, std::to_string(options.eyeStroke.g));
-  appendCachePart(request, std::to_string(options.eyeStroke.b));
-  appendCachePart(request, std::to_string(options.eyeStroke.a));
-  appendCachePart(request, options.eyeballColor);
-  appendCachePart(request, std::to_string(options.eyeball.r));
-  appendCachePart(request, std::to_string(options.eyeball.g));
-  appendCachePart(request, std::to_string(options.eyeball.b));
-  appendCachePart(request, std::to_string(options.eyeball.a));
   appendCachePart(request, std::to_string(options.minVersion));
   appendCachePart(request, std::to_string(options.maxVersion));
   appendCachePart(request, std::to_string(options.mask));
   appendCachePart(request, std::to_string(options.boostEcl));
+  if (output == "matrix") {
+    return request;
+  }
+
+  appendCachePart(request, std::to_string(options.size));
+  appendCachePart(request, std::to_string(options.quietZone));
+  if (output == "svg") {
+    appendCachePart(request, options.foregroundColor);
+    appendCachePart(request, options.backgroundColor);
+    appendCachePart(request, options.strokeColor);
+    appendCachePart(request, options.eyeColor);
+    appendCachePart(request, options.eyeStrokeColor);
+    appendCachePart(request, options.eyeballColor);
+  }
+  const auto appendColor = [&request](const Color &color) {
+    appendCachePart(request, std::to_string(color.r));
+    appendCachePart(request, std::to_string(color.g));
+    appendCachePart(request, std::to_string(color.b));
+    appendCachePart(request, std::to_string(color.a));
+  };
+  appendColor(options.foreground);
+  appendColor(options.background);
+  appendColor(options.stroke);
+  appendColor(options.eye);
+  appendColor(options.eyeStroke);
+  appendColor(options.eyeball);
   appendCachePart(request, options.moduleShape);
   appendCachePart(request, options.eyePatternShape);
   appendCachePart(request, options.eyeballShape);

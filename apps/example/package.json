@@ -20,10 +20,10 @@
     "check": "bun run lint && bun run typecheck && bun run doctor"
   },
   "dependencies": {
-    "expo": "~57.0.15",
-    "expo-build-properties": "~57.0.13",
+    "expo": "~57.0.16",
+    "expo-build-properties": "~57.0.14",
     "expo-linking": "~57.0.7",
-    "expo-router": "~57.0.15",
+    "expo-router": "~57.0.16",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.2",
     "react": "19.2.3",

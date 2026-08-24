@@ -35,6 +35,11 @@ export interface GenerateOptions {
   gradientEndY: number;
 }
 
+export interface MatrixObject {
+  size: number;
+  packedBase64: string;
+}
+
 export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
   generatePngBase64Object(options: GenerateOptions): string;
 
@@ -44,6 +49,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
 
   generatePngDataUriAsyncObject(options: GenerateOptions): Promise<string>;
 
+  /** @deprecated Use generatePngBase64Object instead. */
   generatePngBase64(
     value: string,
     size: number,
@@ -79,6 +85,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): string;
 
+  /** @deprecated Use generatePngBase64AsyncObject instead. */
   generatePngBase64Async(
     value: string,
     size: number,
@@ -114,6 +121,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): Promise<string>;
 
+  /** @deprecated Use generatePngDataUriObject instead. */
   generatePngDataUri(
     value: string,
     size: number,
@@ -149,6 +157,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): string;
 
+  /** @deprecated Use generatePngDataUriAsyncObject instead. */
   generatePngDataUriAsync(
     value: string,
     size: number,
@@ -221,6 +230,16 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     boostEcl: boolean,
   ): number;
 
+  getMatrixObject(
+    value: string,
+    errorCorrectionLevel: string,
+    minVersion: number,
+    maxVersion: number,
+    mask: number,
+    boostEcl: boolean,
+  ): MatrixObject;
+
   clearCache(): void;
   getCacheSize(): number;
+  getCacheBytes(): number;
 }

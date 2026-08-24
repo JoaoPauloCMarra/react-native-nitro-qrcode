@@ -1,3 +1,12 @@
+import {
+  DEFAULT_EYE,
+  DEFAULT_EYE_STROKE,
+  DEFAULT_EYEBALL,
+  DEFAULT_STROKE,
+  areRgbaColorsEqual,
+  isFullyTransparent,
+  toSvgColor,
+} from "./colors";
 import type { NormalizedOptions, QRCodeShape } from "./validation";
 
 export type RenderLayer =
@@ -62,9 +71,9 @@ export function createRenderPlan(
   const rows = buildModuleRows(options, model, geometry);
   return {
     background:
-      options.backgroundColor === "transparent"
+      isFullyTransparent(options.backgroundColor)
         ? { type: "transparent" }
-        : { type: "color", color: options.backgroundColor },
+        : { type: "color", color: toSvgColor(options.backgroundColor) },
     rows,
     drawGroupedFinders: shouldDrawGroupedFinderEyes(options),
     logoArea:
@@ -136,9 +145,9 @@ function shouldDrawGroupedFinderEyes(
   return (
     options.shapeOptions.eyeFrameShape !== "square" ||
     options.shapeOptions.eyeballShape !== "square" ||
-    options.eyeColor !== "#000000" ||
-    options.eyeStrokeColor !== "#000000" ||
-    options.eyeballColor !== "#000000"
+    !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
+    !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
+    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL)
   );
 }
 
@@ -211,7 +220,7 @@ function buildModuleRows(
         cornerRadius,
         layer,
       };
-      if (!eyeModule && options.strokeColor !== "#000000") {
+      if (!eyeModule && !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE)) {
         plan.stroke = "stroke";
         plan.strokeGap = gap + Math.max(1, (x1 - x0) * 0.18);
       }

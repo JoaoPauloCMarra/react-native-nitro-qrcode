@@ -62,9 +62,15 @@ GenerateOptions gradientOptions() {
 } // namespace
 
 int main() {
+#ifdef NITRO_BENCHMARK_SMOKE
+  constexpr int FastRuns = 32;
+  constexpr int RenderRuns = 8;
+  constexpr int ParallelBatches = 2;
+#else
   constexpr int FastRuns = 1000;
   constexpr int RenderRuns = 200;
   constexpr int ParallelBatches = 50;
+#endif
 
   QRCodeGenerator generator;
   const GenerateOptions indexed = indexedOptions();
@@ -87,27 +93,27 @@ int main() {
 
   runBenchmark("indexed-png-cold", RenderRuns, [&](int index) {
     return generator
-        .generatePngBase64(
+        .renderPngBase64(
             "https://example.com/indexed/" + std::to_string(index), indexed)
         .size();
   });
 
-  generator.generatePngBase64("https://example.com/cache-hit", indexed);
+  generator.renderPngBase64("https://example.com/cache-hit", indexed);
   runBenchmark("indexed-png-cache-hit", FastRuns, [&](int) {
-    return generator.generatePngBase64("https://example.com/cache-hit", indexed)
+    return generator.renderPngBase64("https://example.com/cache-hit", indexed)
         .size();
   });
 
   runBenchmark("rgba-gradient-png-cold", RenderRuns, [&](int index) {
     return generator
-        .generatePngBase64(
+        .renderPngBase64(
             "https://example.com/gradient/" + std::to_string(index), gradient)
         .size();
   });
 
   runBenchmark("preview-styled-png-cold", RenderRuns, [&](int index) {
     return generator
-        .generatePngBase64(
+        .renderPngBase64(
             "https://example.com/preview/" + std::to_string(index), preview)
         .size();
   });
@@ -130,7 +136,7 @@ int main() {
     for (int index = 0; index < 8; index++) {
       futures.push_back(std::async(std::launch::async, [&generator, indexed,
                                                         batch, index]() {
-        return generator.generatePngBase64(
+        return generator.renderPngBase64(
             "https://example.com/parallel/" + std::to_string(batch) + "/" +
                 std::to_string(index),
             indexed);
@@ -142,6 +148,13 @@ int main() {
     }
     return total;
   });
+
+  if (generator.memorySize() > QRCodeGenerator::MaxCombinedCacheBytes) {
+    std::cerr << "cache memory exceeded "
+              << QRCodeGenerator::MaxCombinedCacheBytes << " bytes: "
+              << generator.memorySize() << std::endl;
+    return 1;
+  }
 
   std::cerr << "checksum=" << checksum << std::endl;
   return 0;

@@ -175,12 +175,14 @@ export type QRCodeMatrix = {
   packedBase64: string;
 };
 
-export type QRCodeValidationErrorCode =
+export type QRCodeKnownValidationErrorCode =
   | "invalid"
   | QRCodeScanabilityWarning["code"];
 
+export type QRCodeValidationErrorCode = QRCodeKnownValidationErrorCode;
+
 export type QRCodeValidationError = {
-  code: QRCodeValidationErrorCode;
+  code: string;
   message: string;
 };
 
@@ -222,6 +224,7 @@ export type NitroQRCodeApi = Readonly<{
   validateOptions: (options: QRCodeOptions) => QRCodeValidationResult;
   clearCache: () => void;
   getCacheSize: () => number;
+  getCacheBytes: () => number;
   getQRCodeMetrics: () => QRCodeMetricsSnapshot;
   resetQRCodeMetrics: () => void;
   setQRCodeMetricsEnabled: (enabled: boolean) => void;
@@ -575,6 +578,11 @@ export function validateLogoDimensions(
 ): void {
   if (logoAreaSize > size) {
     throw new Error("logoAreaSize must be between 0 and size.");
+  }
+  if (logoAreaBorderRadius > 2048) {
+    throw new Error(
+      "logoAreaBorderRadius must be an integer between 0 and 2048.",
+    );
   }
   if (logoAreaBorderRadius > size / 2) {
     throw new Error(

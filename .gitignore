@@ -92,6 +92,8 @@ tmp-*.png
 *.tmp
 *.temp
 
+.pack-docs-state/
+
 # Editors and OS
 .idea/
 .vscode/

@@ -13,6 +13,9 @@ import {
   DEFAULT_EYEBALL,
   DEFAULT_EYE_STROKE,
   DEFAULT_STROKE,
+  areRgbaColorsEqual,
+  rgbaColorBytes,
+  toSvgColor,
 } from "./colors";
 import { createRenderPlan, type RenderPlan } from "./render-plan";
 import {
@@ -50,6 +53,7 @@ export type {
   QRCodeOptions,
   QRCodeShape,
   QRCodeShapeOptions,
+  QRCodeKnownValidationErrorCode,
   QRCodeValidationError,
   QRCodeValidationErrorCode,
   QRCodeValidationResult,
@@ -279,7 +283,7 @@ export async function toPngDataUriAsync(
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   const request = cacheRequest(normalized, "svg");
-  const key = hashCachePart(request);
+  const key = hashCachePart(cacheRequest(normalized, "svg", true));
   const cached = webCache.get(key, request);
   recordCacheLookup(cached !== undefined);
   if (cached !== undefined) {
@@ -291,9 +295,18 @@ export function toSvgString(options: QRCodeOptions): string {
     const totalSize = model.modules.size + normalized.quietZone * 2;
     let path = "";
     for (let y = 0; y < model.modules.size; y++) {
-      for (let x = 0; x < model.modules.size; x++) {
-        if (isDark(model, x, y)) {
-          path += `M${x + normalized.quietZone},${y + normalized.quietZone}h1v1h-1z`;
+      let x = 0;
+      while (x < model.modules.size) {
+        while (x < model.modules.size && !isDark(model, x, y)) {
+          x++;
+        }
+        const runStart = x;
+        while (x < model.modules.size && isDark(model, x, y)) {
+          x++;
+        }
+        if (runStart < x) {
+          const runLength = x - runStart;
+          path += `M${runStart + normalized.quietZone},${y + normalized.quietZone}h${runLength}v1h-${runLength}z`;
         }
       }
     }
@@ -340,6 +353,10 @@ export function getQRCodeCacheSize(): number {
   return webCache.size();
 }
 
+export function getQRCodeCacheBytes(): number {
+  return webCache.bytes();
+}
+
 export const QRCode: ForwardRefExoticComponent<
   QRCodeProps & RefAttributes<QRCodeRef>
 > = createQRCodeComponent({
@@ -358,6 +375,7 @@ export const NitroQRCode: NitroQRCodeApi = {
   validateOptions,
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
+  getCacheBytes: getQRCodeCacheBytes,
   getQRCodeMetrics: webGetQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
@@ -375,7 +393,7 @@ function preparePngCanvas(
   if (plan.background.type === "transparent") {
     context.clearRect(0, 0, pixelSize, pixelSize);
   } else {
-    context.fillStyle = plan.background.color;
+    context.fillStyle = toSvgColor(plan.background.color);
     context.fillRect(0, 0, pixelSize, pixelSize);
   }
   const foregroundFill = createForegroundFill(
@@ -421,7 +439,7 @@ function drawPlanRows(
     }
     for (const module of row.modules) {
       if (module.stroke !== undefined && module.strokeGap !== undefined) {
-        context.fillStyle = options.strokeColor;
+        context.fillStyle = toSvgColor(options.strokeColor);
         drawModule(
           context,
           module.x0,
@@ -474,10 +492,10 @@ function resolvePlanFill(
   layer: "foreground" | "stroke" | "eye" | "eyeball",
 ): CanvasFill {
   if (layer === "eyeball") {
-    return options.eyeballColor;
+    return toSvgColor(options.eyeballColor);
   }
   if (layer === "eye") {
-    return options.eyeColor;
+    return toSvgColor(options.eyeColor);
   }
   return foregroundFill;
 }
@@ -531,7 +549,7 @@ function createForegroundFill(
   pixelSize: number,
 ): CanvasFill {
   if (options.gradient.type === "none") {
-    return options.foregroundColor;
+    return toSvgColor(options.foregroundColor);
   }
 
   const locations = resolveGradientLocations(options.gradient);
@@ -569,10 +587,10 @@ function createForegroundFill(
 
 function hasCustomLayerColors(options: NormalizedOptions): boolean {
   return (
-    options.strokeColor !== DEFAULT_STROKE ||
-    options.eyeColor !== DEFAULT_EYE ||
-    options.eyeStrokeColor !== DEFAULT_EYE_STROKE ||
-    options.eyeballColor !== DEFAULT_EYEBALL
+    !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE) ||
+    !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
+    !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
+    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL)
   );
 }
 
@@ -691,9 +709,9 @@ function drawGroupedFinder(
   const frameShape = options.shapeOptions.eyeFrameShape;
   const strokeInset = frameShape === "square" ? 0.3 : 0.65;
   const outerColor =
-    options.eyeStrokeColor === DEFAULT_EYE_STROKE
-      ? options.eyeColor
-      : options.eyeStrokeColor;
+    areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE)
+      ? toSvgColor(options.eyeColor)
+      : toSvgColor(options.eyeStrokeColor);
 
   drawFinderShape(
     context,
@@ -702,12 +720,12 @@ function drawGroupedFinder(
     outerColor,
     options.shapeOptions.eyePatternCornerRadius,
   );
-  if (options.eyeStrokeColor !== DEFAULT_EYE_STROKE) {
+  if (!areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE)) {
     drawFinderShape(
       context,
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
-      options.eyeColor,
+      toSvgColor(options.eyeColor),
       options.shapeOptions.eyePatternCornerRadius,
     );
   }
@@ -715,7 +733,7 @@ function drawGroupedFinder(
     context,
     rect(1, 5),
     frameShape,
-    options.backgroundColor,
+    toSvgColor(options.backgroundColor),
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -736,7 +754,7 @@ function drawGroupedFinder(
     context,
     rect(eyeballOffset, eyeballSpan),
     options.shapeOptions.eyeballShape,
-    options.eyeballColor,
+    toSvgColor(options.eyeballColor),
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -948,19 +966,40 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function cacheRequest(options: NormalizedOptions, output: string): string {
+function cacheRequest(
+  options: NormalizedOptions,
+  output: string,
+  canonicalColors = false,
+): string {
+  const colors =
+    output === "svg" && !canonicalColors
+      ? [
+          options.foregroundColor,
+          options.backgroundColor,
+          options.strokeColor,
+          options.eyeColor,
+          options.eyeStrokeColor,
+          options.eyeballColor,
+        ]
+      : [
+          rgbaColorBytes(options.foregroundColor),
+          rgbaColorBytes(options.backgroundColor),
+          rgbaColorBytes(options.strokeColor),
+          rgbaColorBytes(options.eyeColor),
+          rgbaColorBytes(options.eyeStrokeColor),
+          rgbaColorBytes(options.eyeballColor),
+        ];
+  const gradientColors =
+    output === "svg" && !canonicalColors
+      ? options.gradient.colors
+      : options.gradient.colors.map(rgbaColorBytes);
   return JSON.stringify([
     output,
     options.value,
     options.size,
     options.quietZone,
     options.errorCorrectionLevel,
-    options.foregroundColor,
-    options.backgroundColor,
-    options.strokeColor,
-    options.eyeColor,
-    options.eyeStrokeColor,
-    options.eyeballColor,
+    ...colors,
     options.minVersion,
     options.maxVersion,
     options.mask,
@@ -977,7 +1016,7 @@ function cacheRequest(options: NormalizedOptions, output: string): string {
     options.logoAreaSize,
     options.logoAreaBorderRadius,
     options.gradient.type,
-    options.gradient.colors.join(","),
+    gradientColors,
     options.gradient.locations.join(","),
     options.gradient.startX,
     options.gradient.startY,

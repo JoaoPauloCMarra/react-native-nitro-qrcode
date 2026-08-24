@@ -9,6 +9,7 @@ import type {
   QRCodeGradient,
   QRCodeGradientColors,
   QRCodeGradientLocations,
+  QRCodeKnownValidationErrorCode,
   QRCodeMatrix,
   QRCodeMaskPattern,
   QRCodeOptions,
@@ -23,6 +24,7 @@ import * as Web from "../index.web";
 import {
   NitroQRCode,
   getMatrix,
+  getQRCodeCacheBytes,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -81,6 +83,7 @@ const pngBase64: string = toPngBase64(validOptions);
 const pngDataUri: string = toPngDataUri(validOptions);
 const svg: string = toSvgString(validOptions);
 const matrix: QRCodeMatrix = getMatrix(validOptions);
+const cacheBytes: number = getQRCodeCacheBytes();
 const validation: QRCodeValidationResult = validateOptions(validOptions);
 const asyncPngBase64: Promise<string> = toPngBase64Async(validOptions);
 const asyncPngDataUri: Promise<string> = toPngDataUriAsync(validOptions);
@@ -92,6 +95,7 @@ const ref: QRCodeRef = {
 
 void svg;
 void matrix;
+void cacheBytes;
 void validation;
 void asyncPngBase64;
 void asyncPngDataUri;
@@ -166,7 +170,10 @@ expectFalse<IsAssignable<"solid", QRCodeBodyDensity>>();
 expectFalse<IsAssignable<"diamond", QRCodeBodyShape>>();
 expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
+expectFalse<IsAssignable<"unknown", QRCodeKnownValidationErrorCode>>();
 expectFalse<IsAssignable<"unknown", QRCodeValidationErrorCode>>();
+const extensibleValidationCode: string = validation.errors[0]?.code ?? "";
+void extensibleValidationCode;
 expectFalse<
   IsAssignable<
     (uri: number) => void,

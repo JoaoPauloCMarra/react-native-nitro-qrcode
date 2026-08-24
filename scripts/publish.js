@@ -19,6 +19,11 @@ const packageDir = path.join(
   "packages/react-native-nitro-qrcode"
 );
 const packageJsonPath = path.join(packageDir, "package.json");
+const packageDocsSyncScript = path.join(
+  packageDir,
+  "scripts",
+  "sync-package-docs.js",
+);
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -62,6 +67,19 @@ function commandLabel(command, commandArgs = []) {
 function must(command, commandArgs = [], options = {}) {
   if (!run(command, commandArgs, options).ok) {
     throw new Error(`Command failed: ${commandLabel(command, commandArgs)}`);
+  }
+}
+
+function runPackageCommandWithDocs(command, commandArgs, options, label) {
+  try {
+    must("node", [packageDocsSyncScript, "prepare"], {
+      cwd: packageDir,
+    });
+    must(command, commandArgs, { ...options, label });
+  } finally {
+    must("node", [packageDocsSyncScript, "cleanup"], {
+      cwd: packageDir,
+    });
   }
 }
 
@@ -197,15 +215,23 @@ async function main() {
 
   if (dryRun) {
     log("Running package pack dry run...", "cyan");
-    must("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
-      cwd: packageDir,
-    });
+    runPackageCommandWithDocs(
+      "bun",
+      ["pm", "pack", "--dry-run", "--ignore-scripts"],
+      { cwd: packageDir },
+      "Package pack dry run",
+    );
     log("Dry run complete. Package is publishable.", "green");
     return;
   }
 
   log("Publishing to npm...", "cyan");
-  must("bun", publishArgs, { cwd: packageDir });
+  runPackageCommandWithDocs(
+    "bun",
+    publishArgs,
+    { cwd: packageDir },
+    "Publish package",
+  );
 
   log(
     `Published ${packageJson.name}@${packageJson.version}.`,

@@ -1,4 +1,4 @@
-import { contrastRatio, parseHexColor } from "./colors";
+import { contrastRatio, isFullyTransparent, parseHexColor } from "./colors";
 import type { NormalizedOptions } from "./validation";
 
 export type QRCodeScanabilityWarning = {
@@ -73,7 +73,7 @@ export function scanabilityWarnings(
     });
   }
 
-  if (options.backgroundColor !== "transparent") {
+  if (!isFullyTransparent(options.backgroundColor)) {
     const contrast = contrastRatio(
       parseHexColor(options.foregroundColor),
       parseHexColor(options.backgroundColor),
