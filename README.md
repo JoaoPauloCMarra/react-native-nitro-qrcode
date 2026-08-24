@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-0.87.0-61dafb)](https://reactnative.dev/docs/0.87/getting-started-without-a-framework)
+[![React Native](https://img.shields.io/badge/react--native-0.86.2-61dafb)](https://reactnative.dev/docs/0.86/getting-started-without-a-framework)
 [![Expo](https://img.shields.io/badge/expo-SDK%2057%20%28RN%200.86.2%29-000020)](https://docs.expo.dev/versions/v57.0.0/)
 [![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.37.0%20%3C0.38.0-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
@@ -57,18 +57,26 @@ bare React Native app.
 | React Native Web | `>=0.19.0 <1.0.0`                                   |
 | Node             | `>=18.0.0`                                          |
 
-Version 0.6.0 uses React Native `0.87.0` for the standalone package gate and
-React Native `0.86.2` in the Expo SDK 57 example. Expo SDK 57 is the latest
-stable Expo line and selects RN `0.86.2`; do not override that version. Both
-baselines use React `19.2.3` and Nitro Modules `0.37.0`. The wider ranges above
+Version 0.7.0 uses React Native `0.86.2` and Expo SDK 57. The package gate and
+example use that runtime baseline; `check:ci` also compiles the public source
+against React Native `0.87.0` for Strict TypeScript compatibility. Expo SDK 57
+selects React Native `0.86.2`; do not override that version in the example. The
+baseline uses React `19.2.3` and Nitro Modules `0.37.0`. The wider ranges above
 are the package's declared peer compatibility.
 
-### Upgrade from 0.5.x
+### Upgrade from 0.6.x and earlier
 
-Version 0.6.0 requires `react-native-nitro-modules` `>=0.37.0 <0.38.0`.
+Version 0.7.0 requires `react-native-nitro-modules` `>=0.37.0 <0.38.0`.
 Upgrade the Nitro peer before upgrading this package; Nitro Modules 0.36.x is
-not compatible with the 0.6.0 native bindings. The QR rendering and export
-APIs remain unchanged.
+not compatible with the 0.7.0 native bindings. There are no breaking changes
+to the JavaScript generation API when upgrading from 0.6.x. The four older
+positional PNG methods remain available on the native HybridObject as
+deprecated compatibility wrappers; new native integrations should use the
+object methods.
+
+Direct upgrades from 0.5.x or earlier still require the Nitro 0.37 native
+rebuild described above. Review the matching [0.6.0 changelog entry](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/CHANGELOG.md#060---2026-08-20)
+when skipping releases.
 
 ## Expo Config
 
@@ -209,9 +217,11 @@ entries or 512 KiB, whichever comes first) and returns the size and packed data
 through one `getMatrixObject` bridge call. The native output cache retains at
 most 4 MiB, so the default combined native output and matrix cache bound is
 4.5 MiB. The native cache memory report includes both output and matrix cache
-bytes. SVG colors use canonical uppercase `#RRGGBB` values when opaque and
-`#RRGGBBAA` values when alpha is present, so equivalent spellings share output
-and cache entries across native and web.
+bytes. SVG serialization keeps the established output contract: each dark
+module is emitted as its own `1x1` path segment, and normalized color spellings
+such as `transparent` and `#00000000` remain observable in the returned string.
+PNG cache keys still use parsed color bytes so equivalent PNG requests can
+share entries without changing their pixels.
 
 Development builds expose opt-in generation metrics through
 `getQRCodeMetrics()`, `resetQRCodeMetrics()`, and
@@ -334,8 +344,10 @@ warnings. With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
 
 Errors are deterministic: validation returns typed `QRCodeValidationResult`
-entries with stable codes (`invalid` plus the scanability warning codes under
-strict mode). Generation failures throw (or reject with) `Error` instances;
+entries with string codes. `invalid` and the scanability warning codes are the
+package-known values exposed by `QRCodeKnownValidationErrorCode`; consumers
+should keep handling unknown codes defensively because native integrations can
+introduce additional codes. Generation failures throw (or reject with) `Error` instances;
 message text is never used for control flow. The JavaScript layer validates
 all options before the native boundary, so the native side surfaces unexpected
 failures as ordinary exceptions rather than a separate error envelope.
@@ -369,6 +381,7 @@ Main exports:
 - `clearQRCodeCache`, `getQRCodeCacheSize`, and `getQRCodeCacheBytes`.
 - TypeScript types including `QRCodeOptions`, `QRCodeProps`, `QRCodeRef`,
   `QRCodeMatrix`, `QRCodeValidationResult`, `QRCodeValidationErrorCode`,
+  `QRCodeKnownValidationErrorCode`,
   `QRCodeColor`,
   `QRCodeBackgroundColor`, `QRCodeGradient`, and `QRCodeShapeOptions`.
 

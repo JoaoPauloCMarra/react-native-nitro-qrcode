@@ -42,6 +42,7 @@ export type {
   QRCodeOptions,
   QRCodeShape,
   QRCodeShapeOptions,
+  QRCodeKnownValidationErrorCode,
   QRCodeValidationError,
   QRCodeValidationErrorCode,
   QRCodeValidationResult,

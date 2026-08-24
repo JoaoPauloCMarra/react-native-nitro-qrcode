@@ -9,6 +9,7 @@ import type {
   QRCodeGradient,
   QRCodeGradientColors,
   QRCodeGradientLocations,
+  QRCodeKnownValidationErrorCode,
   QRCodeMatrix,
   QRCodeMaskPattern,
   QRCodeOptions,
@@ -169,7 +170,10 @@ expectFalse<IsAssignable<"solid", QRCodeBodyDensity>>();
 expectFalse<IsAssignable<"diamond", QRCodeBodyShape>>();
 expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
+expectFalse<IsAssignable<"unknown", QRCodeKnownValidationErrorCode>>();
 expectFalse<IsAssignable<"unknown", QRCodeValidationErrorCode>>();
+const extensibleValidationCode: string = validation.errors[0]?.code ?? "";
+void extensibleValidationCode;
 expectFalse<
   IsAssignable<
     (uri: number) => void,

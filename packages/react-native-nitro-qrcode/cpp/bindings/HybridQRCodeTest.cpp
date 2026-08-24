@@ -21,6 +21,64 @@ void testHybridQRCodeMethods() {
   const std::string dataUri = qrCode->generatePngDataUriObject(options);
   assert(dataUri.rfind("data:image/png;base64,", 0) == 0);
   assert(qrCode->generatePngDataUriAsyncObject(options)->await().get() == dataUri);
+  const std::string legacyBase64 = qrCode->generatePngBase64(
+      options.value, options.size, options.quietZone,
+      options.errorCorrectionLevel, options.foregroundColor,
+      options.backgroundColor, options.strokeColor, options.eyeColor,
+      options.eyeStrokeColor, options.eyeballColor, options.minVersion,
+      options.maxVersion, options.mask, options.boostEcl, options.moduleShape,
+      options.eyePatternShape, options.eyeballShape, options.gap,
+      options.eyePatternGap, options.bodyDensity, options.cornerRadius,
+      options.eyePatternCornerRadius, options.layout, options.logoAreaSize,
+      options.logoAreaBorderRadius, options.gradientType,
+      options.gradientColors, options.gradientLocations, options.gradientStartX,
+      options.gradientStartY, options.gradientEndX, options.gradientEndY);
+  assert(legacyBase64 == base64);
+  assert(qrCode->generatePngBase64Async(
+             options.value, options.size, options.quietZone,
+             options.errorCorrectionLevel, options.foregroundColor,
+             options.backgroundColor, options.strokeColor, options.eyeColor,
+             options.eyeStrokeColor, options.eyeballColor, options.minVersion,
+             options.maxVersion, options.mask, options.boostEcl,
+             options.moduleShape, options.eyePatternShape,
+             options.eyeballShape, options.gap, options.eyePatternGap,
+             options.bodyDensity, options.cornerRadius,
+             options.eyePatternCornerRadius, options.layout, options.logoAreaSize,
+             options.logoAreaBorderRadius, options.gradientType,
+             options.gradientColors, options.gradientLocations,
+             options.gradientStartX, options.gradientStartY, options.gradientEndX,
+             options.gradientEndY)
+             ->await()
+             .get() == base64);
+  const std::string legacyDataUri = qrCode->generatePngDataUri(
+      options.value, options.size, options.quietZone,
+      options.errorCorrectionLevel, options.foregroundColor,
+      options.backgroundColor, options.strokeColor, options.eyeColor,
+      options.eyeStrokeColor, options.eyeballColor, options.minVersion,
+      options.maxVersion, options.mask, options.boostEcl, options.moduleShape,
+      options.eyePatternShape, options.eyeballShape, options.gap,
+      options.eyePatternGap, options.bodyDensity, options.cornerRadius,
+      options.eyePatternCornerRadius, options.layout, options.logoAreaSize,
+      options.logoAreaBorderRadius, options.gradientType,
+      options.gradientColors, options.gradientLocations, options.gradientStartX,
+      options.gradientStartY, options.gradientEndX, options.gradientEndY);
+  assert(legacyDataUri == dataUri);
+  assert(qrCode->generatePngDataUriAsync(
+             options.value, options.size, options.quietZone,
+             options.errorCorrectionLevel, options.foregroundColor,
+             options.backgroundColor, options.strokeColor, options.eyeColor,
+             options.eyeStrokeColor, options.eyeballColor, options.minVersion,
+             options.maxVersion, options.mask, options.boostEcl,
+             options.moduleShape, options.eyePatternShape,
+             options.eyeballShape, options.gap, options.eyePatternGap,
+             options.bodyDensity, options.cornerRadius,
+             options.eyePatternCornerRadius, options.layout, options.logoAreaSize,
+             options.logoAreaBorderRadius, options.gradientType,
+             options.gradientColors, options.gradientLocations,
+             options.gradientStartX, options.gradientStartY, options.gradientEndX,
+             options.gradientEndY)
+             ->await()
+             .get() == dataUri);
   const std::string svg = qrCode->generateSvgString(
       options.value, options.quietZone, options.errorCorrectionLevel,
       options.foregroundColor, options.backgroundColor, options.minVersion,

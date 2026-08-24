@@ -53,6 +53,7 @@ export type {
   QRCodeOptions,
   QRCodeShape,
   QRCodeShapeOptions,
+  QRCodeKnownValidationErrorCode,
   QRCodeValidationError,
   QRCodeValidationErrorCode,
   QRCodeValidationResult,
@@ -282,7 +283,7 @@ export async function toPngDataUriAsync(
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   const request = cacheRequest(normalized, "svg");
-  const key = hashCachePart(request);
+  const key = hashCachePart(cacheRequest(normalized, "svg", true));
   const cached = webCache.get(key, request);
   recordCacheLookup(cached !== undefined);
   if (cached !== undefined) {
@@ -313,9 +314,9 @@ export function toSvgString(options: QRCodeOptions): string {
     const gradientMarkup = createSvgGradient(normalized);
     const foregroundFill =
       gradientMarkup === ""
-        ? toSvgColor(normalized.foregroundColor)
+        ? normalized.foregroundColor
         : "url(#nitro-qrcode-gradient)";
-    const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${toSvgColor(normalized.backgroundColor)}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
+    const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
     webCache.set(key, request, output);
     return output;
   });
@@ -913,17 +914,16 @@ function addGradientStops(
   locations.forEach((location, index) => {
     const color = colors[index];
     if (color !== undefined) {
-      gradient.addColorStop(location, toSvgColor(color));
+      gradient.addColorStop(location, color);
     }
   });
 }
 
 function getSvgStopMarkup(location: number, color: string): string {
-  const svgColor = toSvgColor(color);
-  const stop = svgColor.slice(0, 7);
+  const stop = color.length === 9 ? color.slice(0, 7) : color;
   const opacity =
-    svgColor.length === 9
-      ? ` stop-opacity="${(parseInt(svgColor.slice(7, 9), 16) / 255).toFixed(3)}"`
+    color.length === 9
+      ? ` stop-opacity="${(parseInt(color.slice(7, 9), 16) / 255).toFixed(3)}"`
       : "";
   return `<stop offset="${formatPercent(location)}" stop-color="${stop}"${opacity}/>`;
 }
@@ -966,19 +966,40 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
-function cacheRequest(options: NormalizedOptions, output: string): string {
+function cacheRequest(
+  options: NormalizedOptions,
+  output: string,
+  canonicalColors = false,
+): string {
+  const colors =
+    output === "svg" && !canonicalColors
+      ? [
+          options.foregroundColor,
+          options.backgroundColor,
+          options.strokeColor,
+          options.eyeColor,
+          options.eyeStrokeColor,
+          options.eyeballColor,
+        ]
+      : [
+          rgbaColorBytes(options.foregroundColor),
+          rgbaColorBytes(options.backgroundColor),
+          rgbaColorBytes(options.strokeColor),
+          rgbaColorBytes(options.eyeColor),
+          rgbaColorBytes(options.eyeStrokeColor),
+          rgbaColorBytes(options.eyeballColor),
+        ];
+  const gradientColors =
+    output === "svg" && !canonicalColors
+      ? options.gradient.colors
+      : options.gradient.colors.map(rgbaColorBytes);
   return JSON.stringify([
     output,
     options.value,
     options.size,
     options.quietZone,
     options.errorCorrectionLevel,
-    rgbaColorBytes(options.foregroundColor),
-    rgbaColorBytes(options.backgroundColor),
-    rgbaColorBytes(options.strokeColor),
-    rgbaColorBytes(options.eyeColor),
-    rgbaColorBytes(options.eyeStrokeColor),
-    rgbaColorBytes(options.eyeballColor),
+    ...colors,
     options.minVersion,
     options.maxVersion,
     options.mask,
@@ -995,7 +1016,7 @@ function cacheRequest(options: NormalizedOptions, output: string): string {
     options.logoAreaSize,
     options.logoAreaBorderRadius,
     options.gradient.type,
-    options.gradient.colors.map(rgbaColorBytes),
+    gradientColors,
     options.gradient.locations.join(","),
     options.gradient.startX,
     options.gradient.startY,

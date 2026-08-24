@@ -1592,7 +1592,7 @@ describe("web QRCode API", () => {
       .toContain("#11223344");
     expect(
       Web.toSvgString({ value: "Hello", backgroundColor: "transparent" }),
-    ).toContain('fill="#00000000"');
+    ).toContain('fill="transparent"');
     expect(
       Web.toSvgString({
         value: "Hello",
@@ -1812,7 +1812,7 @@ describe("web QRCode API", () => {
     expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 
-  it("uses parsed RGBA bytes as the web cache color identity", () => {
+  it("preserves SVG color spellings in web cache entries", () => {
     const first = Web.toSvgString({
       value: "color-identity",
       backgroundColor: "transparent",
@@ -1822,11 +1822,13 @@ describe("web QRCode API", () => {
       backgroundColor: "#00000000",
     });
 
-    expect(second).toBe(first);
+    expect(second).not.toBe(first);
+    expect(first).toContain('fill="transparent"');
+    expect(second).toContain('fill="#00000000"');
     expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 
-  it("canonicalizes SVG color spellings before rendering and caching", () => {
+  it("preserves SVG color spellings before rendering and caching", () => {
     const sixDigit = Web.toSvgString({
       value: "svg-color-identity",
       foregroundColor: "#000000",
@@ -1838,9 +1840,11 @@ describe("web QRCode API", () => {
       backgroundColor: "#FFFFFFFF",
     });
 
-    expect(eightDigit).toBe(sixDigit);
+    expect(eightDigit).not.toBe(sixDigit);
     expect(sixDigit).toContain('<path fill="#FFFFFF"');
     expect(sixDigit).toContain('<path fill="#000000"');
+    expect(eightDigit).toContain('<path fill="#FFFFFFFF"');
+    expect(eightDigit).toContain('<path fill="#000000FF"');
     expect(Web.getQRCodeCacheSize()).toBe(1);
 
     const alpha = Web.toSvgString({
@@ -1848,6 +1852,31 @@ describe("web QRCode API", () => {
       foregroundColor: "#11223344",
     });
     expect(alpha).toContain('<path fill="#11223344"');
+  });
+
+  it("preserves SVG gradient color spellings before rendering and caching", () => {
+    const sixDigit = Web.toSvgString({
+      value: "svg-gradient-color-identity",
+      gradient: {
+        type: "linear",
+        colors: ["#000000", "#FFFFFF"],
+        locations: [0, 1],
+      },
+    });
+    const eightDigit = Web.toSvgString({
+      value: "svg-gradient-color-identity",
+      gradient: {
+        type: "linear",
+        colors: ["#000000FF", "#FFFFFFFF"],
+        locations: [0, 1],
+      },
+    });
+
+    expect(eightDigit).not.toBe(sixDigit);
+    expect(sixDigit).toContain('stop-color="#000000"');
+    expect(eightDigit).toContain('stop-color="#000000"');
+    expect(eightDigit).toContain('stop-opacity="1.000"');
+    expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 
   it("bounds the web cache by output bytes", () => {

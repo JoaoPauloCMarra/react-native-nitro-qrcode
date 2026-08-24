@@ -24,6 +24,74 @@ public:
   std::shared_ptr<Promise<std::string>>
   generatePngDataUriAsyncObject(const GenerateOptions &options) override;
 
+  std::string generatePngBase64(
+      const std::string &value, double size, double quietZone,
+      const std::string &errorCorrectionLevel,
+      const std::string &foregroundColor, const std::string &backgroundColor,
+      const std::string &strokeColor, const std::string &eyeColor,
+      const std::string &eyeStrokeColor, const std::string &eyeballColor,
+      double minVersion, double maxVersion, double mask, bool boostEcl,
+      const std::string &moduleShape, const std::string &eyePatternShape,
+      const std::string &eyeballShape, double gap, double eyePatternGap,
+      const std::string &bodyDensity, double cornerRadius,
+      double eyePatternCornerRadius, const std::string &layout,
+      double logoAreaSize, double logoAreaBorderRadius,
+      const std::string &gradientType,
+      const std::vector<std::string> &gradientColors,
+      const std::vector<double> &gradientLocations, double gradientStartX,
+      double gradientStartY, double gradientEndX, double gradientEndY) override;
+
+  std::shared_ptr<Promise<std::string>> generatePngBase64Async(
+      const std::string &value, double size, double quietZone,
+      const std::string &errorCorrectionLevel,
+      const std::string &foregroundColor, const std::string &backgroundColor,
+      const std::string &strokeColor, const std::string &eyeColor,
+      const std::string &eyeStrokeColor, const std::string &eyeballColor,
+      double minVersion, double maxVersion, double mask, bool boostEcl,
+      const std::string &moduleShape, const std::string &eyePatternShape,
+      const std::string &eyeballShape, double gap, double eyePatternGap,
+      const std::string &bodyDensity, double cornerRadius,
+      double eyePatternCornerRadius, const std::string &layout,
+      double logoAreaSize, double logoAreaBorderRadius,
+      const std::string &gradientType,
+      const std::vector<std::string> &gradientColors,
+      const std::vector<double> &gradientLocations, double gradientStartX,
+      double gradientStartY, double gradientEndX, double gradientEndY) override;
+
+  std::string generatePngDataUri(
+      const std::string &value, double size, double quietZone,
+      const std::string &errorCorrectionLevel,
+      const std::string &foregroundColor, const std::string &backgroundColor,
+      const std::string &strokeColor, const std::string &eyeColor,
+      const std::string &eyeStrokeColor, const std::string &eyeballColor,
+      double minVersion, double maxVersion, double mask, bool boostEcl,
+      const std::string &moduleShape, const std::string &eyePatternShape,
+      const std::string &eyeballShape, double gap, double eyePatternGap,
+      const std::string &bodyDensity, double cornerRadius,
+      double eyePatternCornerRadius, const std::string &layout,
+      double logoAreaSize, double logoAreaBorderRadius,
+      const std::string &gradientType,
+      const std::vector<std::string> &gradientColors,
+      const std::vector<double> &gradientLocations, double gradientStartX,
+      double gradientStartY, double gradientEndX, double gradientEndY) override;
+
+  std::shared_ptr<Promise<std::string>> generatePngDataUriAsync(
+      const std::string &value, double size, double quietZone,
+      const std::string &errorCorrectionLevel,
+      const std::string &foregroundColor, const std::string &backgroundColor,
+      const std::string &strokeColor, const std::string &eyeColor,
+      const std::string &eyeStrokeColor, const std::string &eyeballColor,
+      double minVersion, double maxVersion, double mask, bool boostEcl,
+      const std::string &moduleShape, const std::string &eyePatternShape,
+      const std::string &eyeballShape, double gap, double eyePatternGap,
+      const std::string &bodyDensity, double cornerRadius,
+      double eyePatternCornerRadius, const std::string &layout,
+      double logoAreaSize, double logoAreaBorderRadius,
+      const std::string &gradientType,
+      const std::vector<std::string> &gradientColors,
+      const std::vector<double> &gradientLocations, double gradientStartX,
+      double gradientStartY, double gradientEndX, double gradientEndY) override;
+
   std::string generateSvgString(
       const std::string &value, double quietZone,
       const std::string &errorCorrectionLevel,

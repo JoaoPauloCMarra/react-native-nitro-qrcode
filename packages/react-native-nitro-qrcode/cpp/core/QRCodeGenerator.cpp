@@ -203,15 +203,11 @@ std::vector<uint8_t> renderLayeredRgba(const std::vector<uint8_t> &indices,
   return rgba;
 }
 
-std::string svgColor(const Color &color, bool includeAlpha) {
+std::string svgColor(const Color &color) {
   std::ostringstream output;
-  output << "#" << std::uppercase << std::hex << std::setfill('0')
-         << std::setw(2) << static_cast<int>(color.r) << std::setw(2)
-         << static_cast<int>(color.g) << std::setw(2)
-         << static_cast<int>(color.b);
-  if (includeAlpha && color.a != 255) {
-    output << std::setw(2) << static_cast<int>(color.a);
-  }
+  output << "rgb(" << static_cast<int>(color.r) << ","
+         << static_cast<int>(color.g) << "," << static_cast<int>(color.b)
+         << ")";
   return output.str();
 }
 
@@ -251,7 +247,7 @@ std::string createSvgGradient(const GenerateOptions &options) {
     const Color &color = options.gradient.colors[index];
     defs << "<stop offset=\""
          << formatPercent(resolveGradientLocation(options.gradient, index))
-         << "\" stop-color=\"" << svgColor(color, false) << "\"";
+         << "\" stop-color=\"" << svgColor(color) << "\"";
     if (color.a != 255) {
       std::ostringstream alpha;
       alpha.setf(std::ios::fixed);
@@ -936,25 +932,12 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
   const int totalSize = matrix.size + options.quietZone * 2;
   std::ostringstream path;
   for (int y = 0; y < matrix.size; y++) {
-    int x = 0;
-    while (x < matrix.size) {
-      while (x < matrix.size &&
-             matrix.modules[static_cast<size_t>(y) *
-                                static_cast<size_t>(matrix.size) +
-                            static_cast<size_t>(x)] == 0) {
-        x++;
-      }
-      const int runStart = x;
-      while (x < matrix.size &&
-             matrix.modules[static_cast<size_t>(y) *
-                                static_cast<size_t>(matrix.size) +
-                            static_cast<size_t>(x)] == 1) {
-        x++;
-      }
-      if (runStart < x) {
-        path << "M" << (runStart + options.quietZone) << ","
-             << (y + options.quietZone) << "h" << (x - runStart)
-             << "v1h-" << (x - runStart) << "z";
+    for (int x = 0; x < matrix.size; x++) {
+      if (matrix.modules[static_cast<size_t>(y) *
+                             static_cast<size_t>(matrix.size) +
+                         static_cast<size_t>(x)] == 1) {
+        path << "M" << (x + options.quietZone) << "," << (y + options.quietZone)
+             << "h1v1h-1z";
       }
     }
   }
@@ -963,12 +946,11 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
   svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " << totalSize
       << " " << totalSize << "\" shape-rendering=\"crispEdges\">";
   svg << createSvgGradient(options);
-  svg << "<path fill=\"" << svgColor(options.background, true)
-      << "\" d=\"M0,0h"
+  svg << "<path fill=\"" << options.backgroundColor << "\" d=\"M0,0h"
       << totalSize << "v" << totalSize << "H0z\"/>";
   svg << "<path fill=\""
       << (hasGradient(options) ? "url(#nitro-qrcode-gradient)"
-                               : svgColor(options.foreground, true))
+                               : options.foregroundColor)
       << "\" d=\"" << path.str() << "\"/>";
   svg << "</svg>";
 
@@ -1051,6 +1033,14 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
 
   appendCachePart(request, std::to_string(options.size));
   appendCachePart(request, std::to_string(options.quietZone));
+  if (output == "svg") {
+    appendCachePart(request, options.foregroundColor);
+    appendCachePart(request, options.backgroundColor);
+    appendCachePart(request, options.strokeColor);
+    appendCachePart(request, options.eyeColor);
+    appendCachePart(request, options.eyeStrokeColor);
+    appendCachePart(request, options.eyeballColor);
+  }
   const auto appendColor = [&request](const Color &color) {
     appendCachePart(request, std::to_string(color.r));
     appendCachePart(request, std::to_string(color.g));

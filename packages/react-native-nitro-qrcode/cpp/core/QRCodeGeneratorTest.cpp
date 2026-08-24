@@ -674,10 +674,12 @@ void testCacheIdentityAndMemoryAccounting() {
   equivalent.foreground = parseColor(equivalent.foregroundColor);
   const std::string eightDigit =
       generator.generateSvgString("equivalent-colors", equivalent);
-  assert(eightDigit == sixDigit);
+  assert(eightDigit != sixDigit);
   assert(sixDigit.find("<path fill=\"#FFFFFF\"") != std::string::npos);
   assert(sixDigit.find("<path fill=\"#000000\"") != std::string::npos);
-  assert(generator.getCacheSize() == 1);
+  assert(eightDigit.find("<path fill=\"#000000FF\"") !=
+         std::string::npos);
+  assert(generator.getCacheSize() == 2);
 
   GenerateOptions transparent = options;
   transparent.backgroundColor = "transparent";
@@ -689,8 +691,10 @@ void testCacheIdentityAndMemoryAccounting() {
   transparentHex.background = parseColor("#00000000");
   const std::string transparentHexSvg =
       generator.generateSvgString("transparent-color", transparentHex);
-  assert(transparentHexSvg == transparentSvg);
-  assert(transparentSvg.find("<path fill=\"#00000000\"") !=
+  assert(transparentHexSvg != transparentSvg);
+  assert(transparentSvg.find("<path fill=\"transparent\"") !=
+         std::string::npos);
+  assert(transparentHexSvg.find("<path fill=\"#00000000\"") !=
          std::string::npos);
 
   GenerateOptions alpha = options;
@@ -761,7 +765,7 @@ void testSvgGeneration() {
   assert(svg.find("<svg") != std::string::npos);
   assert(svg.find("shape-rendering=\"crispEdges\"") != std::string::npos);
   assert(svg.find("<path") != std::string::npos);
-  assert(svg.find("v1h-2z") != std::string::npos);
+  assert(svg.find("h1v1h-1z") != std::string::npos);
 
   options.gradient.type = "radial";
   options.gradient.colors = {parseColor("#4AA8FF"), parseColor("#28D17C")};

@@ -10,25 +10,26 @@ Breaking changes are always listed first in each release section.
 
 ### Breaking changes
 
-- The four positional native PNG methods (`generatePngBase64`,
-  `generatePngBase64Async`, `generatePngDataUri`, and
-  `generatePngDataUriAsync`) are removed from the Nitro ABI. Migrate native
-  callers to the object methods (`generatePngBase64Object`,
-  `generatePngBase64AsyncObject`, `generatePngDataUriObject`, and
-  `generatePngDataUriAsyncObject`).
+- None for consumers upgrading from 0.6.x. Direct upgrades from 0.5.x or
+  earlier still require the Nitro Modules 0.37 native rebuild documented in
+  the 0.6.0 release.
 
 ### Changed
 
+- Restored the four positional native PNG methods as deprecated wrappers over
+  the object-based methods, so existing native callers continue to work.
 - Bounded the native matrix cache to 32 entries or 512 KiB and exposed a
   default combined native output/matrix cache bound of 4.5 MiB.
-- Canonicalized SVG colors to uppercase `#RRGGBB` when opaque and
-  `#RRGGBBAA` when alpha is present so equivalent color spellings share exact
-  native and web output and cache entries.
+- Preserved the established SVG serialization: one `1x1` path segment per dark
+  module and the normalized color spelling in the returned string. SVG cache
+  requests keep spelling-sensitive keys; PNG cache requests still use parsed
+  color bytes.
 - Added `getMatrixObject()` returning `{ size, packedBase64 }` in a single
   bridge crossing and `getCacheBytes()` for byte-accurate cache accounting;
   `getMatrixSize()` + `getMatrixPackedBase64()` remain available.
-- Merged consecutive dark modules into single SVG path runs, shrinking large
-  SVG exports without changing rendering.
+- Exposed `QRCodeKnownValidationErrorCode` for stable package-known codes while
+  allowing `QRCodeValidationError.code` to remain a string for forward-compatible
+  native validation codes.
 
 ## [0.6.0] - 2026-08-20
 
@@ -43,9 +44,9 @@ Breaking changes are always listed first in each release section.
   preserving the existing QR rendering and export APIs.
 - Tightened the public validation-error code type to match the stable values
   returned by runtime validation.
-- Declared the `QRCode` component with explicit public props and ref types so
-  emitted declarations remain portable under React Native 0.87's Strict
-  TypeScript API. The consumer-facing QRCode API is unchanged.
+- Added an explicit React Native 0.87 Strict TypeScript declaration check for
+  the `QRCode` component props and ref types. The consumer-facing QRCode API
+  is unchanged.
 
 ### Fixed
 
