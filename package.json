@@ -75,9 +75,9 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "expo": "~57.0.15",
-    "expo-asset": "~57.0.13",
-    "expo-constants": "~57.0.13",
+    "expo": "~57.0.16",
+    "expo-asset": "~57.0.14",
+    "expo-constants": "~57.0.14",
     "expo-font": "~57.0.1",
     "expo-linking": "~57.0.7",
     "react": "19.2.3",
