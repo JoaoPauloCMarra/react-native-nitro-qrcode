@@ -75,6 +75,7 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
+    "caniuse-lite": "1.0.30001810",
     "expo": "~57.0.16",
     "expo-asset": "~57.0.14",
     "expo-constants": "~57.0.14",

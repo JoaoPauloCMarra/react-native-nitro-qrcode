@@ -67,6 +67,28 @@ uint32_t readU32(const std::vector<uint8_t> &bytes, size_t offset) {
          static_cast<uint32_t>(bytes[offset + 3]);
 }
 
+void assertPngCrcs(const std::string &encoded) {
+  const std::vector<uint8_t> png = base64Decode(encoded);
+  size_t offset = 8;
+  while (offset + 12 <= png.size()) {
+    const uint32_t chunkSize = readU32(png, offset);
+    const size_t typeOffset = offset + 4;
+    const size_t dataOffset = typeOffset + 4;
+    const size_t crcOffset = dataOffset + chunkSize;
+    assert(crcOffset + 4 <= png.size());
+
+    uLong crc = ::crc32(0L, Z_NULL, 0);
+    crc = ::crc32(crc, &png[typeOffset], 4 + chunkSize);
+    assert(static_cast<uint32_t>(crc) == readU32(png, crcOffset));
+
+    offset = crcOffset + 4;
+    if (std::string(reinterpret_cast<const char *>(&png[typeOffset]), 4) ==
+        "IEND") {
+      break;
+    }
+  }
+}
+
 std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
                                    int &height) {
   const std::vector<uint8_t> png = base64Decode(encoded);
@@ -189,6 +211,7 @@ void testPngGeneration() {
       generator.renderPngBase64("https://example.com", options);
   assert(!base64.empty());
   assertPngHeader(base64);
+  assertPngCrcs(base64);
 
   const std::string cached =
       generator.renderPngBase64("https://example.com", options);

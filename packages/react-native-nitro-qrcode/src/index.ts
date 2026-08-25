@@ -67,7 +67,7 @@ export {
 
 const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 
-function measuredSync<T>(async: boolean, generate: () => T): T {
+function measuredSync<T>(generate: () => T): T {
   if (!isQRCodeMetricsEnabled()) {
     return generate();
   }
@@ -75,14 +75,14 @@ function measuredSync<T>(async: boolean, generate: () => T): T {
   try {
     const result = generate();
     recordGenerationRequest({
-      async,
+      async: false,
       durationMs: nowMilliseconds() - started,
       failed: false,
     });
     return result;
   } catch (error) {
     recordGenerationRequest({
-      async,
+      async: false,
       durationMs: nowMilliseconds() - started,
       failed: true,
     });
@@ -189,14 +189,14 @@ function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
 
 export function toPngBase64(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return measuredSync(false, () =>
+  return measuredSync(() =>
     NativeQRCode.generatePngBase64Object(toNativeGenerateOptions(normalized)),
   );
 }
 
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return measuredSync(false, () =>
+  return measuredSync(() =>
     NativeQRCode.generatePngDataUriObject(toNativeGenerateOptions(normalized)),
   );
 }
@@ -225,7 +225,7 @@ export async function toPngDataUriAsync(
 
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  return measuredSync(false, () =>
+  return measuredSync(() =>
     NativeQRCode.generateSvgString(...toNativeSvgArgs(normalized)),
   );
 }
@@ -233,7 +233,7 @@ export function toSvgString(options: QRCodeOptions): string {
 export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
   const normalized = normalizeOptions(options);
   const nativeArgs = toNativeMatrixArgs(normalized);
-  return measuredSync(false, () => NativeQRCode.getMatrixObject(...nativeArgs));
+  return measuredSync(() => NativeQRCode.getMatrixObject(...nativeArgs));
 }
 
 export function clearQRCodeCache(): void {

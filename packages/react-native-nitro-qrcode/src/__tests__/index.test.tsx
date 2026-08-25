@@ -1418,18 +1418,28 @@ describe("native QRCode API", () => {
         node.props.source?.uri === "data:image/png;base64,accessible",
     )[0];
     expect(image).toBeDefined();
-    expect(image.props.accessible).toBe(true);
-    expect(image.props.accessibilityRole).toBe("image");
-    expect(image.props.accessibilityLabel).toBe(
+    expect(image.props.accessible).toBe(false);
+    expect(image.props.accessibilityElementsHidden).toBe(true);
+    expect(containerWhilePending.props.accessibilityLabel).toBe(
       "QR code for https://example.com/accessible",
     );
+    expect(containerWhilePending.props.accessible).toBe(true);
+    expect(containerWhilePending.props.accessibilityState).toEqual({
+      busy: false,
+    });
 
-    const logo = currentTree.root.findAll(
-      (node) => node.props.accessible === false,
+    const logoContainer = currentTree.root.findAll(
+      (node) =>
+        node.props.accessible === false &&
+        node.children.some(
+          (child) => typeof child !== "string" && String(child.type) === "logo",
+        ),
     )[0];
-    expect(logo).toBeDefined();
-    expect(logo.props.accessibilityElementsHidden).toBe(true);
-    expect(logo.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(logoContainer).toBeDefined();
+    expect(logoContainer.props.accessibilityElementsHidden).toBe(true);
+    expect(logoContainer.props.importantForAccessibility).toBe(
+      "no-hide-descendants",
+    );
   });
 
   it("uses the default component size", async () => {

@@ -10,26 +10,34 @@ Breaking changes are always listed first in each release section.
 
 ### Breaking changes
 
-- None for consumers upgrading from 0.6.x. Direct upgrades from 0.5.x or
-  earlier still require the Nitro Modules 0.37 native rebuild documented in
-  the 0.6.0 release.
+- None.
 
 ### Changed
 
+- Replaced the native PNG encoder's byte-at-a-time CRC loop with zlib's
+  optimized chunked `crc32` implementation; generated PNG bytes and validation
+  behavior are unchanged.
+- Cleared the QR preview's accessibility busy state after async generation so
+  assistive technology receives the completed preview state.
 - Restored the four positional native PNG methods as deprecated wrappers over
   the object-based methods, so existing native callers continue to work.
 - Bounded the native matrix cache to 32 entries or 512 KiB and exposed a
   default combined native output/matrix cache bound of 4.5 MiB.
-- Preserved the established SVG serialization: one `1x1` path segment per dark
-  module and the normalized color spelling in the returned string. SVG cache
-  requests keep spelling-sensitive keys; PNG cache requests still use parsed
-  color bytes.
+- Preserved native SVG serialization: one `1x1` path segment per dark module
+  and the normalized color spelling in the returned string. Web SVG retains its
+  horizontal-run serialization. SVG cache requests keep spelling-sensitive
+  keys; PNG cache requests still use parsed color bytes.
 - Added `getMatrixObject()` returning `{ size, packedBase64 }` in a single
   bridge crossing and `getCacheBytes()` for byte-accurate cache accounting;
   `getMatrixSize()` + `getMatrixPackedBase64()` remain available.
 - Exposed the additive `QRCodeKnownValidationErrorCode` alias while preserving
   the established `QRCodeValidationError.code` and `QRCodeValidationErrorCode`
   literal union for strict TypeScript consumers.
+- Direct upgrades from 0.5.x or earlier still require the Nitro Modules 0.37
+  native rebuild documented in the 0.6.0 release.
+- Clarified object-API compatibility, native/web SVG serialization, PNG-only
+  logo-area clearing, scan-safe customization, and the isolated benchmark
+  scope without changing defaults or encoded PNG/SVG bytes.
 
 ## [0.6.0] - 2026-08-20
 

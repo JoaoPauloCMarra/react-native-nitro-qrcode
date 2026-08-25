@@ -76,7 +76,7 @@ export {
   type QRCodeMetricsSnapshot,
 } from "./metrics";
 
-function measuredSync<T>(async: boolean, generate: () => T): T {
+function measuredSync<T>(generate: () => T): T {
   if (!isQRCodeMetricsEnabled()) {
     return generate();
   }
@@ -84,14 +84,14 @@ function measuredSync<T>(async: boolean, generate: () => T): T {
   try {
     const result = generate();
     recordGenerationRequest({
-      async,
+      async: false,
       durationMs: nowMilliseconds() - started,
       failed: false,
     });
     return result;
   } catch (error) {
     recordGenerationRequest({
-      async,
+      async: false,
       durationMs: nowMilliseconds() - started,
       failed: true,
     });
@@ -176,7 +176,7 @@ export function toPngDataUri(options: QRCodeOptions): string {
     return cached;
   }
 
-  return measuredSync(false, () => {
+  return measuredSync(() => {
     const model = createModel(normalized);
     const pixelSize = renderPixelSize(normalized, model);
     const canvas = createCanvas(pixelSize);
@@ -290,7 +290,7 @@ export function toSvgString(options: QRCodeOptions): string {
     return cached;
   }
 
-  return measuredSync(false, () => {
+  return measuredSync(() => {
     const model = createModel(normalized);
     const totalSize = model.modules.size + normalized.quietZone * 2;
     let path = "";
