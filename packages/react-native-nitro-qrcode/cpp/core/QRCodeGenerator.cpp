@@ -15,7 +15,6 @@
 namespace NitroQRCode {
 namespace {
 
-constexpr uint32_t CrcPolynomial = 0xEDB88320;
 constexpr uint8_t TransparentLayer = 6;
 
 enum class ModuleShape {
@@ -604,15 +603,16 @@ void writeU32(std::vector<uint8_t> &bytes, uint32_t value) {
   bytes.push_back(static_cast<uint8_t>(value & 0xFF));
 }
 
-uint32_t crc32(const uint8_t *data, size_t size) {
-  uint32_t crc = 0xFFFFFFFF;
-  for (size_t i = 0; i < size; i++) {
-    crc ^= data[i];
-    for (int bit = 0; bit < 8; bit++) {
-      crc = (crc >> 1) ^ (CrcPolynomial & (0U - (crc & 1U)));
-    }
+uint32_t crc32Value(const uint8_t *data, size_t size) {
+  uLong crc = ::crc32(0L, Z_NULL, 0);
+  while (size > 0) {
+    const uInt chunkSize = static_cast<uInt>(std::min<size_t>(
+        size, static_cast<size_t>(std::numeric_limits<uInt>::max())));
+    crc = ::crc32(crc, data, chunkSize);
+    data += chunkSize;
+    size -= chunkSize;
   }
-  return crc ^ 0xFFFFFFFF;
+  return static_cast<uint32_t>(crc);
 }
 
 std::string hashCachePart(const std::string &value) {
@@ -643,7 +643,7 @@ void appendChunk(std::vector<uint8_t> &png, const char *type,
   const size_t crcStart = png.size();
   png.insert(png.end(), type, type + 4);
   png.insert(png.end(), data.begin(), data.end());
-  writeU32(png, crc32(png.data() + crcStart, png.size() - crcStart));
+  writeU32(png, crc32Value(png.data() + crcStart, png.size() - crcStart));
 }
 
 std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {

@@ -193,6 +193,14 @@ const matrix = getMatrix(options);
 Async PNG helpers are useful for UI flows that should yield before native
 generation completes.
 
+The exported `NitroQRCode` object exposes the same PNG, SVG, matrix, validation,
+cache, and metrics helpers for callers that prefer an object API. Native
+`HybridQRCode` integrations should use the object-shaped methods
+`generatePngBase64Object`, `generatePngBase64AsyncObject`,
+`generatePngDataUriObject`, and `generatePngDataUriAsyncObject`. The four older
+positional PNG methods remain available only as deprecated compatibility
+wrappers; they are not used by the JavaScript entrypoints.
+
 `getMatrix` returns the QR symbol size and a Base64-encoded, row-major bitset.
 Each module uses one bit, most-significant bit first; dark modules are `1`.
 Rendering-only options such as colors, size, shapes, gradients, and logo area do
@@ -200,8 +208,9 @@ not change this encoding result.
 
 `toSvgString` exports the encoded matrix with quiet zone, background,
 foreground, and gradient settings. Component-only logo nodes are not embedded
-in PNG or SVG exports. Set `logoAreaSize` when an exported image needs a clear
-center area for a logo added by another tool.
+in PNG or SVG exports. PNG rendering clears the configured `logoAreaSize`; SVG
+does not reserve or clear a logo area, so reserve that space in the consuming
+SVG tool if needed.
 
 Native and web output caches verify the full normalized request after hashed
 lookup. Each cache retains at most 128 entries or 4 MiB, whichever limit is
@@ -216,10 +225,13 @@ Native matrix export reuses a small bounded least-recently-used cache (32
 entries or 512 KiB, whichever comes first) and returns the size and packed data
 through one `getMatrixObject` bridge call. The native output cache retains at
 most 4 MiB, so the default combined native output and matrix cache bound is
-4.5 MiB. The native cache memory report includes both output and matrix cache
-bytes. SVG serialization keeps the established output contract: each dark
-module is emitted as its own `1x1` path segment, and normalized color spellings
-such as `transparent` and `#00000000` remain observable in the returned string.
+4.5 MiB. `getQRCodeCacheBytes()` reports retained native output-cache bytes;
+Nitro's native external-memory report also accounts for the matrix cache. Native
+SVG serialization keeps the established output contract: each dark module is
+emitted as its own `1x1` path segment. Web SVG keeps its existing equivalent
+horizontal-run serialization. Normalized color spellings such as `transparent`
+and `#00000000` remain observable in the returned string where that platform
+entry preserves them.
 PNG cache keys still use parsed color bytes so equivalent PNG requests can
 share entries without changing their pixels.
 
@@ -266,8 +278,8 @@ Generation input bounds:
 Option loss and platform differences:
 
 - **SVG output** encodes the matrix with quiet zone, background, foreground,
-  and gradient only. Body shape, gaps, density, stroke, eye, and eyeball
-  colors do not apply to the SVG path.
+  and gradient only. Body shape, gaps, density, stroke, eye, eyeball colors,
+  and logo-area clearing do not apply to the SVG path.
 - **Web PNG transparency** uses an alpha-cleared background; transparent
   pixels are truly transparent instead of black.
 - **Circle geometry** is defined as an ellipse inscribed in the module cell on
@@ -295,15 +307,16 @@ reports a busy state while generation is pending, and the logo overlay is
 hidden from the accessibility tree. Screen readers announce the QR meaning
 and its generation state on iOS and Android.
 
-The `logo` prop is a React node layered above the generated image. Only
-`logoAreaSize` clears QR pixels and reserves room in the encoded image.
+The `logo` prop is a React node layered above the generated PNG. Only
+`logoAreaSize` clears PNG pixels and reserves room in the encoded image.
 `logoPadding` and `logoBackgroundColor` style the overlay but do not reserve
 additional modules. When `logo` is present and `logoAreaSize` is omitted, the
 component reserves 28% of `size`. Keep the logo area near or below 30% for
 reliable scanning.
 
-With `scanSafe`, quiet zones smaller than four modules are raised to four.
-When a logo area is present, error correction is raised to `H`.
+With `scanSafe`, quiet zones smaller than four modules are raised to four. When
+`scanSafe` is enabled with a non-zero logo area, error correction is raised to
+`H`.
 `scanSafe: "strict"` additionally converts scanability warnings into validation
 errors.
 
@@ -379,6 +392,8 @@ Main exports:
 - `toPngBase64Async` and `toPngDataUriAsync`.
 - `validateOptions`.
 - `clearQRCodeCache`, `getQRCodeCacheSize`, and `getQRCodeCacheBytes`.
+- `getQRCodeMetrics`, `resetQRCodeMetrics`, and
+  `setQRCodeMetricsEnabled` for development instrumentation.
 - TypeScript types including `QRCodeOptions`, `QRCodeProps`, `QRCodeRef`,
   `QRCodeMatrix`, `QRCodeValidationResult`, `QRCodeValidationErrorCode`,
   `QRCodeKnownValidationErrorCode`,
@@ -393,6 +408,9 @@ Main exports:
 | `size`                 | Positive component layout size up to 2048 points; rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels).   |
 | `quietZone`            | Quiet-zone width in QR modules; integer 0 through 32.                                                                                |
 | `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases.                                                                                      |
+| `minVersion` / `maxVersion` | QR version bounds from `1` through `40`, with the minimum no larger than the maximum.                                         |
+| `mask`                 | `-1` for automatic mask selection, or a fixed mask from `0` through `7`.                                                            |
+| `boostEcl`             | Raises error correction within the selected version when the payload fits.                                                         |
 | `scanSafe`             | Raises unsafe defaults; `"strict"` turns scanability warnings into errors.                                                           |
 | `foregroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color.                                                                         |
 | `backgroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`.                                                                         |
@@ -477,6 +495,13 @@ skipped (with a reason), or failed and never passes silently; use
 device or booted iOS simulator is available. `bun run example:smoke:ci`
 verifies the terminal-state reporting without devices and runs in `check`.
 
+`bun run benchmark:cpp` measures only an isolated optimized native C++ process
+in a temporary build directory. It does not measure React Native mounting,
+canvas rendering, device scanning, or UI responsiveness. The smoke variant uses
+the reduced benchmark run counts and rejects averages above 1,000,000
+microseconds; local timings still vary with compiler and machine load. See the
+[benchmark methodology](docs/benchmarks.md) for the measured cases.
+
 When changing encoder behavior, regenerate and verify the parity corpus with
 `bun scripts/generate-parity-corpus.js` (and `--write` after the native side
 is proven by `bun run --cwd packages/react-native-nitro-qrcode test:cpp`).
@@ -486,6 +511,7 @@ is proven by `bun run --cwd packages/react-native-nitro-qrcode test:cpp`).
 - [npm package](https://www.npmjs.com/package/react-native-nitro-qrcode)
 - [GitHub repository](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode)
 - [Issues](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/issues)
+- [Benchmark methodology](docs/benchmarks.md)
 - [Changelog](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/CHANGELOG.md)
 
 ## License

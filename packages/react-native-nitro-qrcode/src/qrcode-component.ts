@@ -442,14 +442,13 @@ export function createQRCodeComponent(
       {
         style: [styles.frame, { width: size, height: size }, style],
         testID,
-        ...(uri === undefined
-          ? {
-              accessible: true,
-              accessibilityRole: "image" as const,
-              accessibilityLabel: generatingAccessibilityLabel(),
-              accessibilityState: { busy: true },
-            }
-          : {}),
+        accessible: true,
+        accessibilityRole: "image" as const,
+        accessibilityLabel:
+          uri === undefined
+            ? generatingAccessibilityLabel()
+            : qrCodeAccessibilityLabel(value),
+        accessibilityState: { busy: uri === undefined },
       },
       uri === undefined && placeholder,
       uri !== undefined &&
@@ -457,9 +456,9 @@ export function createQRCodeComponent(
           source: { uri },
           resizeMode: "contain",
           style: [styles.image, imageStyle],
-          accessible: true,
-          accessibilityRole: "image",
-          accessibilityLabel: qrCodeAccessibilityLabel(value),
+          accessible: false,
+          accessibilityElementsHidden: true,
+          importantForAccessibility: "no-hide-descendants",
           ...(generators.accessibilityIgnoresInvertColors !== undefined
             ? {
                 accessibilityIgnoresInvertColors:

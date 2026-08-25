@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import {
   Image,
   Platform,
@@ -13,7 +13,7 @@ import {
 import {
   getMatrix,
   getQRCodeCacheSize,
-  NitroQRCode,
+  getQRCodeMetrics,
   QRCode,
   toPngDataUri,
   toSvgString,
@@ -26,19 +26,19 @@ import {
   type QRCodeEyeBallShape,
   type QRCodeEyeFrameShape,
   type QRCodeGradient,
+  type QRCodeOptions,
   type QRCodeShapeOptions,
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
-const METRIC_RASTER_SIZE = PREVIEW_SIZE * 2;
 const APP_ICON = require("../assets/icon.png");
 const PAYLOAD_INITIAL_SELECTION = { start: 0, end: 0 };
 const CONFIG_TABS = ["color", "shapes", "logo"] as const;
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
 const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
-const BODY_SHAPES = ["square", "circle"] as const;
+const BODY_SHAPES = ["square", "rounded", "circle"] as const;
 const EYE_FRAME_SHAPES = [
   "square",
   "rounded",
@@ -169,15 +169,14 @@ export default function DemoScreen() {
     matrixSize: 0,
     cacheSize: 0,
   });
-  const [readyUri, setReadyUri] = useState("");
+  const [readyKey, setReadyKey] = useState("");
   const [qrError, setQrError] = useState<string | null>(null);
   const [exportPreview, setExportPreview] = useState<string | null>(null);
   const [apiPreview, setApiPreview] = useState<string | null>(null);
-  const [metricsError, setMetricsError] = useState<Error | null>(null);
   const qrRef = useRef<QRCodeRef>(null);
   const hasPayload = value.trim().length > 0;
   const displayError = hasPayload
-    ? (metricsError?.message ?? qrError)
+    ? qrError
     : "Enter a payload to generate a QR code.";
 
   const shapeOptions = useMemo<QRCodeShapeOptions>(
@@ -204,82 +203,45 @@ export default function DemoScreen() {
   const logoAreaSize = showLogo ? 58 : 0;
   const logoAreaBorderRadius = showLogo ? 12 : 0;
   const logoPaddingSize = showLogo ? LOGO_PADDING_CONFIG[logoPadding] : 0;
-
-  useEffect(() => {
-    if (!hasPayload) {
-      return;
-    }
-
-    let isMounted = true;
-    const timeoutId = setTimeout(() => {
-      const startedAt = now();
-      void NitroQRCode.toPngBase64Async({
-        value,
-        size: METRIC_RASTER_SIZE,
-        scanSafe: true,
-        errorCorrectionLevel: showLogo ? "H" : "M",
-        foregroundColor,
-        backgroundColor,
-        strokeColor,
-        eyeColor,
-        eyeStrokeColor,
-        eyeballColor,
-        gradient,
-        shapeOptions: scaleShapeOptions(
-          shapeOptions,
-          METRIC_RASTER_SIZE / PREVIEW_SIZE,
-        ),
-        logoAreaSize: Math.round(
-          logoAreaSize * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
-        ),
-        logoAreaBorderRadius: Math.round(
-          logoAreaBorderRadius * (METRIC_RASTER_SIZE / PREVIEW_SIZE),
-        ),
-      }).then(
-        (png) => {
-          if (!isMounted) {
-            return;
-          }
-
-          const matrix = getMatrix({ value });
-          setMetricsError(null);
-          setMetrics({
-            elapsed: now() - startedAt,
-            bytes: Math.ceil((png.length * 3) / 4),
-            matrixSize: matrix.size,
-            cacheSize: getQRCodeCacheSize(),
-          });
-        },
-        (error: unknown) => {
-          if (!isMounted) {
-            return;
-          }
-          setMetricsError(
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        },
-      );
-    }, 120);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [
-    backgroundColor,
-    eyeballColor,
-    eyeColor,
-    eyeStrokeColor,
-    foregroundColor,
-    gradient,
-    hasPayload,
-    logoAreaBorderRadius,
-    logoAreaSize,
-    shapeOptions,
-    showLogo,
-    strokeColor,
-    value,
-  ]);
+  const previewOptions = useMemo<QRCodeOptions>(
+    () => ({
+      value,
+      size: PREVIEW_SIZE,
+      scanSafe: true,
+      errorCorrectionLevel: showLogo ? "H" : "M",
+      foregroundColor,
+      backgroundColor,
+      strokeColor,
+      eyeColor,
+      eyeStrokeColor,
+      eyeballColor,
+      gradient,
+      shapeOptions,
+      logoAreaSize,
+      logoAreaBorderRadius,
+    }),
+    [
+      backgroundColor,
+      eyeballColor,
+      eyeColor,
+      eyeStrokeColor,
+      foregroundColor,
+      gradient,
+      logoAreaBorderRadius,
+      logoAreaSize,
+      shapeOptions,
+      showLogo,
+      strokeColor,
+      value,
+    ],
+  );
+  const previewGeneration = useMemo(
+    () => ({
+      key: JSON.stringify(previewOptions),
+    }),
+    [previewOptions],
+  );
+  const isPreviewReady = hasPayload && readyKey === previewGeneration.key;
 
   return (
     <ScrollView
@@ -330,7 +292,16 @@ export default function DemoScreen() {
                     }
                     hideLogoUntilReady
                     onReady={(uri) => {
-                      setReadyUri(uri);
+                      const generationMs =
+                        getQRCodeMetrics().lastGenerationMs ?? 0;
+                      const matrix = getMatrix(previewOptions);
+                      setReadyKey(previewGeneration.key);
+                      setMetrics({
+                        elapsed: generationMs,
+                        bytes: estimateBase64Bytes(uri),
+                        matrixSize: matrix.size,
+                        cacheSize: getQRCodeCacheSize(),
+                      });
                       setQrError(null);
                     }}
                     onError={(error) => {
@@ -363,7 +334,7 @@ export default function DemoScreen() {
               <Tag>
                 {!hasPayload
                   ? "Needs payload"
-                  : readyUri === ""
+                  : !isPreviewReady
                     ? "Pending"
                     : "Ready"}
               </Tag>
@@ -374,9 +345,9 @@ export default function DemoScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityState={{
-                disabled: !hasPayload || readyUri === "",
+                disabled: !isPreviewReady,
               }}
-              disabled={!hasPayload || readyUri === ""}
+              disabled={!isPreviewReady}
               onPress={() => {
                 const data = qrRef.current?.toPngBase64();
                 setExportPreview(
@@ -387,14 +358,13 @@ export default function DemoScreen() {
               }}
               style={[
                 styles.selectButton,
-                (!hasPayload || readyUri === "") &&
-                  styles.selectButtonDisabled,
+                !isPreviewReady && styles.selectButtonDisabled,
               ]}
             >
               <Text
                 style={[
                   styles.selectButtonText,
-                  (!hasPayload || readyUri === "") && styles.textDisabledDark,
+                  !isPreviewReady && styles.textDisabledDark,
                 ]}
               >
                 Export PNG base64
@@ -408,8 +378,7 @@ export default function DemoScreen() {
               accessibilityState={{ disabled: !hasPayload }}
               disabled={!hasPayload}
               onPress={() => {
-                const options = { value, size: PREVIEW_SIZE } as const;
-                const validation = validateOptions(options);
+                const validation = validateOptions(previewOptions);
                 if (!validation.valid) {
                   setApiPreview(
                     `Invalid options: ${validation.errors[0]?.message ?? "unknown error"}`,
@@ -418,9 +387,9 @@ export default function DemoScreen() {
                 }
 
                 try {
-                  const matrix = getMatrix(options);
-                  const png = toPngDataUri(options);
-                  const svg = toSvgString(options);
+                  const matrix = getMatrix(previewOptions);
+                  const png = toPngDataUri(previewOptions);
+                  const svg = toSvgString(previewOptions);
                   setApiPreview(
                     `Valid · ${matrix.size}×${matrix.size} matrix · PNG ${png.length} chars · SVG ${svg.length} chars`,
                   );
@@ -448,10 +417,9 @@ export default function DemoScreen() {
               accessibilityLabel="QR payload"
               onChangeText={(nextValue) => {
                 setValue(nextValue);
-                setReadyUri("");
+                setReadyKey("");
                 setExportPreview(null);
                 setApiPreview(null);
-                setMetricsError(null);
                 setQrError(null);
                 if (nextValue.trim().length === 0) {
                   setMetrics({
@@ -480,7 +448,11 @@ export default function DemoScreen() {
               value={`${metrics.elapsed.toFixed(2)} ms`}
               tone="green"
             />
-            <FpsMetric />
+            <Metric
+              label="Cache"
+              value={`${metrics.cacheSize}`}
+              tone="amber"
+            />
             <Metric
               label="PNG"
               value={`${formatBytes(metrics.bytes)}`}
@@ -1116,40 +1088,6 @@ function Metric({
   );
 }
 
-function FpsMetric() {
-  const [fps, setFps] = useState(60);
-
-  useEffect(() => {
-    let frameCount = 0;
-    let frameId = 0;
-    let lastFpsTick = 0;
-
-    function tick(timestamp: number) {
-      if (lastFpsTick === 0) {
-        lastFpsTick = timestamp;
-      }
-
-      frameCount += 1;
-      const elapsed = timestamp - lastFpsTick;
-      if (elapsed >= 500) {
-        setFps(Math.round((frameCount * 1000) / elapsed));
-        frameCount = 0;
-        lastFpsTick = timestamp;
-      }
-      frameId = requestAnimationFrame(tick);
-    }
-
-    frameId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, []);
-
-  return (
-    <Metric label="FPS" value={`${fps}`} tone={fps >= 55 ? "green" : "amber"} />
-  );
-}
-
 function getToneStyle(tone: "green" | "amber" | "blue" | "purple") {
   switch (tone) {
     case "green":
@@ -1163,15 +1101,16 @@ function getToneStyle(tone: "green" | "amber" | "blue" | "purple") {
   }
 }
 
-function now(): number {
-  return typeof performance !== "undefined" ? performance.now() : Date.now();
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
   }
   return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function estimateBase64Bytes(uri: string): number {
+  const base64 = uri.slice("data:image/png;base64,".length);
+  return Math.ceil((base64.length * 3) / 4);
 }
 
 function capitalize(value: string): string {
@@ -1297,30 +1236,6 @@ function isHexColor(value: string): value is QRCodeBackgroundColor {
   return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(
     value,
   );
-}
-
-function scaleShapeOptions(
-  options: QRCodeShapeOptions,
-  scale: number,
-): QRCodeShapeOptions {
-  return {
-    layout: options.layout,
-    shape: options.shape,
-    eyeFrameShape: options.eyeFrameShape,
-    eyeballShape: options.eyeballShape,
-    eyePatternShape: options.eyePatternShape,
-    bodyDensity: options.bodyDensity,
-    gap: Math.round((options.gap ?? 0) * scale),
-    eyePatternGap: Math.round((options.eyePatternGap ?? 0) * scale),
-    cornerRadius:
-      options.cornerRadius === undefined
-        ? undefined
-        : Math.round(options.cornerRadius * scale),
-    eyePatternCornerRadius:
-      options.eyePatternCornerRadius === undefined
-        ? undefined
-        : Math.round(options.eyePatternCornerRadius * scale),
-  };
 }
 
 const styles = StyleSheet.create({

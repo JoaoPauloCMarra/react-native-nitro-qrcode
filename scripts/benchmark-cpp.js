@@ -1,5 +1,6 @@
 const { execFileSync, execSync } = require("child_process");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const packageDir = path.join(
@@ -8,10 +9,19 @@ const packageDir = path.join(
   "packages",
   "react-native-nitro-qrcode"
 );
+const packageManifest = require(path.join(packageDir, "package.json"));
 const cppDir = path.join(packageDir, "cpp");
-const buildDir = path.join(cppDir, "build");
+const buildDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), "react-native-nitro-qrcode-benchmark-"),
+);
 const outputFile = path.join(buildDir, "qrcode_generator_benchmark");
 const smoke = process.argv.includes("--smoke");
+
+if (packageManifest.name !== "react-native-nitro-qrcode") {
+  throw new Error(
+    `Benchmark setup failed: expected react-native-nitro-qrcode, got ${packageManifest.name}.`,
+  );
+}
 
 const PINNED_LLVM_VERSION = 18;
 
@@ -42,8 +52,24 @@ function runCommand(command, args) {
   });
 }
 
-fs.rmSync(buildDir, { recursive: true, force: true });
-fs.mkdirSync(buildDir, { recursive: true });
+function parseBenchmarkOutput(output) {
+  const lines = output.trim().split(/\r?\n/);
+  const headerIndex = lines.indexOf("benchmark,runs,total_us,avg_us");
+  if (headerIndex < 0) {
+    throw new Error("C++ benchmark did not emit its CSV header");
+  }
+
+  return lines
+    .slice(headerIndex + 1)
+    .map((line) => line.split(","))
+    .filter((parts) => parts.length === 4)
+    .map(([benchmark, runs, totalUs, averageUs]) => ({
+      benchmark,
+      runs: Number(runs),
+      totalUs: Number(totalUs),
+      averageUs: Number(averageUs),
+    }));
+}
 
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorBenchmark.cpp"),
@@ -69,27 +95,48 @@ const compileArgs = [
 ];
 
 console.log("Compiling optimized C++ QRCode benchmark...");
-runCommand(resolveTool("clang++"), compileArgs);
+try {
+  runCommand(resolveTool("clang++"), compileArgs);
 
-console.log("Running C++ QRCode benchmark...");
-if (!smoke) {
-  runCommand(outputFile, []);
-} else {
-  const output = execFileSync(outputFile, [], { encoding: "utf8" });
+  console.log(
+    `Benchmark package: ${packageManifest.name}@${packageManifest.version}`,
+  );
+  console.log(
+    "Benchmark scope: isolated optimized C++ process with a temporary build directory; no repository build state is reused.",
+  );
+  console.log("Running C++ QRCode benchmark...");
+  const output = execFileSync(outputFile, [], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   process.stdout.write(output);
-  const ceilingMicros = 1_000_000;
-  const regressions = output
-    .trim()
-    .split("\n")
-    .slice(1)
-    .map((line) => line.split(","))
-    .filter((parts) => parts.length === 4)
-    .filter((parts) => Number(parts[3]) > ceilingMicros);
-  if (regressions.length > 0) {
-    throw new Error(
-      `C++ benchmark smoke exceeded ${ceilingMicros} average microseconds: ${regressions
-        .map((parts) => `${parts[0]}=${parts[3]}`)
-        .join(", ")}`,
+  const metrics = parseBenchmarkOutput(output);
+  if (smoke) {
+    const ceilingMicros = 1_000_000;
+    const regressions = metrics.filter(
+      (metric) => metric.averageUs > ceilingMicros,
     );
+    if (regressions.length > 0) {
+      throw new Error(
+        `C++ benchmark smoke exceeded ${ceilingMicros} average microseconds: ${regressions
+          .map((metric) => `${metric.benchmark}=${metric.averageUs}`)
+          .join(", ")}`,
+      );
+    }
   }
+  console.log(
+    `BENCHMARK_RESULT ${JSON.stringify({
+      package: packageManifest.name,
+      version: packageManifest.version,
+      benchmark: "native-cpp-qrcode",
+      scope: "isolated-native-cpp-process",
+      smoke,
+      compiler: "clang++ -O3 -DNDEBUG",
+      metrics,
+      platform: process.platform,
+      architecture: process.arch,
+    })}`,
+  );
+} finally {
+  fs.rmSync(buildDir, { recursive: true, force: true });
 }

@@ -63,12 +63,18 @@ function waitForAndroidUi() {
     );
 
     if (dump.status === 0) {
-      const output = run("adb", ["shell", "cat", dumpPath]);
-      try {
-        assertVisible(output, "Android");
-        return;
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
+      const read = spawnSync("adb", ["shell", "cat", dumpPath], {
+        encoding: "utf8",
+      });
+      if (read.status === 0) {
+        try {
+          assertVisible(read.stdout, "Android");
+          return;
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+        }
+      } else {
+        lastError = `UI dump read exited with ${read.status ?? "no status"}`;
       }
     } else {
       lastError = `uiautomator dump exited with ${dump.status ?? "no status"}`;
