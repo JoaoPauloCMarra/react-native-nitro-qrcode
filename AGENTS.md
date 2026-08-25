@@ -23,7 +23,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 - Never manually edit `packages/react-native-nitro-qrcode/nitrogen/generated/**`; run `bun run codegen` when `src/*.nitro.ts` specs change and commit generated files. `codegen:check` is non-mutating (snapshot-and-restore).
 - Add or update tests for behavior changes; C++ changes need `bun run test:cpp`, `bun run test:cpp:sanitize`, and `bun run benchmark:cpp` green. Encoder behavior changes must re-run `bun scripts/generate-parity-corpus.js` and keep the native/web parity corpus green (decode-back and golden C++ tests).
 - For user-facing changes, update `README.md` and `CHANGELOG.md` (changes go under the current version header, no `Unreleased` section).
-- `apps/example/ios` and `apps/example/android` are generated (gitignored); CI runs `CI=1 bun run --cwd apps/example prebuild -- --platform <android|ios>` before native builds.
+- `apps/example/ios` and `apps/example/android` are generated (gitignored); native example prebuilds and builds remain local validation commands, while CI runs device-free example checks.
 
 ## Native Code Rules
 

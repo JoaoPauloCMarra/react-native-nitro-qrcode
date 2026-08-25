@@ -488,8 +488,9 @@ bun run example:android
 bun run example:ios
 ```
 
-Run native example builds before release when changing plugin, native, Nitro, or
-packaging files. `bun run example:smoke` reports each platform as executed,
+Run native example builds locally before release when changing plugin, native,
+Nitro, or packaging files. GitHub CI does not build the Android or iOS example.
+`bun run example:smoke` reports each platform as executed,
 skipped (with a reason), or failed and never passes silently; use
 `bun run example:smoke -- --strict` when a release must fail if no Android
 device or booted iOS simulator is available. `bun run example:smoke:ci`
