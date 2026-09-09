@@ -1313,6 +1313,76 @@ describe("native QRCode API", () => {
     expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(2);
   });
 
+  it.each(["resolve", "reject"] as const)("ignores stale %s while the latest request owns callbacks and the visible QR", async (outcome) => {
+    const first = createDeferred<string>();
+    const second = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+    const firstError = jest.fn();
+    const secondError = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "one",
+          onReady: firstReady,
+          onError: firstError,
+        }),
+      );
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    await act(async () => {
+      currentTree.update(
+        React.createElement(QRCode, {
+          value: "two",
+          onReady: secondReady,
+          onError: secondError,
+        }),
+      );
+    });
+
+    await act(async () => {
+      if (outcome === "resolve") {
+        first.resolve("data:image/png;base64,stale");
+      } else {
+        first.reject(new Error("stale generation failure"));
+      }
+      await Promise.resolve();
+    });
+
+    expect(firstReady).not.toHaveBeenCalled();
+    expect(firstError).not.toHaveBeenCalled();
+    expect(secondReady).not.toHaveBeenCalled();
+    expect(secondError).not.toHaveBeenCalled();
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,stale",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      second.resolve("data:image/png;base64,latest");
+      await Promise.resolve();
+    });
+
+    expect(firstReady).not.toHaveBeenCalled();
+    expect(secondReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).toHaveBeenCalledWith("data:image/png;base64,latest");
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,latest",
+      ),
+    ).not.toHaveLength(0);
+  });
+
   it("surfaces async QR generation errors", async () => {
     const consoleErrorSpy = jest
       .spyOn(console, "error")

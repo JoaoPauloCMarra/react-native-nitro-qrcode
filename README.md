@@ -4,8 +4,8 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-0.86.2-61dafb)](https://reactnative.dev/docs/0.86/getting-started-without-a-framework)
-[![Expo](https://img.shields.io/badge/expo-SDK%2057%20%28RN%200.86.2%29-000020)](https://docs.expo.dev/versions/v57.0.0/)
+[![React Native](https://img.shields.io/badge/react--native-0.86.3-61dafb)](https://reactnative.dev/docs/0.86/getting-started-without-a-framework)
+[![Expo](https://img.shields.io/badge/expo-SDK%2057%20%28RN%200.86.3%29-000020)](https://docs.expo.dev/versions/v57.0.0/)
 [![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.37.0%20%3C0.38.0-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
@@ -57,12 +57,21 @@ bare React Native app.
 | React Native Web | `>=0.19.0 <1.0.0`                                   |
 | Node             | `>=18.0.0`                                          |
 
-Version 0.7.0 uses React Native `0.86.2` and Expo SDK 57. The package gate and
-example use that runtime baseline; `check:ci` also compiles the public source
-against React Native `0.87.0` for Strict TypeScript compatibility. Expo SDK 57
-selects React Native `0.86.2`; do not override that version in the example. The
-baseline uses React `19.2.3` and Nitro Modules `0.37.0`. The wider ranges above
-are the package's declared peer compatibility.
+The current example and package gate use React Native `0.86.3` and Expo SDK 57.
+`check:ci` also compiles the public source against React Native `0.87.0` for
+Strict TypeScript compatibility. Expo SDK 57 selects React Native `0.86.3`; do
+not override that version in the example. The baseline uses React `19.2.3` and
+Nitro Modules `0.37.1`. The wider ranges above are the package's declared peer
+compatibility.
+
+### Upgrade from 0.7.0
+
+Version 0.7.1 is a compatible patch. It pins Nitrogen and Nitro Modules
+`0.37.1` inside the existing `>=0.37.0 <0.38.0` peer range, applies the
+Kotlin Android plugin only when the Gradle Kotlin extension is absent so
+AGP 9 consumers with built-in Kotlin can configure the library, and
+aligns the example with Expo SDK 57.0.21 / React Native `0.86.3`. There
+are no JavaScript API or encoded PNG/SVG changes.
 
 ### Upgrade from 0.6.x and earlier
 

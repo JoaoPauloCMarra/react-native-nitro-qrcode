@@ -93,6 +93,7 @@ tmp-*.png
 *.temp
 
 .pack-docs-state/
+/.agent-device/
 
 # Editors and OS
 .idea/

@@ -3,6 +3,7 @@
 #include "../qrcodegen/qrcodegen.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <iomanip>
 #include <limits>
@@ -624,14 +625,28 @@ std::string hashCachePart(const std::string &value) {
   return std::to_string(hash);
 }
 
-void appendCachePart(std::string &request, const std::string &part) {
-  request += std::to_string(part.size());
-  request += ":";
-  request += part;
+void appendCachePart(std::string &request, std::string_view part) {
+  char sizeBuffer[24];
+  const auto sizeConverted = std::to_chars(
+      sizeBuffer, sizeBuffer + sizeof(sizeBuffer), part.size());
+  request.append(sizeBuffer, sizeConverted.ptr);
+  request.push_back(':');
+  request.append(part.data(), part.size());
+}
+
+template <typename Number>
+void appendCacheNumber(std::string &request, Number value) {
+  char valueBuffer[32];
+  const auto converted =
+      std::to_chars(valueBuffer, valueBuffer + sizeof(valueBuffer), value);
+  appendCachePart(request,
+                  std::string_view(valueBuffer, converted.ptr - valueBuffer));
 }
 
 std::string cacheDouble(double value) {
-  std::ostringstream output;
+  thread_local std::ostringstream output;
+  output.str("");
+  output.clear();
   output << std::setprecision(std::numeric_limits<double>::max_digits10)
          << value;
   return output.str();
@@ -1020,19 +1035,22 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
                                           const GenerateOptions &options,
                                           const std::string &output) const {
   std::string request;
+  request.reserve(256 + value.size() + output.size() +
+                  options.foregroundColor.size() +
+                  options.backgroundColor.size());
   appendCachePart(request, output);
   appendCachePart(request, value);
   appendCachePart(request, options.errorCorrectionLevel);
-  appendCachePart(request, std::to_string(options.minVersion));
-  appendCachePart(request, std::to_string(options.maxVersion));
-  appendCachePart(request, std::to_string(options.mask));
-  appendCachePart(request, std::to_string(options.boostEcl));
+  appendCacheNumber(request, options.minVersion);
+  appendCacheNumber(request, options.maxVersion);
+  appendCacheNumber(request, options.mask);
+  appendCacheNumber(request, static_cast<int>(options.boostEcl));
   if (output == "matrix") {
     return request;
   }
 
-  appendCachePart(request, std::to_string(options.size));
-  appendCachePart(request, std::to_string(options.quietZone));
+  appendCacheNumber(request, options.size);
+  appendCacheNumber(request, options.quietZone);
   if (output == "svg") {
     appendCachePart(request, options.foregroundColor);
     appendCachePart(request, options.backgroundColor);
@@ -1042,10 +1060,10 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
     appendCachePart(request, options.eyeballColor);
   }
   const auto appendColor = [&request](const Color &color) {
-    appendCachePart(request, std::to_string(color.r));
-    appendCachePart(request, std::to_string(color.g));
-    appendCachePart(request, std::to_string(color.b));
-    appendCachePart(request, std::to_string(color.a));
+    appendCacheNumber(request, color.r);
+    appendCacheNumber(request, color.g);
+    appendCacheNumber(request, color.b);
+    appendCacheNumber(request, color.a);
   };
   appendColor(options.foreground);
   appendColor(options.background);
@@ -1056,20 +1074,20 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendCachePart(request, options.moduleShape);
   appendCachePart(request, options.eyePatternShape);
   appendCachePart(request, options.eyeballShape);
-  appendCachePart(request, std::to_string(options.gap));
-  appendCachePart(request, std::to_string(options.eyePatternGap));
+  appendCacheNumber(request, options.gap);
+  appendCacheNumber(request, options.eyePatternGap);
   appendCachePart(request, options.bodyDensity);
-  appendCachePart(request, std::to_string(options.cornerRadius));
-  appendCachePart(request, std::to_string(options.eyePatternCornerRadius));
+  appendCacheNumber(request, options.cornerRadius);
+  appendCacheNumber(request, options.eyePatternCornerRadius);
   appendCachePart(request, options.layout);
-  appendCachePart(request, std::to_string(options.logoAreaSize));
-  appendCachePart(request, std::to_string(options.logoAreaBorderRadius));
+  appendCacheNumber(request, options.logoAreaSize);
+  appendCacheNumber(request, options.logoAreaBorderRadius);
   appendCachePart(request, options.gradient.type);
   for (const auto &color : options.gradient.colors) {
-    appendCachePart(request, std::to_string(color.r));
-    appendCachePart(request, std::to_string(color.g));
-    appendCachePart(request, std::to_string(color.b));
-    appendCachePart(request, std::to_string(color.a));
+    appendCacheNumber(request, color.r);
+    appendCacheNumber(request, color.g);
+    appendCacheNumber(request, color.b);
+    appendCacheNumber(request, color.a);
   }
   for (double location : options.gradient.locations) {
     appendCachePart(request, cacheDouble(location));

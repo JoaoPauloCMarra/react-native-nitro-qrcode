@@ -6,7 +6,10 @@
 #include <cmath>
 #include <cstdint>
 #include <future>
+#include <iomanip>
 #include <iostream>
+#include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -87,6 +90,89 @@ void assertPngCrcs(const std::string &encoded) {
       break;
     }
   }
+}
+
+void appendLegacyCachePart(std::string &request, const std::string &part) {
+  request += std::to_string(part.size());
+  request += ":";
+  request += part;
+}
+
+template <typename Number>
+void appendLegacyCacheNumber(std::string &request, Number value) {
+  appendLegacyCachePart(request, std::to_string(value));
+}
+
+std::string legacyCacheDouble(double value) {
+  std::ostringstream output;
+  output << std::setprecision(std::numeric_limits<double>::max_digits10)
+         << value;
+  return output.str();
+}
+
+std::string legacyCacheRequest(const std::string &value,
+                               const GenerateOptions &options,
+                               const std::string &output) {
+  std::string request;
+  appendLegacyCachePart(request, output);
+  appendLegacyCachePart(request, value);
+  appendLegacyCachePart(request, options.errorCorrectionLevel);
+  appendLegacyCacheNumber(request, options.minVersion);
+  appendLegacyCacheNumber(request, options.maxVersion);
+  appendLegacyCacheNumber(request, options.mask);
+  appendLegacyCacheNumber(request, options.boostEcl);
+  if (output == "matrix") {
+    return request;
+  }
+
+  appendLegacyCacheNumber(request, options.size);
+  appendLegacyCacheNumber(request, options.quietZone);
+  if (output == "svg") {
+    appendLegacyCachePart(request, options.foregroundColor);
+    appendLegacyCachePart(request, options.backgroundColor);
+    appendLegacyCachePart(request, options.strokeColor);
+    appendLegacyCachePart(request, options.eyeColor);
+    appendLegacyCachePart(request, options.eyeStrokeColor);
+    appendLegacyCachePart(request, options.eyeballColor);
+  }
+  const auto appendColor = [&request](const auto &color) {
+    appendLegacyCacheNumber(request, color.r);
+    appendLegacyCacheNumber(request, color.g);
+    appendLegacyCacheNumber(request, color.b);
+    appendLegacyCacheNumber(request, color.a);
+  };
+  appendColor(options.foreground);
+  appendColor(options.background);
+  appendColor(options.stroke);
+  appendColor(options.eye);
+  appendColor(options.eyeStroke);
+  appendColor(options.eyeball);
+  appendLegacyCachePart(request, options.moduleShape);
+  appendLegacyCachePart(request, options.eyePatternShape);
+  appendLegacyCachePart(request, options.eyeballShape);
+  appendLegacyCacheNumber(request, options.gap);
+  appendLegacyCacheNumber(request, options.eyePatternGap);
+  appendLegacyCachePart(request, options.bodyDensity);
+  appendLegacyCacheNumber(request, options.cornerRadius);
+  appendLegacyCacheNumber(request, options.eyePatternCornerRadius);
+  appendLegacyCachePart(request, options.layout);
+  appendLegacyCacheNumber(request, options.logoAreaSize);
+  appendLegacyCacheNumber(request, options.logoAreaBorderRadius);
+  appendLegacyCachePart(request, options.gradient.type);
+  for (const auto &color : options.gradient.colors) {
+    appendLegacyCacheNumber(request, color.r);
+    appendLegacyCacheNumber(request, color.g);
+    appendLegacyCacheNumber(request, color.b);
+    appendLegacyCacheNumber(request, color.a);
+  }
+  for (double location : options.gradient.locations) {
+    appendLegacyCachePart(request, legacyCacheDouble(location));
+  }
+  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startX));
+  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
+  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
+  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  return request;
 }
 
 std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
@@ -273,6 +359,65 @@ void testCollisionSafeCache() {
   assert(alternate != first);
   assert(generator.generateSvgString("first", options) == first);
   assert(generator.getCacheSize() == 1);
+}
+
+void testNumericCacheKeyFormatting() {
+  std::vector<std::string> requests;
+  QRCodeGenerator generator([&requests](const std::string &request) {
+    requests.push_back(request);
+    return "captured-" + std::to_string(requests.size());
+  });
+
+  GenerateOptions options;
+  options.size = 257;
+  options.quietZone = 3;
+  options.errorCorrectionLevel = "Q";
+  options.minVersion = 2;
+  options.maxVersion = 16;
+  options.mask = -1;
+  options.boostEcl = false;
+  options.foregroundColor = "#10203040";
+  options.backgroundColor = "#50607080";
+  options.strokeColor = "#90A0B0C0";
+  options.eyeColor = "#D0E0F001";
+  options.eyeStrokeColor = "#20304050";
+  options.eyeballColor = "#60708090";
+  options.foreground = parseColor(options.foregroundColor);
+  options.background = parseColor(options.backgroundColor);
+  options.stroke = parseColor(options.strokeColor);
+  options.eye = parseColor(options.eyeColor);
+  options.eyeStroke = parseColor(options.eyeStrokeColor);
+  options.eyeball = parseColor(options.eyeballColor);
+  options.moduleShape = "circle";
+  options.eyePatternShape = "rounded";
+  options.eyeballShape = "circle";
+  options.gap = 2;
+  options.eyePatternGap = 3;
+  options.bodyDensity = "balanced";
+  options.cornerRadius = -1;
+  options.eyePatternCornerRadius = 5;
+  options.layout = "matrix";
+  options.logoAreaSize = 16;
+  options.logoAreaBorderRadius = 4;
+  options.gradient.type = "linear";
+  options.gradient.colors = {parseColor("#01020304"),
+                             parseColor("#FAFBFCFD")};
+  options.gradient.locations = {0.12345678901234566, 0.8765432109876543};
+  options.gradient.startX = 0.23456789012345678;
+  options.gradient.startY = 0.3456789012345679;
+  options.gradient.endX = 0.7654321098765432;
+  options.gradient.endY = 0.6543210987654321;
+
+  generator.generateSvgString("numeric-cache-key-false", options);
+  assert(requests.size() == 1);
+  assert(requests.front() ==
+         legacyCacheRequest("numeric-cache-key-false", options, "svg"));
+
+  options.boostEcl = true;
+  generator.generateSvgString("numeric-cache-key-true", options);
+  assert(requests.size() == 2);
+  assert(requests.back() ==
+         legacyCacheRequest("numeric-cache-key-true", options, "svg"));
 }
 
 void testByteBoundedCache() {
@@ -1050,6 +1195,7 @@ int main() {
   testPngGeneration();
   testDataUriAndCache();
   testCollisionSafeCache();
+  testNumericCacheKeyFormatting();
   testByteBoundedCache();
   testBoundedCacheAccounting();
   testConcurrentGeneration();

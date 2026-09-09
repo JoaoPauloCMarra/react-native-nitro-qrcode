@@ -12,10 +12,13 @@ import {
 } from "react-native";
 import {
   getMatrix,
+  getQRCodeCacheBytes,
   getQRCodeCacheSize,
   getQRCodeMetrics,
   QRCode,
+  toPngBase64Async,
   toPngDataUri,
+  toPngDataUriAsync,
   toSvgString,
   validateOptions,
   type QRCodeRef,
@@ -30,6 +33,7 @@ import {
   type QRCodeShapeOptions,
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { E2eGate } from "../components/e2e-gate";
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
@@ -172,7 +176,11 @@ export default function DemoScreen() {
   const [readyKey, setReadyKey] = useState("");
   const [qrError, setQrError] = useState<string | null>(null);
   const [exportPreview, setExportPreview] = useState<string | null>(null);
-  const [apiPreview, setApiPreview] = useState<string | null>(null);
+  const [apiPreview, setApiPreview] = useState<{
+    options: QRCodeOptions;
+    text: string;
+  } | null>(null);
+  const helperRequest = useRef(0);
   const qrRef = useRef<QRCodeRef>(null);
   const hasPayload = value.trim().length > 0;
   const displayError = hasPayload
@@ -262,6 +270,7 @@ export default function DemoScreen() {
         <Text style={styles.subtitle}>
           Configure production-safe QR codes and verify the output live.
         </Text>
+        <E2eGate />
       </View>
 
       <View style={[styles.workbench, isWideLayout && styles.workbenchWide]}>
@@ -343,7 +352,9 @@ export default function DemoScreen() {
               <Text style={styles.errorText}>{displayError}</Text>
             ) : null}
             <Pressable
+              testID="export-png-base64"
               accessibilityRole="button"
+              accessibilityLabel="Export PNG base64"
               accessibilityState={{
                 disabled: !isPreviewReady,
               }}
@@ -371,33 +382,49 @@ export default function DemoScreen() {
               </Text>
             </Pressable>
             {exportPreview !== null ? (
-              <Text style={styles.label}>{exportPreview}</Text>
+              <Text testID="export-png-result" style={styles.label}>
+                {exportPreview}
+              </Text>
             ) : null}
             <Pressable
+              testID="verify-helpers"
               accessibilityRole="button"
+              accessibilityLabel="Verify helpers + validation"
               accessibilityState={{ disabled: !hasPayload }}
               disabled={!hasPayload}
               onPress={() => {
-                const validation = validateOptions(previewOptions);
-                if (!validation.valid) {
-                  setApiPreview(
-                    `Invalid options: ${validation.errors[0]?.message ?? "unknown error"}`,
-                  );
-                  return;
-                }
+                const request = ++helperRequest.current;
+                const showResult = (text: string) => {
+                  if (request === helperRequest.current) {
+                    setApiPreview({ options: previewOptions, text });
+                  }
+                };
+                void (async () => {
+                  const validation = validateOptions(previewOptions);
+                  if (!validation.valid) {
+                    showResult(
+                      `Invalid options: ${validation.errors[0]?.message ?? "unknown error"}`,
+                    );
+                    return;
+                  }
 
-                try {
-                  const matrix = getMatrix(previewOptions);
-                  const png = toPngDataUri(previewOptions);
-                  const svg = toSvgString(previewOptions);
-                  setApiPreview(
-                    `Valid · ${matrix.size}×${matrix.size} matrix · PNG ${png.length} chars · SVG ${svg.length} chars`,
-                  );
-                } catch (error: unknown) {
-                  setApiPreview(
-                    `Helper error: ${error instanceof Error ? error.message : String(error)}`,
-                  );
-                }
+                  try {
+                    const [png, pngAsync, base64Async] = await Promise.all([
+                      toPngDataUri(previewOptions),
+                      toPngDataUriAsync(previewOptions),
+                      toPngBase64Async(previewOptions),
+                    ]);
+                    const matrix = getMatrix(previewOptions);
+                    const svg = toSvgString(previewOptions);
+                    showResult(
+                      `Valid · ${matrix.size}×${matrix.size} matrix · PNG ${png.length} · async URI ${pngAsync.length} · async base64 ${base64Async.length} · SVG ${svg.length} · cache ${getQRCodeCacheBytes()} B`,
+                    );
+                  } catch (error: unknown) {
+                    showResult(
+                      `Helper error: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                  }
+                })();
               }}
               style={styles.selectButton}
             >
@@ -405,14 +432,17 @@ export default function DemoScreen() {
                 Verify helpers + validation
               </Text>
             </Pressable>
-            {apiPreview !== null ? (
-              <Text style={styles.label}>{apiPreview}</Text>
+            {apiPreview?.options === previewOptions ? (
+              <Text testID="verify-helpers-result" style={styles.label}>
+                {apiPreview.text}
+              </Text>
             ) : null}
           </View>
 
           <View style={styles.inputPanel}>
             <Text style={styles.label}>Payload</Text>
             <TextInput
+              testID="payload-input"
               value={value}
               accessibilityLabel="QR payload"
               onChangeText={(nextValue) => {
@@ -550,6 +580,7 @@ function ConfigTabs({
         const selected = tab === value;
         return (
           <Pressable
+            testID={`config-tab-${tab}`}
             aria-selected={selected}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
@@ -810,6 +841,7 @@ function ShapeGrid<T extends string>({
         const selected = option === value;
         return (
           <Pressable
+            testID={`shape-${option}`}
             accessibilityRole="button"
             aria-selected={selected}
             accessibilityState={{ selected }}
@@ -855,6 +887,7 @@ function LogoConfigPanel({
     <View style={styles.builderPanel}>
       <ControlGroup label="Demo logo">
         <Pressable
+          testID="logo-toggle"
           accessibilityLabel="Show demo logo"
           accessibilityRole="switch"
           aria-checked={showLogo}

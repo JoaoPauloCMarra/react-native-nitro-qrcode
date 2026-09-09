@@ -11,7 +11,11 @@ export default function RootLayout() {
           headerShown: false,
           contentStyle: styles.container,
         }}
-      />
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="e2e" />
+        <Stack.Screen name="e2e-render" />
+      </Stack>
     </View>
   );
 }
