@@ -3,6 +3,7 @@ import {
   forwardRef,
   useImperativeHandle,
   useMemo,
+  useState,
   type ForwardRefExoticComponent,
   type Ref,
   type RefAttributes,
@@ -420,6 +421,25 @@ export function createQRCodeComponent(
       onReady,
       onError,
     );
+    const [imageState, setImageState] = useState<{
+      requested: string | undefined;
+      loaded: string | undefined;
+    }>({ requested: uri, loaded: undefined });
+    if (imageState.requested !== uri) {
+      setImageState({
+        requested: uri,
+        loaded: keepPreviousImage ? imageState.loaded : undefined,
+      });
+    }
+    const imageUris = uri === undefined ? [] : [uri];
+    if (
+      keepPreviousImage &&
+      uri !== undefined &&
+      imageState.loaded !== undefined &&
+      imageState.loaded !== uri
+    ) {
+      imageUris.unshift(imageState.loaded);
+    }
 
     useImperativeHandle(
       ref,
@@ -451,11 +471,25 @@ export function createQRCodeComponent(
         accessibilityState: { busy: uri === undefined },
       },
       uri === undefined && placeholder,
-      uri !== undefined &&
+      imageUris.map((imageUri) =>
         createElement(Image, {
-          source: { uri },
+          key: imageUri,
+          source: { uri: imageUri },
+          fadeDuration: 0,
           resizeMode: "contain",
-          style: [styles.image, imageStyle],
+          style: [
+            styles.image,
+            { position: "absolute" },
+            imageStyle,
+            imageUri !== imageState.loaded && { opacity: 0 },
+          ],
+          onLoad: () => {
+            setImageState((current) =>
+              current.requested === imageUri && current.loaded !== imageUri
+                ? { requested: imageUri, loaded: imageUri }
+                : current,
+            );
+          },
           accessible: false,
           accessibilityElementsHidden: true,
           importantForAccessibility: "no-hide-descendants",
@@ -466,6 +500,7 @@ export function createQRCodeComponent(
               }
             : {}),
         }),
+      ),
       showLogo &&
         createElement(
           View,

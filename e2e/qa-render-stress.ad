@@ -1,0 +1,17 @@
+open "com.qrcode.example" --relaunch
+wait "stable"
+wait id="open-e2e-lab"
+press id="open-e2e-lab"
+wait id="e2e-screen"
+press id="open-e2e-render"
+wait id="e2e-render-screen"
+wait text "e2e-ready"
+wait text "ok:ready=12/12:ms="
+wait id="e2e-render-qr-default"
+scroll bottom
+wait id="e2e-render-qr-empty-safe"
+wait text "Whitespace trimmed"
+scroll top
+press id="e2e-render-remount"
+wait text "ok:ready=12/12:ms="
+close

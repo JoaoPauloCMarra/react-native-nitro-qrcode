@@ -805,7 +805,7 @@ describe("native QRCode API", () => {
     ).not.toHaveLength(0);
   });
 
-  it("keeps the previous image while the next async QR is pending", async () => {
+  it("keeps the loaded image until its replacement loads without Android fading", async () => {
     const first = createDeferred<string>();
     const second = createDeferred<string>();
     mockHybridObject.generatePngDataUriAsyncObject
@@ -824,6 +824,12 @@ describe("native QRCode API", () => {
     await act(async () => {
       first.resolve("data:image/png;base64,first");
       await Promise.resolve();
+    });
+    const firstImage = currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,first",
+    )[0];
+    await act(async () => {
+      firstImage.props.onLoad?.();
     });
     expect(
       currentTree.root.findAll(
@@ -844,11 +850,57 @@ describe("native QRCode API", () => {
       second.resolve("data:image/png;base64,second");
       await Promise.resolve();
     });
-    expect(
-      currentTree.root.findAll(
-        (node) => node.props.source?.uri === "data:image/png;base64,second",
-      ),
-    ).not.toHaveLength(0);
+    const replacementImages = currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,second",
+    );
+    expect(replacementImages).not.toHaveLength(0);
+    for (const image of replacementImages) {
+      expect(image.props.fadeDuration).toBe(0);
+    }
+    expect(currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,first",
+    )).not.toHaveLength(0);
+    await act(async () => {
+      replacementImages[0].props.onLoad();
+    });
+    expect(currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,first",
+    )).toHaveLength(0);
+    expect(currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,second",
+    )[0]).toBe(replacementImages[0]);
+    const completedLoad = replacementImages[0].props.onLoad;
+    await act(async () => {
+      completedLoad();
+    });
+    expect(replacementImages[0].props.onLoad).toBe(completedLoad);
+    mockHybridObject.generatePngDataUriAsyncObject.mockResolvedValueOnce(
+      "data:image/png;base64,third",
+    );
+    await act(async () => {
+      currentTree.update(React.createElement(QRCode, { value: "three" }));
+    });
+    const staleLoad = currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,third",
+    )[0].props.onLoad;
+    mockHybridObject.generatePngDataUriAsyncObject.mockResolvedValueOnce(
+      "data:image/png;base64,fourth",
+    );
+    await act(async () => {
+      currentTree.update(React.createElement(QRCode, { value: "four" }));
+    });
+    await act(async () => {
+      staleLoad();
+    });
+    expect(currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,third",
+    )).toHaveLength(0);
+    expect(currentTree.root.findAll(
+      (node) => node.props.source?.uri === "data:image/png;base64,second",
+    )[0]).toBe(replacementImages[0]);
+    await act(async () => {
+      currentTree.unmount();
+    });
   });
 
   it("clears the QR image when keepPreviousImage is false", async () => {
@@ -875,6 +927,11 @@ describe("native QRCode API", () => {
     await act(async () => {
       first.resolve("data:image/png;base64,one");
       await Promise.resolve();
+    });
+    await act(async () => {
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,one",
+      )[0].props.onLoad();
     });
     expect(
       currentTree.root.findAll(
@@ -1190,6 +1247,20 @@ describe("native QRCode API", () => {
     expect(mockHybridObject.generatePngBase64Object).toHaveBeenCalled();
   });
 
+  it("rejects unsafe strict options before native rendering", async () => {
+    const options = {
+      value: "strict-low-contrast",
+      foregroundColor: "#AAAAAA" as const,
+      backgroundColor: "#FFFFFF" as const,
+      scanSafe: "strict" as const,
+    };
+    for (const render of [toPngBase64, toPngDataUri, toSvgString, getMatrix]) {
+      expect(() => render(options)).toThrow("contrast is low");
+    }
+    await expect(toPngBase64Async(options)).rejects.toThrow("contrast is low");
+    await expect(toPngDataUriAsync(options)).rejects.toThrow("contrast is low");
+  });
+
   it("validates scanability warnings and errors", () => {
     const scanable = NitroQRCode.validateOptions({
       value: "https://example.com",
@@ -1311,6 +1382,76 @@ describe("native QRCode API", () => {
     });
 
     expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["resolve", "reject"] as const)("ignores stale %s while the latest request owns callbacks and the visible QR", async (outcome) => {
+    const first = createDeferred<string>();
+    const second = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const firstReady = jest.fn();
+    const secondReady = jest.fn();
+    const firstError = jest.fn();
+    const secondError = jest.fn();
+
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "one",
+          onReady: firstReady,
+          onError: firstError,
+        }),
+      );
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+
+    await act(async () => {
+      currentTree.update(
+        React.createElement(QRCode, {
+          value: "two",
+          onReady: secondReady,
+          onError: secondError,
+        }),
+      );
+    });
+
+    await act(async () => {
+      if (outcome === "resolve") {
+        first.resolve("data:image/png;base64,stale");
+      } else {
+        first.reject(new Error("stale generation failure"));
+      }
+      await Promise.resolve();
+    });
+
+    expect(firstReady).not.toHaveBeenCalled();
+    expect(firstError).not.toHaveBeenCalled();
+    expect(secondReady).not.toHaveBeenCalled();
+    expect(secondError).not.toHaveBeenCalled();
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,stale",
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      second.resolve("data:image/png;base64,latest");
+      await Promise.resolve();
+    });
+
+    expect(firstReady).not.toHaveBeenCalled();
+    expect(secondReady).toHaveBeenCalledTimes(1);
+    expect(secondReady).toHaveBeenCalledWith("data:image/png;base64,latest");
+    expect(
+      currentTree.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,latest",
+      ),
+    ).not.toHaveLength(0);
   });
 
   it("surfaces async QR generation errors", async () => {
@@ -2323,6 +2464,20 @@ describe("web QRCode API", () => {
     });
 
     expect(onReady).toHaveBeenCalledWith("data:image/png;base64,web-png");
+  });
+
+  it("rejects unsafe strict options before web rendering", async () => {
+    const options = {
+      value: "strict-low-contrast",
+      foregroundColor: "#AAAAAA" as const,
+      backgroundColor: "#FFFFFF" as const,
+      scanSafe: "strict" as const,
+    };
+    for (const render of [Web.toPngBase64, Web.toPngDataUri, Web.toSvgString, Web.getMatrix]) {
+      expect(() => render(options)).toThrow("contrast is low");
+    }
+    await expect(Web.toPngBase64Async(options)).rejects.toThrow("contrast is low");
+    await expect(Web.toPngDataUriAsync(options)).rejects.toThrow("contrast is low");
   });
 
   it("validates web scanability warnings and errors", () => {
