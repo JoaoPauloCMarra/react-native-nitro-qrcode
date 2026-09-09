@@ -234,7 +234,7 @@ export function validateOptions(
   options: QRCodeOptions,
 ): QRCodeValidationResult {
   try {
-    const normalized = normalizeOptions(options);
+    const normalized = normalizeOptionsUnchecked(options);
     const warnings = scanabilityWarnings(normalized);
     return {
       valid: normalized.scanSafe !== "strict" || warnings.length === 0,
@@ -257,6 +257,17 @@ export function validateOptions(
 }
 
 export function normalizeOptions(options: QRCodeOptions): NormalizedOptions {
+  const normalized = normalizeOptionsUnchecked(options);
+  if (normalized.scanSafe === "strict") {
+    const warnings = scanabilityWarnings(normalized);
+    if (warnings.length > 0) {
+      throw new Error(warnings.map((warning) => warning.message).join(" "));
+    }
+  }
+  return normalized;
+}
+
+function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
   if (options.value.length === 0) {
     throw new Error("QRCode value must not be empty.");
   }

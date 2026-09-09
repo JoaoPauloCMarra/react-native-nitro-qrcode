@@ -326,12 +326,16 @@ reliable scanning.
 With `scanSafe`, quiet zones smaller than four modules are raised to four. When
 `scanSafe` is enabled with a non-zero logo area, error correction is raised to
 `H`.
-`scanSafe: "strict"` additionally converts scanability warnings into validation
-errors.
+`scanSafe: "strict"` additionally rejects generation when scanability warnings
+remain. Synchronous methods throw, asynchronous methods reject, and the component
+reports the error through `onError`. `validateOptions` returns the warnings as
+structured errors without throwing.
 
 Generation starts when normalized render options change. While it runs,
 `placeholder` is shown if no current image is available. `keepPreviousImage`
-keeps the prior QR visible, and `hideLogoUntilReady` delays the overlay.
+keeps the prior QR visible until the replacement image finishes loading, and
+`hideLogoUntilReady` delays the overlay. QR images do not use Android's default
+fade animation when the value or options change.
 `onReady` receives the successful PNG data URI. Stale or unmounted async
 completions are ignored. Identical options on a later mount reuse the package
 cache, so `onReady` can fire with the cached URI without a second encode.
@@ -504,6 +508,17 @@ skipped (with a reason), or failed and never passes silently; use
 `bun run example:smoke -- --strict` when a release must fail if no Android
 device or booted iOS simulator is available. `bun run example:smoke:ci`
 verifies the terminal-state reporting without devices and runs in `check`.
+
+With the example's Metro server running, `bun run example:e2e:image-swap
+--device "RN Expo MidRange"` records 12 QR values at two-second intervals.
+Use the selected iOS simulator's name for the iOS regression check. Inspect
+the recording for blank or faded frames between values; generation callbacks
+alone do not prove that the image stayed visible.
+
+The `e2e/qa-scanability.ad` flow checks sizes, payloads, shapes, gradients, logos,
+transparent backgrounds, strict validation, and recovery. Decode the captured
+QR images with an independent scanner and compare the exact payloads with
+`apps/example/app/e2e-scanability.tsx`.
 
 `bun run benchmark:cpp` measures only an isolated optimized native C++ process
 in a temporary build directory. It does not measure React Native mounting,

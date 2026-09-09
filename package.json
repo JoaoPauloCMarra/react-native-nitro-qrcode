@@ -44,6 +44,7 @@
     "example:e2e:android": "agent-device test e2e/qa-full-features.ad --device \"RN Expo MidRange\" --retries 1",
     "example:e2e:ios": "agent-device test e2e/qa-full-features.ad --device \"iPhone 17 Pro Max (iOS 26.5)\" --retries 1",
     "example:e2e:render": "agent-device test e2e/qa-render-stress.ad --retries 1",
+    "example:e2e:image-swap": "agent-device test e2e/qa-image-swap.ad --retries 0 --record-video",
     "example:e2e:render:android": "agent-device test e2e/qa-render-stress.ad --device \"RN Expo MidRange\" --retries 1",
     "example:e2e:render:ios": "agent-device test e2e/qa-render-stress.ad --device \"iPhone 17 Pro Max (iOS 26.5)\" --retries 1",
     "example:e2e:deeplink": "agent-device test e2e/qa-deeplink.ad --retries 1",

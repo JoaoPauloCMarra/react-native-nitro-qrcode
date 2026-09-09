@@ -1,0 +1,79 @@
+open "com.qrcode.example" --relaunch
+wait id="open-e2e-lab"
+open "qrcode://e2e-scanability"
+wait text "ready:default"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/default.png"
+press id="scan-next"
+wait text "ready:small"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/small.png"
+press id="scan-next"
+wait text "ready:large"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/large.png"
+press id="scan-next"
+wait text "ready:unicode"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/unicode.png"
+press id="scan-next"
+wait text "ready:long"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/long.png"
+press id="scan-next"
+wait text "ready:rounded"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/rounded.png"
+press id="scan-next"
+wait text "ready:dots"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/dots.png"
+press id="scan-next"
+wait text "ready:branded"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/branded.png"
+press id="scan-next"
+wait text "ready:linear"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/linear.png"
+press id="scan-next"
+wait text "ready:radial"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/radial.png"
+press id="scan-next"
+wait text "ready:logo"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/logo.png"
+press id="scan-next"
+wait text "ready:transparent-light"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/transparent-light.png"
+press id="scan-next"
+wait text "ready:transparent-dark"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/transparent-dark.png"
+press id="scan-next"
+wait text "ready:quiet-zone"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/quiet-zone.png"
+press id="scan-next"
+wait text "ready:clear-previous"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/clear-previous.png"
+press id="scan-next"
+wait text "rejected:invalid-empty"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/invalid-empty.png"
+press id="scan-next"
+wait text "ready:recover"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/recover.png"
+press id="scan-next"
+wait text "rejected:strict-low-contrast"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/strict-low-contrast.png"
+press id="scan-next"
+wait text "ready:final-recover"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/final-recover.png"
+close

@@ -1,0 +1,5 @@
+open "com.qrcode.example" --relaunch
+wait id="open-e2e-lab"
+open "qrcode://e2e-image-swap"
+wait text "QR code for https://example.com/scan/12?" 40000
+close

@@ -14,6 +14,11 @@ Breaking changes are always listed first in each release section.
 
 ### Fixed
 
+- Reject scanability warnings during generation with `scanSafe: "strict"`
+  on native and web, including low-contrast colors.
+- Keep the loaded QR visible until its replacement image loads and disable
+  Android image fading, preventing blank or faded frames during value updates
+  with `keepPreviousImage` enabled ([#25](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/issues/25)).
 - Apply the Kotlin Android plugin only when the Gradle Kotlin extension is
   absent, so AGP 9 consumers that already ship built-in Kotlin can configure
   the library.
