@@ -87,6 +87,10 @@ Direct upgrades from 0.5.x or earlier still require the Nitro 0.37 native
 rebuild described above. Review the matching [0.6.0 changelog entry](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/CHANGELOG.md#060---2026-08-20)
 when skipping releases.
 
+iOS static frameworks are supported with source-built React Native. After
+upgrading, regenerate the Expo native project or run `pod install`, then rebuild
+the app so CocoaPods applies the updated header paths.
+
 ## Expo Config
 
 No app config options are required.
