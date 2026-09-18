@@ -15,7 +15,7 @@ export function isAlignmentModule(
     return false;
   }
   const version = (matrixSize - 17) / 4;
-  if (version < 2 || !Number.isInteger(version)) {
+  if (!Number.isInteger(version)) {
     return false;
   }
   const positions = alignmentPatternPositions(version, matrixSize);

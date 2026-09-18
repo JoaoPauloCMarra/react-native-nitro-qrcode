@@ -98,4 +98,28 @@ describe("web color-equivalent PNG rendering", () => {
     expect(canvas.toDataURL).toHaveBeenCalledTimes(2);
     expect(Web.getQRCodeCacheSize()).toBe(2);
   });
+
+  it("paints a distinct quiet zone over an opaque inner background", () => {
+    installRecordingCanvas();
+    const output = Web.toPngDataUri({
+      ...equivalentOptions,
+      backgroundColor: "#FFFFFF",
+      quietZoneColor: "#E2E8F0",
+    });
+
+    expect(output.startsWith("data:image/png;base64,")).toBe(true);
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+  });
+
+  it("clears a distinct quiet zone over a transparent inner background", () => {
+    installRecordingCanvas();
+    const output = Web.toPngDataUri({
+      ...equivalentOptions,
+      backgroundColor: "transparent",
+      quietZoneColor: "#E2E8F0",
+    });
+
+    expect(output.startsWith("data:image/png;base64,")).toBe(true);
+    expect(Web.getQRCodeCacheSize()).toBe(1);
+  });
 });
