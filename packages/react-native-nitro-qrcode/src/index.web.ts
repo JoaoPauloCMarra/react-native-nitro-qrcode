@@ -17,7 +17,11 @@ import {
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
-import { createRenderPlan, type RenderPlan } from "./render-plan";
+import {
+  createRenderPlan,
+  type RenderNeighbors,
+  type RenderPlan,
+} from "./render-plan";
 import {
   normalizeOptions,
   validateOptions,
@@ -161,6 +165,26 @@ const webCache = createBoundedCache<string>(
   (key, request, value) => (key.length + request.length + value.length) * 2,
 );
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
+
+function dataUriToArrayBuffer(uri: string): ArrayBuffer {
+  const encoded = uri.slice("data:image/png;base64,".length);
+  const binary = globalThis.atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+export function toPngArrayBuffer(options: QRCodeOptions): ArrayBuffer {
+  return dataUriToArrayBuffer(toPngDataUri(options));
+}
+
+export async function toPngArrayBufferAsync(
+  options: QRCodeOptions,
+): Promise<ArrayBuffer> {
+  return dataUriToArrayBuffer(await toPngDataUriAsync(options));
+}
 
 export function toPngBase64(options: QRCodeOptions): string {
   const uri = toPngDataUri(options);
@@ -366,6 +390,8 @@ export const QRCode: ForwardRefExoticComponent<
 });
 
 export const NitroQRCode: NitroQRCodeApi = {
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngDataUri,
   toPngBase64Async,
@@ -390,11 +416,24 @@ function preparePngCanvas(
   useLayerColors: boolean;
 } {
   const pixelSize = plan.pixelSize;
-  if (plan.background.type === "transparent") {
+  const canvasFill = plan.quietZoneFill ?? plan.background;
+  if (canvasFill.type === "transparent") {
     context.clearRect(0, 0, pixelSize, pixelSize);
   } else {
-    context.fillStyle = toSvgColor(plan.background.color);
+    context.fillStyle = toSvgColor(canvasFill.color);
     context.fillRect(0, 0, pixelSize, pixelSize);
+  }
+  if (plan.quietZoneFill !== undefined) {
+    const inset = Math.round(
+      (plan.quietZone * pixelSize) / plan.totalModules,
+    );
+    const inner = pixelSize - inset * 2;
+    if (plan.background.type === "transparent") {
+      context.clearRect(inset, inset, inner, inner);
+    } else {
+      context.fillStyle = toSvgColor(plan.background.color);
+      context.fillRect(inset, inset, inner, inner);
+    }
   }
   const foregroundFill = createForegroundFill(
     context,
@@ -449,6 +488,7 @@ function drawPlanRows(
           module.shape,
           module.gap,
           module.cornerRadius,
+          module.neighbors,
         );
         context.fillStyle = resolvePlanFill(
           options,
@@ -464,6 +504,7 @@ function drawPlanRows(
           module.shape,
           module.strokeGap,
           module.cornerRadius,
+          module.neighbors,
         );
         continue;
       }
@@ -481,6 +522,7 @@ function drawPlanRows(
         module.shape,
         module.gap,
         module.cornerRadius,
+        module.neighbors,
       );
     }
   }
@@ -489,13 +531,19 @@ function drawPlanRows(
 function resolvePlanFill(
   options: NormalizedOptions,
   foregroundFill: CanvasFill,
-  layer: "foreground" | "stroke" | "eye" | "eyeball",
+  layer: "foreground" | "stroke" | "eye" | "eyeball" | "alignment" | "timing",
 ): CanvasFill {
   if (layer === "eyeball") {
     return toSvgColor(options.eyeballColor);
   }
   if (layer === "eye") {
     return toSvgColor(options.eyeColor);
+  }
+  if (layer === "alignment") {
+    return toSvgColor(options.alignmentColor);
+  }
+  if (layer === "timing") {
+    return toSvgColor(options.timingColor);
   }
   return foregroundFill;
 }
@@ -590,7 +638,11 @@ function hasCustomLayerColors(options: NormalizedOptions): boolean {
     !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE) ||
     !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
     !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
-    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL)
+    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL) ||
+    !areRgbaColorsEqual(options.alignmentColor, options.foregroundColor) ||
+    !areRgbaColorsEqual(options.timingColor, options.foregroundColor) ||
+    !areRgbaColorsEqual(options.quietZoneColor, options.backgroundColor) ||
+    !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
   );
 }
 
@@ -733,7 +785,7 @@ function drawGroupedFinder(
     context,
     rect(1, 5),
     frameShape,
-    toSvgColor(options.backgroundColor),
+    toSvgColor(options.finderInnerColor),
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -779,7 +831,22 @@ function drawFinderShape(
     context.fill();
     return;
   }
-  if (shape === "rounded" || cornerRadius >= 0) {
+  if (shape === "diamond") {
+    drawDiamond(context, rect.x, rect.y, rect.size, rect.size);
+    return;
+  }
+  if (shape === "squircle") {
+    drawRoundedRect(
+      context,
+      rect.x,
+      rect.y,
+      rect.size,
+      rect.size,
+      Math.max(1, (rect.size * 9) / 20),
+    );
+    return;
+  }
+  if (shape === "rounded" || shape === "classy" || cornerRadius >= 0) {
     drawRoundedRect(
       context,
       rect.x,
@@ -802,6 +869,7 @@ function drawModule(
   shape: QRCodeShape,
   gap: number,
   cornerRadius: number,
+  neighbors: RenderNeighbors,
 ): void {
   const maxGap = Math.max(0, (Math.min(x1 - x0, y1 - y0) - 1) / 2);
   const inset = Math.min(gap, maxGap);
@@ -811,6 +879,33 @@ function drawModule(
   const height = Math.max(0, y1 - y0 - inset * 2);
   if (shape === "circle") {
     drawEllipse(context, left, top, width, height);
+    return;
+  }
+  if (shape === "diamond") {
+    drawDiamond(context, left, top, width, height);
+    return;
+  }
+  if (shape === "squircle") {
+    drawRoundedRect(
+      context,
+      left,
+      top,
+      width,
+      height,
+      Math.max(1, (Math.min(width, height) * 9) / 20),
+    );
+    return;
+  }
+  if (shape === "classy") {
+    drawClassy(
+      context,
+      left,
+      top,
+      width,
+      height,
+      cornerRadius >= 0 ? cornerRadius : Math.min(width, height) / 3,
+      neighbors,
+    );
     return;
   }
   if (shape === "rounded" || cornerRadius >= 0) {
@@ -844,6 +939,79 @@ function clearLogoArea(
   drawRoundedRect(context, left, top, areaSize, areaSize, borderRadius);
   context.restore();
   context.fillStyle = foregroundFill;
+}
+
+function drawDiamond(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  context.beginPath();
+  context.moveTo(x + width / 2, y);
+  context.lineTo(x + width, y + height / 2);
+  context.lineTo(x + width / 2, y + height);
+  context.lineTo(x, y + height / 2);
+  context.closePath();
+  context.fill();
+}
+
+function drawClassy(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  neighbors: RenderNeighbors,
+): void {
+  const roundTL = !neighbors.north && !neighbors.west;
+  const roundTR = !neighbors.north && !neighbors.east;
+  const roundBR = !neighbors.south && !neighbors.east;
+  const roundBL = !neighbors.south && !neighbors.west;
+  if (!roundTL && !roundTR && !roundBR && !roundBL) {
+    context.fillRect(x, y, width, height);
+    return;
+  }
+  const corner = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  if (roundTL) {
+    context.moveTo(x + corner, y);
+  } else {
+    context.moveTo(x, y);
+  }
+  if (roundTR) {
+    context.lineTo(x + width - corner, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + corner);
+  } else {
+    context.lineTo(x + width, y);
+  }
+  if (roundBR) {
+    context.lineTo(x + width, y + height - corner);
+    context.quadraticCurveTo(
+      x + width,
+      y + height,
+      x + width - corner,
+      y + height,
+    );
+  } else {
+    context.lineTo(x + width, y + height);
+  }
+  if (roundBL) {
+    context.lineTo(x + corner, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - corner);
+  } else {
+    context.lineTo(x, y + height);
+  }
+  if (roundTL) {
+    context.lineTo(x, y + corner);
+    context.quadraticCurveTo(x, y, x + corner, y);
+  } else {
+    context.lineTo(x, y);
+  }
+  context.closePath();
+  context.fill();
 }
 
 function drawEllipse(
@@ -980,6 +1148,10 @@ function cacheRequest(
           options.eyeColor,
           options.eyeStrokeColor,
           options.eyeballColor,
+          options.alignmentColor,
+          options.timingColor,
+          options.quietZoneColor,
+          options.finderInnerColor,
         ]
       : [
           rgbaColorBytes(options.foregroundColor),
@@ -988,6 +1160,10 @@ function cacheRequest(
           rgbaColorBytes(options.eyeColor),
           rgbaColorBytes(options.eyeStrokeColor),
           rgbaColorBytes(options.eyeballColor),
+          rgbaColorBytes(options.alignmentColor),
+          rgbaColorBytes(options.timingColor),
+          rgbaColorBytes(options.quietZoneColor),
+          rgbaColorBytes(options.finderInnerColor),
         ];
   const gradientColors =
     output === "svg" && !canonicalColors
@@ -1012,6 +1188,8 @@ function cacheRequest(
     options.shapeOptions.bodyDensity,
     options.shapeOptions.cornerRadius,
     options.shapeOptions.eyePatternCornerRadius,
+    options.shapeOptions.alignmentShape,
+    options.shapeOptions.timingShape,
     options.shapeOptions.layout,
     options.logoAreaSize,
     options.logoAreaBorderRadius,

@@ -20,4 +20,74 @@ performance change is considered stable.
 The benchmark covers matrix generation, packed base64, cold and cache-hit PNG
 rendering, gradients, styled previews, SVG, base64 encoding, and parallel PNG
 work. It is not a React Native mount or device benchmark; measure those
-separately in the example app.
+separately in the example app (`apps/example/app/e2e-png-bench.tsx`).
+
+## iPhone 17e PNG export (cold cache)
+
+Device: iPhone 17e, iOS 27.0 (24A437), personal team `W7FC2HV876`.
+Method: 3 warmup + 20 timed iterations, `clearQRCodeCache` before each sample,
+`performance.now()`. Payloads: `small-text` (`Hi`, 128 px), `medium-url`
+(GitHub URL, 256 px), `large-high-res` (240-character URL, 1024 px).
+
+Before (v0.7.2, base64-only):
+
+| payload | method | median ms | bytes |
+| --- | --- | ---: | ---: |
+| small-text | sync-base64 | 1.935 | 456 |
+| small-text | async-base64 | 1.216 | 456 |
+| medium-url | sync-base64 | 2.755 | 948 |
+| medium-url | async-base64 | 2.771 | 948 |
+| large-high-res | sync-base64 | 18.093 | 4696 |
+| large-high-res | async-base64 | 18.163 | 4696 |
+
+After (0.8.0 ArrayBuffer path; base64 remains a wrapper over PNG bytes):
+
+| payload | method | median ms | bytes |
+| --- | --- | ---: | ---: |
+| small-text | sync-base64 | 1.969 | 456 |
+| small-text | async-base64 | 1.214 | 456 |
+| small-text | sync-arraybuffer | 1.027 | 340 |
+| small-text | async-arraybuffer | 1.049 | 340 |
+| medium-url | sync-base64 | 2.750 | 948 |
+| medium-url | async-base64 | 2.772 | 948 |
+| medium-url | sync-arraybuffer | 2.737 | 709 |
+| medium-url | async-arraybuffer | 2.765 | 709 |
+| large-high-res | sync-base64 | 18.005 | 4696 |
+| large-high-res | async-base64 | 18.326 | 4696 |
+| large-high-res | sync-arraybuffer | 18.072 | 3520 |
+| large-high-res | async-arraybuffer | 18.903 | 3520 |
+
+ArrayBuffer `bytes` are raw PNG length; base64 `bytes` are the encoded string
+length. Encode work dominates medium and large payloads, so those medians sit
+inside run-to-run noise of the previous base64 path. The small-text sync
+ArrayBuffer median was 1.027 ms on this device versus 1.935 ms for the
+previous sync base64 path.
+
+Those iPhone rows are Dev Client + JSI + `clearQRCodeCache` costs, not the
+isolated C++ encoder. `bun run benchmark:cpp` is the process that measures
+native PNG encode.
+
+## Encoder bake-off (Apple Silicon ARM64, `-O2`)
+
+Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
+
+| Candidate | Result | Decision |
+| --- | --- | --- |
+| Nayuki `QR-Code-generator` (already vendored) | Correct mixed-mode matrix; `quirc` decoded it | Keep |
+| Current 1-bit indexed zlib PNG | 0.19 ms / 1949 B for a 1024 px flat QR | Keep |
+| Current zlib RGBA (`Z_BEST_SPEED`) | 3.56 ms / 48.9 KB flat, 4.90 ms / 185 KB gradient | Replaced for RGBA |
+| `fpng` two-pass (`FPNG_ENCODE_SLOWER`) | 1.68 ms / 49.7 KB flat (SSE4.1 unavailable) | Keep for RGBA |
+| `fpng` one-pass | 1.64 ms but 102 KB flat | Reject (size) |
+| Apple zlib `Z_RLE` / `Z_HUFFMAN_ONLY` | 11–19 ms and much larger | Reject |
+| `zlib-ng` `Z_BEST_SPEED` | 2.50 ms but 374 KB | Reject (size + vendor weight) |
+| `zlib-ng` default level | 2.94 ms / 117 KB | Reject (large vendor for one path `fpng` already covers) |
+| `fpnge` | AVX2-only | Reject |
+| Nayuki Rust / `qrcode` crate | Same matrix algorithm, extra FFI next to Nitro | Reject |
+| Rust `qr-code-styling` / `modo-rs` | Useful styled-dot algorithms, extra FFI next to Nitro | Reject; ported classy/diamond/squircle into `core/` |
+| `zxing-cpp` | Useful decoder, too large to vendor | Reject |
+| `quirc` | Decoded a real Nayuki matrix (`found=1 matched=1`) | Keep as host C++ scan-back only |
+
+Do not treat the bake-off table as an iPhone 17e result. Re-run
+`bun run benchmark:cpp` on the same machine after PNG encoder changes. The
+`rgba-gradient-png-cold` and `preview-styled-png-cold` rows are the `fpng`
+path; `indexed-png-*` rows stay on the 1-bit zlib writer.

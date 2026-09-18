@@ -19,8 +19,11 @@ Pod::Spec.new do |s|
     "cpp/bindings/*.{h,hpp,c,cpp}",
     "cpp/core/BoundedCache.hpp",
     "cpp/core/QRCodeGenerator.{h,hpp,c,cpp}",
-    "cpp/qrcodegen/*.{h,hpp,c,cpp}"
+    "cpp/qrcodegen/*.{h,hpp,c,cpp}",
+    "cpp/vendor/fpng/fpng.h",
+    "cpp/vendor/fpng/fpng_unity.cpp"
   ]
+  s.preserve_paths = "cpp/vendor/fpng/fpng.cpp"
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
@@ -30,6 +33,7 @@ Pod::Spec.new do |s|
       "\"$(PODS_TARGET_SRCROOT)/cpp/core\"",
       "\"$(PODS_TARGET_SRCROOT)/cpp/bindings\"",
       "\"$(PODS_TARGET_SRCROOT)/cpp/qrcodegen\"",
+      "\"$(PODS_TARGET_SRCROOT)/cpp/vendor/fpng\"",
       "\"$(PODS_TARGET_SRCROOT)/nitrogen/generated/shared/c++\"",
       "\"$(PODS_TARGET_SRCROOT)/nitrogen/generated/ios\""
     ].join(" ")

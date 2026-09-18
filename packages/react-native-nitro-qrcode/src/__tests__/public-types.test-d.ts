@@ -25,6 +25,8 @@ import {
   NitroQRCode,
   getMatrix,
   getQRCodeCacheBytes,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -58,10 +60,18 @@ const validOptions: QRCodeOptions = {
   size: 4096,
   foregroundColor: hexColor,
   backgroundColor: transparentBackground,
+  alignmentColor: hexColor,
+  timingColor: hexColor,
+  quietZoneColor: transparentBackground,
+  finderInnerColor: transparentBackground,
   gradient: validGradient,
   minVersion: version,
   mask,
   orbit: true,
+  shapeOptions: {
+    alignmentShape: "diamond",
+    timingShape: "circle",
+  },
 };
 
 const validProps: QRCodeProps = {
@@ -79,12 +89,15 @@ const validProps: QRCodeProps = {
 
 void validProps;
 
+const pngBytes: ArrayBuffer = toPngArrayBuffer(validOptions);
 const pngBase64: string = toPngBase64(validOptions);
 const pngDataUri: string = toPngDataUri(validOptions);
 const svg: string = toSvgString(validOptions);
 const matrix: QRCodeMatrix = getMatrix(validOptions);
 const cacheBytes: number = getQRCodeCacheBytes();
 const validation: QRCodeValidationResult = validateOptions(validOptions);
+const asyncPngBytes: Promise<ArrayBuffer> =
+  toPngArrayBufferAsync(validOptions);
 const asyncPngBase64: Promise<string> = toPngBase64Async(validOptions);
 const asyncPngDataUri: Promise<string> = toPngDataUriAsync(validOptions);
 const api: NitroQRCodeApi = NitroQRCode;
@@ -93,10 +106,12 @@ const ref: QRCodeRef = {
   toPngBase64: () => pngBase64,
 };
 
+void pngBytes;
 void svg;
 void matrix;
 void cacheBytes;
 void validation;
+void asyncPngBytes;
 void asyncPngBase64;
 void asyncPngDataUri;
 void api;
@@ -113,6 +128,22 @@ const badForegroundOption: QRCodeOptions = {
   // @ts-expect-error only backgrounds can be transparent.
   foregroundColor: "transparent",
 };
+
+const badAlignmentOption: QRCodeOptions = {
+  value: "x",
+  // @ts-expect-error alignment colors must be hex colors.
+  alignmentColor: "transparent",
+};
+
+void badAlignmentOption;
+
+const badTimingOption: QRCodeOptions = {
+  value: "x",
+  // @ts-expect-error timing colors must be hex colors.
+  timingColor: "transparent",
+};
+
+void badTimingOption;
 
 void badForegroundOption;
 
@@ -167,7 +198,11 @@ void badLayout;
 
 expectFalse<IsAssignable<"maximum", ErrorCorrectionLevel>>();
 expectFalse<IsAssignable<"solid", QRCodeBodyDensity>>();
-expectFalse<IsAssignable<"diamond", QRCodeBodyShape>>();
+const modernShape: QRCodeBodyShape = "diamond";
+const modernPreset: QRCodePreset = "fluid";
+void modernShape;
+void modernPreset;
+expectFalse<IsAssignable<"hexagon", QRCodeBodyShape>>();
 expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
 expectFalse<IsAssignable<"unknown", QRCodeKnownValidationErrorCode>>();

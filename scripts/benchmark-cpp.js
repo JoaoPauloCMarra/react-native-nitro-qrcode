@@ -74,6 +74,7 @@ function parseBenchmarkOutput(output) {
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorBenchmark.cpp"),
   path.join(cppDir, "core", "QRCodeGenerator.cpp"),
+  path.join(cppDir, "vendor", "fpng", "fpng_unity.cpp"),
   path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
 ];
 
@@ -87,6 +88,7 @@ const compileArgs = [
   ...(smoke ? ["-DNITRO_BENCHMARK_SMOKE"] : []),
   `-I${path.join(cppDir, "core")}`,
   `-I${path.join(cppDir, "qrcodegen")}`,
+  `-I${path.join(cppDir, "vendor", "fpng")}`,
   ...sources,
   "-o",
   outputFile,

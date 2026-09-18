@@ -5,7 +5,7 @@ namespace margelo::nitro::NitroQRCode {
 
 ::NitroQRCode::GenerateOptions makeGenerateOptions(
     const GenerateOptions &options) {
-  return makeGenerateOptions(
+  auto resolved = makeGenerateOptions(
       options.size, options.quietZone, options.errorCorrectionLevel,
       options.foregroundColor, options.backgroundColor, options.strokeColor,
       options.eyeColor, options.eyeStrokeColor, options.eyeballColor,
@@ -17,9 +17,41 @@ namespace margelo::nitro::NitroQRCode {
       options.gradientType, options.gradientColors, options.gradientLocations,
       options.gradientStartX, options.gradientStartY, options.gradientEndX,
       options.gradientEndY);
+  resolved.alignmentColor =
+      options.alignmentColor.value_or(options.foregroundColor);
+  resolved.timingColor = options.timingColor.value_or(options.foregroundColor);
+  resolved.quietZoneColor =
+      options.quietZoneColor.value_or(options.backgroundColor);
+  resolved.finderInnerColor =
+      options.finderInnerColor.value_or(options.backgroundColor);
+  resolved.alignment = ::NitroQRCode::parseColor(resolved.alignmentColor);
+  resolved.timing = ::NitroQRCode::parseColor(resolved.timingColor);
+  resolved.quietZoneFill = ::NitroQRCode::parseColor(resolved.quietZoneColor);
+  resolved.finderInner = ::NitroQRCode::parseColor(resolved.finderInnerColor);
+  resolved.alignmentShape =
+      options.alignmentShape.value_or(options.moduleShape);
+  resolved.timingShape = options.timingShape.value_or(options.moduleShape);
+  return resolved;
 }
 
 HybridQRCode::HybridQRCode() : HybridObject(TAG), HybridQRCodeSpec() {}
+
+std::shared_ptr<ArrayBuffer> HybridQRCode::generatePngArrayBufferObject(
+    const GenerateOptions &options) {
+  return ArrayBuffer::move(generator_.renderPngBytes(
+      options.value, makeGenerateOptions(options)));
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridQRCode::generatePngArrayBufferAsyncObject(
+    const GenerateOptions &options) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::shared_ptr<ArrayBuffer>>::async(
+      [self, options]() mutable {
+        return ArrayBuffer::move(self->generator_.renderPngBytes(
+            options.value, makeGenerateOptions(options)));
+      });
+}
 
 std::string HybridQRCode::generatePngBase64Object(
     const GenerateOptions &options) {

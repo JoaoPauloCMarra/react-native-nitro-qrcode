@@ -57,12 +57,26 @@ bare React Native app.
 | React Native Web | `>=0.19.0 <1.0.0`                                   |
 | Node             | `>=18.0.0`                                          |
 
-The current example and package gate use React Native `0.86.3` and Expo SDK 57.
+The current example and package gate use React Native `0.86.3` and Expo SDK 57
+(`expo@~57.0.24`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
 Strict TypeScript compatibility. Expo SDK 57 selects React Native `0.86.3`; do
 not override that version in the example. The baseline uses React `19.2.3` and
 Nitro Modules `0.37.1`. The wider ranges above are the package's declared peer
 compatibility.
+
+### Upgrade from 0.7.x
+
+Version 0.8.0 adds `toPngArrayBuffer` / `toPngArrayBufferAsync` (and the
+matching Nitro object methods). Existing base64 and data-URI helpers stay;
+they now wrap raw PNG bytes. Native RGBA export (gradients, layered colors,
+logo-area clearing) uses vendored `fpng`, so those PNG files can differ in
+size and compressed bytes from 0.7.x while decoding to the same pixels. Flat
+two-color codes still use the 1-bit indexed zlib writer. New optional looks
+are `classy`, `mosaic`, and `fluid` (`diamond`, `squircle`, and neighbor-aware
+`classy` shapes). Alignment, timing, quiet-zone, and finder-inner colors/shapes
+are independently optional; omitted values keep the previous body/background
+look. There are no breaking JavaScript API changes.
 
 ### Upgrade from 0.7.0
 
@@ -140,7 +154,7 @@ export function BrandedCode() {
     <QRCode
       value="https://example.com/app"
       size={260}
-      preset="branded"
+      preset="classy"
       foregroundColor="#111827"
       backgroundColor="#FFFFFF"
       eyeColor="#1E40AF"
@@ -151,10 +165,16 @@ export function BrandedCode() {
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
       }}
+      alignmentColor="#B45309"
+      timingColor="#0F766E"
+      quietZoneColor="#F8FAFC"
+      finderInnerColor="#FFF7ED"
       shapeOptions={{
         shape: "rounded",
         eyeFrameShape: "rounded",
         eyeballShape: "circle",
+        alignmentShape: "diamond",
+        timingShape: "circle",
         gap: 1,
         bodyDensity: "dense",
       }}
@@ -182,6 +202,8 @@ export function BrandedCode() {
 import {
   getMatrix,
   getQRCodeCacheBytes,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -196,8 +218,10 @@ const options = {
   backgroundColor: "#FFFFFF",
 } as const;
 
+const pngBytes = toPngArrayBuffer(options);
 const png = toPngBase64(options);
 const uri = toPngDataUri(options);
+const asyncPngBytes = await toPngArrayBufferAsync(options);
 const asyncPng = await toPngBase64Async(options);
 const svg = toSvgString(options);
 const matrix = getMatrix(options);
@@ -209,8 +233,11 @@ generation completes.
 The exported `NitroQRCode` object exposes the same PNG, SVG, matrix, validation,
 cache, and metrics helpers for callers that prefer an object API. Native
 `HybridQRCode` integrations should use the object-shaped methods
+`generatePngArrayBufferObject`, `generatePngArrayBufferAsyncObject`,
 `generatePngBase64Object`, `generatePngBase64AsyncObject`,
-`generatePngDataUriObject`, and `generatePngDataUriAsyncObject`. The four older
+`generatePngDataUriObject`, and `generatePngDataUriAsyncObject`. Prefer the
+ArrayBuffer methods when the caller can consume PNG bytes directly; the
+base64 and data-URI methods remain thin wrappers over that byte path. The four older
 positional PNG methods remain available only as deprecated compatibility
 wrappers; they are not used by the JavaScript entrypoints.
 
@@ -264,7 +291,7 @@ entirely byte-mode without digits, uppercase letters, or `$%*+-./:` characters,
 when version, error correction level, and mask are fixed. This contract is
 enforced by a committed parity corpus (`src/__tests__/fixtures/parity-corpus.json`,
 regenerable with `bun scripts/generate-parity-corpus.js`) plus decode-back
-tests. Automatic mask selection (`mask: -1`) can pick different but equally
+tests (JavaScript `jsqr` and host-only C++ `quirc`). Automatic mask selection (`mask: -1`) can pick different but equally
 valid masks because the two encoders interpret the ISO N4 penalty rounding
 differently; fixed masks always match.
 
@@ -291,8 +318,9 @@ Generation input bounds:
 Option loss and platform differences:
 
 - **SVG output** encodes the matrix with quiet zone, background, foreground,
-  and gradient only. Body shape, gaps, density, stroke, eye, eyeball colors,
-  and logo-area clearing do not apply to the SVG path.
+  and gradient only. Body shape, gaps, density, stroke, eye, eyeball,
+  alignment, timing, quiet-zone, finder-inner colors, and logo-area clearing
+  do not apply to the SVG path.
 - **Web PNG transparency** uses an alpha-cleared background; transparent
   pixels are truly transparent instead of black.
 - **Circle geometry** is defined as an ellipse inscribed in the module cell on
@@ -306,7 +334,16 @@ Option loss and platform differences:
 - **Web async PNG helpers** render in row bands and yield to the main thread
   between bands so large canvas work does not block the UI in one step.
 - **Native sync PNG helpers** remain available through 4096 pixels for
-  compatibility; prefer `toPngBase64Async`/`toPngDataUriAsync` for UI flows.
+  compatibility; prefer `toPngArrayBufferAsync`/`toPngBase64Async`/`toPngDataUriAsync`
+  for UI flows.
+- **Native PNG encoding** writes flat two-color codes as 1-bit indexed zlib
+  PNGs. Gradients, layered colors, and logo-area clearing use vendored `fpng`
+  for RGBA. The QR matrix still comes from Project Nayuki. Web PNG stays on
+  canvas `toDataURL`.
+- **Styled modules** stay on the standard QR matrix. `classy` connects
+  neighbors, `diamond` draws rhombi, and `squircle` uses extra-rounded cells.
+  Rust crates such as `qr-code-styling` and `modo-rs` were not vendored; the
+  existing C++/canvas rasterizer draws these shapes.
 
 ## Rendering, Logos, And Errors
 
@@ -405,8 +442,8 @@ Main exports:
 
 - `QRCode` React component.
 - `NitroQRCode` object with the same generation helpers.
-- `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
-- `toPngBase64Async` and `toPngDataUriAsync`.
+- `toPngArrayBuffer`, `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
+- `toPngArrayBufferAsync`, `toPngBase64Async`, and `toPngDataUriAsync`.
 - `validateOptions`.
 - `clearQRCodeCache`, `getQRCodeCacheSize`, and `getQRCodeCacheBytes`.
 - `getQRCodeMetrics`, `resetQRCodeMetrics`, and
@@ -435,10 +472,17 @@ Main exports:
 | `eyeColor`             | Finder frame fill color.                                                                                                             |
 | `eyeStrokeColor`       | Finder frame stroke color.                                                                                                           |
 | `eyeballColor`         | Finder center color.                                                                                                                 |
+| `alignmentColor`       | Alignment-pattern color; defaults to `foregroundColor`.                                                                              |
+| `timingColor`          | Timing-pattern color; defaults to `foregroundColor`.                                                                                 |
+| `quietZoneColor`       | Quiet-zone color; defaults to `backgroundColor`.                                                                                     |
+| `finderInnerColor`     | Finder inner-ring color; defaults to `backgroundColor`.                                                                              |
 | `gradient`             | Linear or radial foreground gradient with 2 through 8 colors.                                                                        |
 | `orbit`                | Deprecated no-op retained for source compatibility.                                                                                  |
-| `shapeOptions`         | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
-| `preset`               | `default`, `rounded`, `dots`, or `branded`.                                                                                          |
+| `shapeOptions`         | Body, finder, alignment, timing, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
+| `preset`               | `default`, `rounded`, `dots`, `branded`, `classy`, `mosaic`, or `fluid`.                                                              |
+| `shapeOptions.shape`   | `square`, `circle`, `rounded`, `diamond`, `squircle`, or `classy`. Finder, alignment, and timing shapes accept the same set.         |
+| `shapeOptions.alignmentShape` | Alignment-pattern shape; defaults to `shape`.                                                                                 |
+| `shapeOptions.timingShape` | Timing-pattern shape; defaults to `shape`.                                                                                         |
 | `logo`                 | React node overlaid above the generated image; not embedded in exports.                                                              |
 | `logoAreaSize`         | Cleared center area in points; integer 0 through `size`.                                                                             |
 | `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`.                                                                              |
@@ -546,3 +590,11 @@ is proven by `bun run --cwd packages/react-native-nitro-qrcode test:cpp`).
 ## License
 
 MIT
+
+Third-party native sources shipped with this package:
+
+- `cpp/qrcodegen` — Project Nayuki QR Code generator library (MIT)
+- `cpp/vendor/fpng` — fpng RGBA PNG encoder (Unlicense)
+
+Host-only C++ tests also vendor `cpp/tests/quirc` (ISC-style). That decoder is
+not linked into the published iOS or Android libraries.

@@ -32,6 +32,22 @@ describe("scanability color policy", () => {
     },
   );
 
+  it("warns when alignment or timing contrast against the background is low", () => {
+    const options = normalizeOptions({
+      value: "region-contrast",
+      foregroundColor: "#000000",
+      backgroundColor: "#FFFFFF",
+      alignmentColor: "#F5F5F5",
+      timingColor: "#FAFAFA",
+    });
+
+    expect(
+      scanabilityWarnings(options).filter(
+        (warning) => warning.code === "low-contrast",
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("keeps contrast warnings for translucent nontransparent backgrounds", () => {
     const options = normalizeOptions({
       value: "translucent-background",

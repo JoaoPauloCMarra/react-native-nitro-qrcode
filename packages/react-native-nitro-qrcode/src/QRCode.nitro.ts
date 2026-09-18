@@ -33,6 +33,12 @@ export interface GenerateOptions {
   gradientStartY: number;
   gradientEndX: number;
   gradientEndY: number;
+  alignmentColor?: string;
+  timingColor?: string;
+  quietZoneColor?: string;
+  finderInnerColor?: string;
+  alignmentShape?: string;
+  timingShape?: string;
 }
 
 export interface MatrixObject {
@@ -41,6 +47,12 @@ export interface MatrixObject {
 }
 
 export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
+  generatePngArrayBufferObject(options: GenerateOptions): ArrayBuffer;
+
+  generatePngArrayBufferAsyncObject(
+    options: GenerateOptions,
+  ): Promise<ArrayBuffer>;
+
   generatePngBase64Object(options: GenerateOptions): string;
 
   generatePngBase64AsyncObject(options: GenerateOptions): Promise<string>;

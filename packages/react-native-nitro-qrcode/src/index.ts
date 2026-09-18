@@ -2,7 +2,7 @@ import {
   isQRCodeMetricsEnabled,
   nowMilliseconds,
   recordGenerationRequest,
-  getQRCodeMetrics,
+  getQRCodeMetrics as readQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "./metrics";
@@ -59,7 +59,6 @@ export {
   validateOptions,
 } from "./validation";
 export {
-  getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
   type QRCodeMetricsSnapshot,
@@ -130,6 +129,10 @@ function toNativeGenerateOptions(
     eyeColor: normalized.eyeColor,
     eyeStrokeColor: normalized.eyeStrokeColor,
     eyeballColor: normalized.eyeballColor,
+    alignmentColor: normalized.alignmentColor,
+    timingColor: normalized.timingColor,
+    quietZoneColor: normalized.quietZoneColor,
+    finderInnerColor: normalized.finderInnerColor,
     minVersion: normalized.minVersion,
     maxVersion: normalized.maxVersion,
     mask: normalized.mask,
@@ -142,6 +145,8 @@ function toNativeGenerateOptions(
     bodyDensity: normalized.shapeOptions.bodyDensity,
     cornerRadius: normalized.shapeOptions.cornerRadius,
     eyePatternCornerRadius: normalized.shapeOptions.eyePatternCornerRadius,
+    alignmentShape: normalized.shapeOptions.alignmentShape,
+    timingShape: normalized.shapeOptions.timingShape,
     layout: normalized.shapeOptions.layout,
     logoAreaSize: normalized.logoAreaSize,
     logoAreaBorderRadius: normalized.logoAreaBorderRadius,
@@ -185,6 +190,26 @@ function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
     normalized.mask,
     normalized.boostEcl,
   ];
+}
+
+export function toPngArrayBuffer(options: QRCodeOptions): ArrayBuffer {
+  const normalized = normalizeOptions(options);
+  return measuredSync(() =>
+    NativeQRCode.generatePngArrayBufferObject(
+      toNativeGenerateOptions(normalized),
+    ),
+  );
+}
+
+export async function toPngArrayBufferAsync(
+  options: QRCodeOptions,
+): Promise<ArrayBuffer> {
+  const normalized = normalizeOptions(options);
+  return measuredAsync(() =>
+    NativeQRCode.generatePngArrayBufferAsyncObject(
+      toNativeGenerateOptions(normalized),
+    ),
+  );
 }
 
 export function toPngBase64(options: QRCodeOptions): string {
@@ -248,6 +273,14 @@ export function getQRCodeCacheBytes(): number {
   return NativeQRCode.getCacheBytes();
 }
 
+export function getQRCodeMetrics() {
+  const snapshot = readQRCodeMetrics();
+  if (!snapshot.enabled) {
+    return snapshot;
+  }
+  return { ...snapshot, cacheBytes: NativeQRCode.getCacheBytes() };
+}
+
 export const QRCode: ForwardRefExoticComponent<
   QRCodeProps & RefAttributes<QRCodeRef>
 > = createQRCodeComponent({
@@ -258,6 +291,8 @@ export const QRCode: ForwardRefExoticComponent<
 });
 
 export const NitroQRCode: NitroQRCodeApi = {
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngDataUri,
   toPngBase64Async,

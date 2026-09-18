@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.8.0] - 2026-09-18
+
+### Breaking changes
+
+- None.
+
+### Added
+
+- Native and web `toPngArrayBuffer` / `toPngArrayBufferAsync` helpers, plus
+  `generatePngArrayBufferObject` / `generatePngArrayBufferAsyncObject` on the
+  Nitro HybridObject, return PNG bytes as an owning `ArrayBuffer` without a
+  base64 string crossing the JSI boundary.
+- Host C++ tests decode a real Nayuki matrix with vendored `quirc` so
+  scan-back stays independent of the generator. `quirc` is test-only and is
+  not linked into the published iOS or Android libraries.
+- `diamond`, `squircle`, and `classy` module and finder shapes, plus `classy`,
+  `mosaic`, and `fluid` presets. Classy rounds only outer corners so adjacent
+  modules connect. Rust styling crates were measured and not vendored.
+- Optional `alignmentColor`, `timingColor`, `quietZoneColor`, and
+  `finderInnerColor`, plus `shapeOptions.alignmentShape` /
+  `shapeOptions.timingShape`, so every QR region can be styled without moving
+  the matrix. Omitted values keep the previous body/background look.
+
+### Fixed
+
+- Host C++ tests compile vendored `fpng` through `FPNG_NO_SSE` in
+  `fpng_unity.cpp`, so clang 18 on baseline x86-64 no longer requires
+  SSE4.1+pclmul for the whole binary.
+
+### Changed
+
+- Native `getQRCodeMetrics()` now reports live `cacheBytes` from the output
+  cache, matching the web entry.
+- Native `generatePngBase64Object` / `generatePngDataUriObject` (and their
+  async and deprecated positional wrappers) now encode from the PNG byte path
+  instead of caching a pre-encoded base64 string.
+- Native RGBA PNG export (gradients, layered colors, and logo-area clearing)
+  now uses vendored `fpng` two-pass encoding. Flat two-color QR codes still
+  use the existing 1-bit indexed zlib writer. The Nayuki QR matrix encoder is
+  unchanged.
+- The example and workspace Expo pins follow SDK 57.0.24 (`expo-doctor` /
+  `expo install --check`). React Native stays `0.86.3`.
+
 ## [0.7.2] - 2026-09-10
 
 ### Breaking changes

@@ -74,16 +74,22 @@ export function scanabilityWarnings(
   }
 
   if (!isFullyTransparent(options.backgroundColor)) {
-    const contrast = contrastRatio(
-      parseHexColor(options.foregroundColor),
-      parseHexColor(options.backgroundColor),
-    );
-    if (contrast < SCANABILITY_LOW_CONTRAST) {
-      warnings.push({
-        code: "low-contrast",
-        message:
-          "foregroundColor and backgroundColor contrast is low; low-contrast codes are harder to scan.",
-      });
+    const background = parseHexColor(options.backgroundColor);
+    const contrastPairs: [string, string][] = [
+      [options.foregroundColor, "foregroundColor"],
+      [options.alignmentColor, "alignmentColor"],
+      [options.timingColor, "timingColor"],
+      [options.eyeColor, "eyeColor"],
+      [options.eyeballColor, "eyeballColor"],
+    ];
+    for (const [color, name] of contrastPairs) {
+      const contrast = contrastRatio(parseHexColor(color), background);
+      if (contrast < SCANABILITY_LOW_CONTRAST) {
+        warnings.push({
+          code: "low-contrast",
+          message: `${name} and backgroundColor contrast is low; low-contrast codes are harder to scan.`,
+        });
+      }
     }
   }
 

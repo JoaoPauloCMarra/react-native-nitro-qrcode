@@ -4,7 +4,13 @@ import jsQR from "jsqr";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+const PNG_SIGNATURE = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+]);
+
 const mockHybridObject = {
+  generatePngArrayBufferObject: jest.fn(() => PNG_SIGNATURE.buffer),
+  generatePngArrayBufferAsyncObject: jest.fn(async () => PNG_SIGNATURE.buffer),
   generatePngBase64Object: jest.fn(() => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
@@ -81,6 +87,8 @@ import {
   NitroQRCode,
   QRCode,
   type QRCodeRef,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -121,12 +129,32 @@ describe("entrypoint export parity", () => {
 describe("native QRCode API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHybridObject.generatePngArrayBufferAsyncObject.mockImplementation(
+      async () => PNG_SIGNATURE.buffer,
+    );
     mockHybridObject.generatePngBase64AsyncObject.mockImplementation(
       async () => "png-base64",
     );
     mockHybridObject.generatePngDataUriAsyncObject.mockImplementation(
       async () => "data:image/png;base64,png-base64",
     );
+  });
+
+  it("generates PNG ArrayBuffer without a base64 round-trip", () => {
+    const png = toPngArrayBuffer({ value: "https://example.com" });
+    expect(new Uint8Array(png).subarray(0, 8)).toEqual(
+      PNG_SIGNATURE.subarray(0, 8),
+    );
+    expect(mockHybridObject.generatePngArrayBufferObject).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(mockHybridObject.generatePngBase64Object).not.toHaveBeenCalled();
+  });
+
+  it("generates PNG ArrayBuffer asynchronously", async () => {
+    await expect(
+      toPngArrayBufferAsync({ value: "async-bytes" }),
+    ).resolves.toBe(PNG_SIGNATURE.buffer);
   });
 
   it("generates PNG base64 with normalized defaults", () => {
@@ -142,6 +170,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
+      quietZoneColor: "#FFFFFF",
+      finderInnerColor: "#FFFFFF",
       minVersion: 1,
       maxVersion: 40,
       mask: -1,
@@ -154,6 +186,8 @@ describe("native QRCode API", () => {
       bodyDensity: "dense",
       cornerRadius: -1,
       eyePatternCornerRadius: -1,
+      alignmentShape: "square",
+      timingShape: "square",
       layout: "matrix",
       logoAreaSize: 0,
       logoAreaBorderRadius: 0,
@@ -206,6 +240,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#111111",
+      timingColor: "#111111",
+      quietZoneColor: "#EEEEEE",
+      finderInnerColor: "#EEEEEE",
       minVersion: 2,
       maxVersion: 8,
       mask: 3,
@@ -218,6 +256,8 @@ describe("native QRCode API", () => {
       bodyDensity: "balanced",
       cornerRadius: 3,
       eyePatternCornerRadius: 4,
+      alignmentShape: "rounded",
+      timingShape: "rounded",
       layout: "matrix",
       logoAreaSize: 48,
       logoAreaBorderRadius: 8,
@@ -255,6 +295,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
+      quietZoneColor: "#FFFFFF",
+      finderInnerColor: "#FFFFFF",
       minVersion: 1,
       maxVersion: 40,
       mask: -1,
@@ -267,6 +311,8 @@ describe("native QRCode API", () => {
       bodyDensity: "dense",
       cornerRadius: -1,
       eyePatternCornerRadius: -1,
+      alignmentShape: "square",
+      timingShape: "square",
       layout: "matrix",
       logoAreaSize: 0,
       logoAreaBorderRadius: 0,
@@ -455,7 +501,9 @@ describe("native QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be square, circle, or rounded");
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
@@ -473,13 +521,33 @@ describe("native QRCode API", () => {
         value: "x",
         shapeOptions: { eyePatternShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({
         value: "x",
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeballShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { alignmentShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { timingShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({
         value: "x",
@@ -1915,6 +1983,23 @@ describe("web QRCode API", () => {
     );
   });
 
+  it("decodes web PNG data URIs into ArrayBuffers", async () => {
+    const canvas = installCanvas();
+    canvas.toDataURL.mockReturnValue(
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    );
+    const png = Web.toPngArrayBuffer({ value: "array-buffer" });
+    expect(new Uint8Array(png).subarray(0, 8)).toEqual(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+    const asyncPng = await Web.toPngArrayBufferAsync({
+      value: "array-buffer-async",
+    });
+    expect(new Uint8Array(asyncPng).subarray(0, 8)).toEqual(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+  });
+
   it("exposes async web PNG helpers", async () => {
     installCanvas();
     await expect(Web.toPngBase64Async({ value: "Hello" })).resolves.toBe(
@@ -1953,10 +2038,14 @@ describe("web QRCode API", () => {
     const first = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#0B8E79",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
     });
     const second = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#D9F104",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
     });
 
     expect(second).not.toBe(first);
@@ -2126,19 +2215,41 @@ describe("web QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be square, circle, or rounded");
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
         shapeOptions: { eyePatternShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeballShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { alignmentShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { timingShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
@@ -2995,6 +3106,35 @@ describe("web transparent and geometry rendering", () => {
     expect(canvas.height).toBe(64);
   });
 
+  it("accepts modern module shapes and rejects unknown ones", () => {
+    expect(() =>
+      toPngBase64({
+        value: "modern-classy",
+        shapeOptions: { shape: "classy" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-mosaic",
+        shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-fluid",
+        shapeOptions: { shape: "squircle", eyeFrameShape: "circle" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-hexagon",
+        shapeOptions: { shape: "hexagon" as "square" },
+      }),
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+  });
+
   it("draws circle modules as inscribed ellipses matching native geometry", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -3017,6 +3157,61 @@ describe("web transparent and geometry rendering", () => {
       expect(startAngle).toBe(0);
       expect(endAngle).toBe(Math.PI * 2);
     }
+  });
+
+  it("draws diamond modules as four-point paths", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+    });
+
+    expect(context.lineTo).toHaveBeenCalled();
+    expect(context.closePath).toHaveBeenCalled();
+  });
+
+  it("draws classy modules with selective rounded corners", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: { shape: "classy", eyeFrameShape: "rounded" },
+    });
+    Web.clearQRCodeCache();
+    Web.toPngDataUri({
+      value: "Hello classy radius",
+      size: 64,
+      shapeOptions: {
+        shape: "classy",
+        eyeFrameShape: "rounded",
+        cornerRadius: 6,
+      },
+    });
+
+    expect(context.quadraticCurveTo).toHaveBeenCalled();
+  });
+
+  it("draws squircle modules and diamond finders", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: {
+        shape: "squircle",
+        eyeFrameShape: "diamond",
+        eyeballShape: "squircle",
+      },
+    });
+
+    expect(context.lineTo).toHaveBeenCalled();
+    expect(context.quadraticCurveTo).toHaveBeenCalled();
   });
 });
 });

@@ -46,6 +46,14 @@ struct GenerateOptions {
   Color eye = {0, 0, 0, 255};
   Color eyeStroke = {0, 0, 0, 255};
   Color eyeball = {0, 0, 0, 255};
+  std::string alignmentColor = "#000000";
+  std::string timingColor = "#000000";
+  std::string quietZoneColor = "#FFFFFF";
+  std::string finderInnerColor = "#FFFFFF";
+  Color alignment = {0, 0, 0, 255};
+  Color timing = {0, 0, 0, 255};
+  Color quietZoneFill = {255, 255, 255, 255};
+  Color finderInner = {255, 255, 255, 255};
   GradientOptions gradient;
   int minVersion = 1;
   int maxVersion = 40;
@@ -59,6 +67,8 @@ struct GenerateOptions {
   std::string bodyDensity = "dense";
   int cornerRadius = -1;
   int eyePatternCornerRadius = -1;
+  std::string alignmentShape = "square";
+  std::string timingShape = "square";
   std::string layout = "matrix";
   int logoAreaSize = 0;
   int logoAreaBorderRadius = 0;
@@ -85,6 +95,8 @@ public:
 
   explicit QRCodeGenerator(CacheKeyHasher cacheKeyHasher = {},
                            size_t maxCacheBytes = DefaultMaxCacheBytes);
+  std::vector<uint8_t> renderPngBytes(const std::string &value,
+                                      const GenerateOptions &options);
   std::string renderPngBase64(const std::string &value,
                                 const GenerateOptions &options);
   std::string renderPngDataUri(const std::string &value,

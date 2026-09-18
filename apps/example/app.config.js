@@ -13,6 +13,17 @@ module.exports = {
       bundleIdentifier: "com.qrcode.example",
       infoPlist: {
         CFBundleDevelopmentRegion: "en",
+        UIApplicationSceneManifest: {
+          UIApplicationSupportsMultipleScenes: false,
+          UISceneConfigurations: {
+            UIWindowSceneSessionRoleApplication: [
+              {
+                UISceneConfigurationName: "Default Configuration",
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate",
+              },
+            ],
+          },
+        },
       },
     },
     android: {
@@ -29,6 +40,7 @@ module.exports = {
       "expo-router",
       "expo-build-properties",
       "./plugins/with-gradle-assignment-syntax",
+      "./plugins/with-ios-scene-lifecycle",
       "react-native-nitro-qrcode",
       "expo-status-bar",
     ],

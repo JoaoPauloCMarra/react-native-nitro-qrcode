@@ -23,6 +23,7 @@ using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
 
 void runQRCodeBridgeOptionsTests();
+void runQRCodeScanTests();
 #ifdef NITRO_HYBRID_BINDING_TEST
 void runHybridQRCodeTests();
 #endif
@@ -147,9 +148,15 @@ std::string legacyCacheRequest(const std::string &value,
   appendColor(options.eye);
   appendColor(options.eyeStroke);
   appendColor(options.eyeball);
+  appendColor(options.alignment);
+  appendColor(options.timing);
+  appendColor(options.quietZoneFill);
+  appendColor(options.finderInner);
   appendLegacyCachePart(request, options.moduleShape);
   appendLegacyCachePart(request, options.eyePatternShape);
   appendLegacyCachePart(request, options.eyeballShape);
+  appendLegacyCachePart(request, options.alignmentShape);
+  appendLegacyCachePart(request, options.timingShape);
   appendLegacyCacheNumber(request, options.gap);
   appendLegacyCacheNumber(request, options.eyePatternGap);
   appendLegacyCachePart(request, options.bodyDensity);
@@ -201,26 +208,55 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
     offset = dataOffset + chunkSize + 4;
   }
 
-  std::vector<uint8_t> raw((static_cast<size_t>(width) * 4 + 1) *
-                           static_cast<size_t>(height));
+  const size_t rowBytes = static_cast<size_t>(width) * 4;
+  std::vector<uint8_t> raw((rowBytes + 1) * static_cast<size_t>(height));
   uLongf rawSize = static_cast<uLongf>(raw.size());
   const int result = uncompress(raw.data(), &rawSize, compressed.data(),
                                 static_cast<uLong>(compressed.size()));
   assert(result == Z_OK);
   assert(rawSize == raw.size());
 
-  std::vector<uint8_t> rgba(static_cast<size_t>(width) *
-                            static_cast<size_t>(height) * 4);
+  std::vector<uint8_t> rgba(rowBytes * static_cast<size_t>(height));
+  std::vector<uint8_t> previous(rowBytes, 0);
   for (int y = 0; y < height; y++) {
-    const size_t rawRow = static_cast<size_t>(y) *
-                          (static_cast<size_t>(width) * 4 + 1);
-    assert(raw[rawRow] == 0);
-    const size_t rgbaRow =
-        static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
-    std::copy(raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1),
-              raw.begin() + static_cast<std::ptrdiff_t>(
-                                rawRow + 1 + static_cast<size_t>(width) * 4),
+    const size_t rawRow = static_cast<size_t>(y) * (rowBytes + 1);
+    const uint8_t filter = raw[rawRow];
+    std::vector<uint8_t> row(raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1),
+                             raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1 + rowBytes));
+    for (size_t index = 0; index < rowBytes; index++) {
+      const uint8_t left = index >= 4 ? row[index - 4] : 0;
+      const uint8_t up = previous[index];
+      const uint8_t upLeft = index >= 4 ? previous[index - 4] : 0;
+      uint8_t predictor = 0;
+      switch (filter) {
+      case 1:
+        predictor = left;
+        break;
+      case 2:
+        predictor = up;
+        break;
+      case 3:
+        predictor = static_cast<uint8_t>((static_cast<unsigned>(left) + up) / 2);
+        break;
+      case 4: {
+        const int p = static_cast<int>(left) + static_cast<int>(up) -
+                      static_cast<int>(upLeft);
+        const int pa = std::abs(p - static_cast<int>(left));
+        const int pb = std::abs(p - static_cast<int>(up));
+        const int pc = std::abs(p - static_cast<int>(upLeft));
+        predictor = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        break;
+      }
+      default:
+        assert(filter == 0);
+        break;
+      }
+      row[index] = static_cast<uint8_t>(row[index] + predictor);
+    }
+    const size_t rgbaRow = static_cast<size_t>(y) * rowBytes;
+    std::copy(row.begin(), row.end(),
               rgba.begin() + static_cast<std::ptrdiff_t>(rgbaRow));
+    previous = std::move(row);
   }
   return rgba;
 }
@@ -293,11 +329,23 @@ void testPngGeneration() {
   QRCodeGenerator generator;
   GenerateOptions options;
   options.size = 128;
+  const std::vector<uint8_t> png =
+      generator.renderPngBytes("https://example.com", options);
+  assert(png.size() >= 8);
+  assert(png[0] == 0x89);
+  assert(png[1] == 0x50);
+  assert(png[2] == 0x4E);
+  assert(png[3] == 0x47);
+  assert(png[4] == 0x0D);
+  assert(png[5] == 0x0A);
+  assert(png[6] == 0x1A);
+  assert(png[7] == 0x0A);
   const std::string base64 =
       generator.renderPngBase64("https://example.com", options);
   assert(!base64.empty());
   assertPngHeader(base64);
   assertPngCrcs(base64);
+  assert(base64Encode(png) == base64);
 
   const std::string cached =
       generator.renderPngBase64("https://example.com", options);
@@ -757,6 +805,10 @@ void testTransparentBackgroundPng() {
   options.quietZone = 4;
   options.backgroundColor = "transparent";
   options.background = parseColor("transparent");
+  options.quietZoneColor = "transparent";
+  options.quietZoneFill = options.background;
+  options.finderInnerColor = "transparent";
+  options.finderInner = options.background;
   const std::string encoded =
       generator.renderPngBase64("https://example.com/transparent", options);
 
@@ -900,9 +952,8 @@ void testShapeLimits() {
     assert(didThrow);
   };
 
-  for (const auto &shape : {"diamond", "hexagon", "octagon", "star",
-                            "heart",   "scallop", "leaf",    "clover",
-                            "triangle"}) {
+  for (const auto &shape : {"hexagon", "octagon", "star", "heart", "scallop",
+                            "leaf", "clover", "triangle"}) {
     options.moduleShape = shape;
     assertThrows([&]() {
       generator.renderPngBase64("https://example.com/shape", options);
@@ -922,6 +973,58 @@ void testShapeLimits() {
   assertThrows([&]() {
     generator.renderPngBase64("https://example.com/layout", options);
   });
+
+  for (const auto &shape : {"diamond", "squircle", "classy"}) {
+    options = GenerateOptions{};
+    options.size = 160;
+    options.moduleShape = shape;
+    options.eyePatternShape = shape;
+    options.eyeballShape = shape;
+    const std::vector<uint8_t> png =
+        generator.renderPngBytes("https://example.com/modern", options);
+    assert(png.size() > 8);
+    assert(png[0] == 137);
+    assert(png[1] == 80);
+    options.logoAreaSize = 36;
+    options.logoAreaBorderRadius = 8;
+    const std::vector<uint8_t> logoPng =
+        generator.renderPngBytes("https://example.com/modern-logo", options);
+    assert(logoPng.size() > 8);
+    assert(logoPng[0] == 137);
+  }
+}
+
+void testRegionTokens() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 192;
+  const std::vector<uint8_t> baseline =
+      generator.renderPngBytes("https://example.com/regions", options);
+
+  options.alignmentColor = "#CC0000";
+  options.alignment = parseColor(options.alignmentColor);
+  options.timingColor = "#00AA00";
+  options.timing = parseColor(options.timingColor);
+  options.quietZoneColor = "#E2E8F0";
+  options.quietZoneFill = parseColor(options.quietZoneColor);
+  options.finderInnerColor = "#FFF7ED";
+  options.finderInner = parseColor(options.finderInnerColor);
+  options.alignmentShape = "diamond";
+  options.timingShape = "circle";
+  const std::vector<uint8_t> styled =
+      generator.renderPngBytes("https://example.com/regions", options);
+  assert(styled.size() > 8);
+  assert(styled[0] == 137);
+  assert(styled != baseline);
+
+  options.alignmentShape = "hexagon";
+  bool didThrow = false;
+  try {
+    generator.renderPngBytes("https://example.com/regions", options);
+  } catch (const std::invalid_argument &) {
+    didThrow = true;
+  }
+  assert(didThrow);
 }
 
 void testSvgGeneration() {
@@ -1005,6 +1108,13 @@ void testColorAndBase64Helpers() {
   const std::vector<uint8_t> png = encodePngRgba(2, 2, rgba);
   assert(png.size() > 8);
   assert(png[0] == 137);
+  assert(png[1] == 80);
+  assert(png[2] == 78);
+  assert(png[3] == 71);
+  assert(png[4] == 13);
+  assert(png[5] == 10);
+  assert(png[6] == 26);
+  assert(png[7] == 10);
 }
 
 void testValidation() {
@@ -1205,6 +1315,7 @@ int main() {
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();
+  testRegionTokens();
   testMatrixCacheLru();
   testCacheIdentityAndMemoryAccounting();
   testSvgGeneration();
@@ -1212,6 +1323,7 @@ int main() {
   testColorAndBase64Helpers();
   testValidation();
   runQRCodeBridgeOptionsTests();
+  runQRCodeScanTests();
 #ifdef NITRO_HYBRID_BINDING_TEST
   runHybridQRCodeTests();
 #endif

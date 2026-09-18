@@ -9,6 +9,8 @@ import {
 } from "../metrics";
 
 const mockHybridObject = {
+  generatePngArrayBufferObject: jest.fn(() => new ArrayBuffer(8)),
+  generatePngArrayBufferAsyncObject: jest.fn(async () => new ArrayBuffer(8)),
   generatePngBase64Object: jest.fn(() => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
@@ -188,7 +190,9 @@ describe("generation metrics", () => {
     toPngBase64({ value: "metrics-api" });
 
     expect(nativeGetQRCodeMetrics().requests).toBe(1);
+    expect(nativeGetQRCodeMetrics().cacheBytes).toBe(256);
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(1);
+    expect(NitroQRCode.getQRCodeMetrics().cacheBytes).toBe(256);
     expect(NitroQRCode.getCacheBytes()).toBe(256);
     NitroQRCode.resetQRCodeMetrics();
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(0);

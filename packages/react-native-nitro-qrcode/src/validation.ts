@@ -47,13 +47,22 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeBodyShape = "square" | "circle" | "rounded";
+export const QR_MODULE_SHAPES = [
+  "square",
+  "circle",
+  "rounded",
+  "diamond",
+  "squircle",
+  "classy",
+] as const;
+
+export type QRCodeBodyShape = (typeof QR_MODULE_SHAPES)[number];
 
 export type QRCodeShape = QRCodeBodyShape;
 
-export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
+export type QRCodeEyeFrameShape = QRCodeBodyShape;
 
-export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
+export type QRCodeEyeBallShape = QRCodeBodyShape;
 
 export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
 
@@ -73,6 +82,8 @@ export type QRCodeShapeOptions = {
   bodyDensity?: QRCodeBodyDensity;
   cornerRadius?: number;
   eyePatternCornerRadius?: number;
+  alignmentShape?: QRCodeBodyShape;
+  timingShape?: QRCodeBodyShape;
 };
 
 export type QRCodeGradientType = "linear" | "radial";
@@ -159,6 +170,10 @@ export type QRCodeOptions = {
   eyeColor?: QRCodeColor;
   eyeStrokeColor?: QRCodeColor;
   eyeballColor?: QRCodeColor;
+  alignmentColor?: QRCodeColor;
+  timingColor?: QRCodeColor;
+  quietZoneColor?: QRCodeBackgroundColor;
+  finderInnerColor?: QRCodeBackgroundColor;
   gradient?: QRCodeGradient;
   minVersion?: QRCodeVersion;
   maxVersion?: QRCodeVersion;
@@ -215,6 +230,8 @@ export type NormalizedOptions = Required<
 };
 
 export type NitroQRCodeApi = Readonly<{
+  toPngArrayBuffer: (options: QRCodeOptions) => ArrayBuffer;
+  toPngArrayBufferAsync: (options: QRCodeOptions) => Promise<ArrayBuffer>;
   toPngBase64: (options: QRCodeOptions) => string;
   toPngDataUri: (options: QRCodeOptions) => string;
   toPngBase64Async: (options: QRCodeOptions) => Promise<string>;
@@ -345,6 +362,22 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
       options.eyeballColor ?? DEFAULT_EYEBALL,
       "eyeballColor",
     ),
+    alignmentColor: sanitizeColor(
+      options.alignmentColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "alignmentColor",
+    ),
+    timingColor: sanitizeColor(
+      options.timingColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "timingColor",
+    ),
+    quietZoneColor: sanitizeBackgroundColor(
+      options.quietZoneColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "quietZoneColor",
+    ),
+    finderInnerColor: sanitizeBackgroundColor(
+      options.finderInnerColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "finderInnerColor",
+    ),
     gradient: normalizeGradient(options.gradient),
     minVersion,
     maxVersion,
@@ -408,9 +441,10 @@ export function normalizeGradient(
 export function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
 ): Required<QRCodeShapeOptions> {
+  const shape = sanitizeShape(options?.shape, "shape");
   return {
     layout: sanitizeLayout(options?.layout),
-    shape: sanitizeShape(options?.shape, "shape"),
+    shape,
     eyeFrameShape: sanitizeEyeFrameShape(
       options?.eyeFrameShape ?? options?.eyePatternShape,
     ),
@@ -439,6 +473,11 @@ export function normalizeShapeOptions(
       0,
       256,
     ),
+    alignmentShape: sanitizeShape(
+      options?.alignmentShape ?? shape,
+      "alignmentShape",
+    ),
+    timingShape: sanitizeShape(options?.timingShape ?? shape, "timingShape"),
   };
 }
 
@@ -465,17 +504,20 @@ export function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
   return resolved;
 }
 
+function isModuleShape(value: string): value is QRCodeBodyShape {
+  return (QR_MODULE_SHAPES as readonly string[]).includes(value);
+}
+
+const MODULE_SHAPE_ERROR =
+  "must be square, circle, rounded, diamond, squircle, or classy.";
+
 export function sanitizeShape(
   value: QRCodeBodyShape | undefined,
   name: string,
 ): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error(`${name} must be square, circle, or rounded.`);
+  if (!isModuleShape(resolved)) {
+    throw new Error(`${name} ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
@@ -484,12 +526,8 @@ export function sanitizeEyeFrameShape(
   value: QRCodeEyeFrameShape | undefined,
 ): QRCodeEyeFrameShape {
   const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error("eyeFrameShape must be square, circle, or rounded.");
+  if (!isModuleShape(resolved)) {
+    throw new Error(`eyeFrameShape ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
@@ -498,12 +536,8 @@ export function sanitizeEyeballShape(
   value: QRCodeEyeBallShape | undefined,
 ): QRCodeEyeBallShape {
   const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error("eyeballShape must be square, circle, or rounded.");
+  if (!isModuleShape(resolved)) {
+    throw new Error(`eyeballShape ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
@@ -638,6 +672,8 @@ export function scaleShapeOptions(
       options.eyePatternCornerRadius === undefined
         ? undefined
         : Math.round(options.eyePatternCornerRadius * scale),
+    alignmentShape: options.alignmentShape,
+    timingShape: options.timingShape,
   };
 }
 

@@ -10,6 +10,7 @@ set(SOURCES
   "../cpp/bindings/QRCodeBridgeOptions.cpp"
   "../cpp/core/QRCodeGenerator.cpp"
   "../cpp/qrcodegen/qrcodegen.cpp"
+  "../cpp/vendor/fpng/fpng_unity.cpp"
 )
 
 add_library(
@@ -25,6 +26,7 @@ target_include_directories(
   "../cpp/core"
   "../cpp/bindings"
   "../cpp/qrcodegen"
+  "../cpp/vendor/fpng"
   "./src/main/cpp"
 )
 

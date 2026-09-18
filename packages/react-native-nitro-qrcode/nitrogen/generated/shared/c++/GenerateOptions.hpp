@@ -32,6 +32,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace margelo::nitro::NitroQRCode {
 
@@ -72,10 +73,16 @@ namespace margelo::nitro::NitroQRCode {
     double gradientStartY     SWIFT_PRIVATE;
     double gradientEndX     SWIFT_PRIVATE;
     double gradientEndY     SWIFT_PRIVATE;
+    std::optional<std::string> alignmentColor     SWIFT_PRIVATE;
+    std::optional<std::string> timingColor     SWIFT_PRIVATE;
+    std::optional<std::string> quietZoneColor     SWIFT_PRIVATE;
+    std::optional<std::string> finderInnerColor     SWIFT_PRIVATE;
+    std::optional<std::string> alignmentShape     SWIFT_PRIVATE;
+    std::optional<std::string> timingShape     SWIFT_PRIVATE;
 
   public:
     GenerateOptions() = default;
-    explicit GenerateOptions(std::string value, double size, double quietZone, std::string errorCorrectionLevel, std::string foregroundColor, std::string backgroundColor, std::string strokeColor, std::string eyeColor, std::string eyeStrokeColor, std::string eyeballColor, double minVersion, double maxVersion, double mask, bool boostEcl, std::string moduleShape, std::string eyePatternShape, std::string eyeballShape, double gap, double eyePatternGap, std::string bodyDensity, double cornerRadius, double eyePatternCornerRadius, std::string layout, double logoAreaSize, double logoAreaBorderRadius, std::string gradientType, std::vector<std::string> gradientColors, std::vector<double> gradientLocations, double gradientStartX, double gradientStartY, double gradientEndX, double gradientEndY): value(value), size(size), quietZone(quietZone), errorCorrectionLevel(errorCorrectionLevel), foregroundColor(foregroundColor), backgroundColor(backgroundColor), strokeColor(strokeColor), eyeColor(eyeColor), eyeStrokeColor(eyeStrokeColor), eyeballColor(eyeballColor), minVersion(minVersion), maxVersion(maxVersion), mask(mask), boostEcl(boostEcl), moduleShape(moduleShape), eyePatternShape(eyePatternShape), eyeballShape(eyeballShape), gap(gap), eyePatternGap(eyePatternGap), bodyDensity(bodyDensity), cornerRadius(cornerRadius), eyePatternCornerRadius(eyePatternCornerRadius), layout(layout), logoAreaSize(logoAreaSize), logoAreaBorderRadius(logoAreaBorderRadius), gradientType(gradientType), gradientColors(gradientColors), gradientLocations(gradientLocations), gradientStartX(gradientStartX), gradientStartY(gradientStartY), gradientEndX(gradientEndX), gradientEndY(gradientEndY) {}
+    explicit GenerateOptions(std::string value, double size, double quietZone, std::string errorCorrectionLevel, std::string foregroundColor, std::string backgroundColor, std::string strokeColor, std::string eyeColor, std::string eyeStrokeColor, std::string eyeballColor, double minVersion, double maxVersion, double mask, bool boostEcl, std::string moduleShape, std::string eyePatternShape, std::string eyeballShape, double gap, double eyePatternGap, std::string bodyDensity, double cornerRadius, double eyePatternCornerRadius, std::string layout, double logoAreaSize, double logoAreaBorderRadius, std::string gradientType, std::vector<std::string> gradientColors, std::vector<double> gradientLocations, double gradientStartX, double gradientStartY, double gradientEndX, double gradientEndY, std::optional<std::string> alignmentColor, std::optional<std::string> timingColor, std::optional<std::string> quietZoneColor, std::optional<std::string> finderInnerColor, std::optional<std::string> alignmentShape, std::optional<std::string> timingShape): value(value), size(size), quietZone(quietZone), errorCorrectionLevel(errorCorrectionLevel), foregroundColor(foregroundColor), backgroundColor(backgroundColor), strokeColor(strokeColor), eyeColor(eyeColor), eyeStrokeColor(eyeStrokeColor), eyeballColor(eyeballColor), minVersion(minVersion), maxVersion(maxVersion), mask(mask), boostEcl(boostEcl), moduleShape(moduleShape), eyePatternShape(eyePatternShape), eyeballShape(eyeballShape), gap(gap), eyePatternGap(eyePatternGap), bodyDensity(bodyDensity), cornerRadius(cornerRadius), eyePatternCornerRadius(eyePatternCornerRadius), layout(layout), logoAreaSize(logoAreaSize), logoAreaBorderRadius(logoAreaBorderRadius), gradientType(gradientType), gradientColors(gradientColors), gradientLocations(gradientLocations), gradientStartX(gradientStartX), gradientStartY(gradientStartY), gradientEndX(gradientEndX), gradientEndY(gradientEndY), alignmentColor(alignmentColor), timingColor(timingColor), quietZoneColor(quietZoneColor), finderInnerColor(finderInnerColor), alignmentShape(alignmentShape), timingShape(timingShape) {}
 
   public:
     friend bool operator==(const GenerateOptions& lhs, const GenerateOptions& rhs) = default;
@@ -122,7 +129,13 @@ namespace margelo::nitro {
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientStartX"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientStartY"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientEndX"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientEndY")))
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientEndY"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "alignmentColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timingColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "quietZoneColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "finderInnerColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "alignmentShape"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timingShape")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::NitroQRCode::GenerateOptions& arg) {
@@ -159,6 +172,12 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "gradientStartY"), JSIConverter<double>::toJSI(runtime, arg.gradientStartY));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "gradientEndX"), JSIConverter<double>::toJSI(runtime, arg.gradientEndX));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "gradientEndY"), JSIConverter<double>::toJSI(runtime, arg.gradientEndY));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "alignmentColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.alignmentColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "timingColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.timingColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "quietZoneColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.quietZoneColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "finderInnerColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.finderInnerColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "alignmentShape"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.alignmentShape));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "timingShape"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.timingShape));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -201,6 +220,12 @@ namespace margelo::nitro {
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientStartY")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientEndX")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "gradientEndY")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "alignmentColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timingColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "quietZoneColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "finderInnerColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "alignmentShape")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timingShape")))) return false;
       return true;
     }
   };

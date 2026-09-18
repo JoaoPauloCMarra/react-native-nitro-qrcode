@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
+#include <optional>
 using margelo::nitro::NitroQRCode::GenerateOptions;
 using margelo::nitro::NitroQRCode::HybridQRCode;
 namespace {
@@ -10,11 +11,27 @@ GenerateOptions makeOptions() {
       "https://example.com/hybrid", 128, 4, "M", "#000000", "#FFFFFF",
       "#000000", "#000000", "#000000", "#000000", 1, 40, -1, true,
       "square", "square", "square", 0, 0, "dense", -1, -1, "matrix", 0,
-      0, "none", {}, {}, 0, 0, 1, 1);
+      0, "none", {}, {}, 0, 0, 1, 1, std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt, std::nullopt, std::nullopt);
 }
 void testHybridQRCodeMethods() {
   auto qrCode = std::make_shared<HybridQRCode>();
   const GenerateOptions options = makeOptions();
+  const auto png = qrCode->generatePngArrayBufferObject(options);
+  assert(png != nullptr);
+  assert(png->size() >= 8);
+  assert(png->data()[0] == 0x89);
+  assert(png->data()[1] == 0x50);
+  assert(png->data()[2] == 0x4E);
+  assert(png->data()[3] == 0x47);
+  assert(png->data()[4] == 0x0D);
+  assert(png->data()[5] == 0x0A);
+  assert(png->data()[6] == 0x1A);
+  assert(png->data()[7] == 0x0A);
+  const auto asyncPng =
+      qrCode->generatePngArrayBufferAsyncObject(options)->await().get();
+  assert(asyncPng != nullptr);
+  assert(asyncPng->size() == png->size());
   const std::string base64 = qrCode->generatePngBase64Object(options);
   assert(base64.rfind("iVBORw0KGgo", 0) == 0);
   assert(qrCode->generatePngBase64AsyncObject(options)->await().get() == base64);
