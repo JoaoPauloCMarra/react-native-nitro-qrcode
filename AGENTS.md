@@ -28,5 +28,5 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 ## Native Code Rules
 
 - Guard `static_cast<int>` from `NaN`/`Inf`/fractional inputs in C++ option parsing.
-- Keep `cpp/qrcodegen` and `cpp/vendor/fpng/{fpng.cpp,fpng.h}` vendored sources unmodified; wrap changes in `core/`/`bindings/` or `fpng_unity.cpp` instead. See `cpp/qrcodegen/README.nayuki.markdown` and `cpp/vendor/fpng/README.md` for the pinned commits and synchronization policy. Do not vendor zlib-ng or replace Nayuki.
+- Keep `cpp/qrcodegen` and `cpp/vendor/fpng/{fpng.cpp,fpng.h}` vendored sources unmodified; wrap changes in `core/`/`bindings/` or `fpng_unity.cpp` instead. See `cpp/qrcodegen/README.nayuki.markdown` and `cpp/vendor/fpng/README.md` for the pinned commits and synchronization policy. Do not vendor zlib-ng, replace Nayuki, or add a Rust FFI for styled modules. New looks stay on `layout: "matrix"` (`classy`, `diamond`, `squircle`).
 - Cache ownership lives in `cpp/core/BoundedCache.hpp` (bounded LRU); the output cache keeps 128 entries/4 MiB and the matrix cache keeps 32 entries/512 KiB.

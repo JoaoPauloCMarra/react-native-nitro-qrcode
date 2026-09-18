@@ -42,6 +42,26 @@ export default function QrcodeE2eScreen() {
           <Text style={styles.renderLinkText}>Open render wall</Text>
         </Pressable>
       </Link>
+      <Link href={"/e2e-visuals" as Href} asChild>
+        <Pressable
+          testID="open-e2e-visuals"
+          accessibilityRole="link"
+          accessibilityLabel="Open visual wall"
+          style={styles.renderLink}
+        >
+          <Text style={styles.renderLinkText}>Open visual wall</Text>
+        </Pressable>
+      </Link>
+      <Link href={"/e2e-scanability" as Href} asChild>
+        <Pressable
+          testID="open-e2e-scanability"
+          accessibilityRole="link"
+          accessibilityLabel="Open scanability wall"
+          style={styles.renderLink}
+        >
+          <Text style={styles.renderLinkText}>Open scanability wall</Text>
+        </Pressable>
+      </Link>
       <Link href={"/e2e-png-bench" as Href} asChild>
         <Pressable
           testID="open-e2e-png-bench"

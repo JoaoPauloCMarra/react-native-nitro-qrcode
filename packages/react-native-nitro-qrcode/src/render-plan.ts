@@ -15,6 +15,13 @@ export type RenderLayer =
   | "eye"
   | "eyeball";
 
+export type RenderNeighbors = {
+  north: boolean;
+  east: boolean;
+  south: boolean;
+  west: boolean;
+};
+
 export type RenderModulePlan = {
   x0: number;
   y0: number;
@@ -24,6 +31,7 @@ export type RenderModulePlan = {
   gap: number;
   cornerRadius: number;
   layer: RenderLayer;
+  neighbors: RenderNeighbors;
   stroke?: RenderLayer;
   strokeGap?: number;
 };
@@ -91,6 +99,9 @@ export function createRenderPlan(
 }
 
 function isDark(model: QRCodeModuleModel, x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= model.modules.size || y >= model.modules.size) {
+    return false;
+  }
   return Boolean(model.modules.data[y * model.modules.size + x]);
 }
 
@@ -219,6 +230,12 @@ function buildModuleRows(
         gap,
         cornerRadius,
         layer,
+        neighbors: {
+          north: isDark(model, moduleX, moduleY - 1),
+          east: isDark(model, moduleX + 1, moduleY),
+          south: isDark(model, moduleX, moduleY + 1),
+          west: isDark(model, moduleX - 1, moduleY),
+        },
       };
       if (!eyeModule && !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE)) {
         plan.stroke = "stroke";

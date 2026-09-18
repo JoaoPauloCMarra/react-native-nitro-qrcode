@@ -24,6 +24,16 @@ enum class ModuleShape {
   Square,
   Circle,
   Rounded,
+  Diamond,
+  Squircle,
+  Classy,
+};
+
+struct ModuleNeighbors {
+  bool north = false;
+  bool east = false;
+  bool south = false;
+  bool west = false;
 };
 
 enum class BodyDensity {
@@ -52,8 +62,15 @@ ModuleShape parseShape(const std::string &value, const char *name) {
     return ModuleShape::Circle;
   if (value == "rounded")
     return ModuleShape::Rounded;
-  throw std::invalid_argument(std::string(name) +
-                              " must be square, circle, or rounded.");
+  if (value == "diamond")
+    return ModuleShape::Diamond;
+  if (value == "squircle")
+    return ModuleShape::Squircle;
+  if (value == "classy")
+    return ModuleShape::Classy;
+  throw std::invalid_argument(
+      std::string(name) +
+      " must be square, circle, rounded, diamond, squircle, or classy.");
 }
 
 ModuleShape parseEyePatternShape(const std::string &value) {
@@ -449,9 +466,86 @@ void fillRoundedRect(std::vector<uint8_t> &indices, int imageSize, int x0,
   }
 }
 
+void fillDiamond(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
+                 int x1, int y1, uint8_t value) {
+  const double radiusX = static_cast<double>(x1 - x0) / 2.0;
+  const double radiusY = static_cast<double>(y1 - y0) / 2.0;
+  const double centerX = static_cast<double>(x0 + x1 - 1) / 2.0;
+  const double centerY = static_cast<double>(y0 + y1 - 1) / 2.0;
+  for (int y = y0; y < y1; y++) {
+    for (int x = x0; x < x1; x++) {
+      const double dx = std::abs(static_cast<double>(x) - centerX) / radiusX;
+      const double dy = std::abs(static_cast<double>(y) - centerY) / radiusY;
+      if (dx + dy <= 1.0) {
+        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
+                static_cast<size_t>(x)] = value;
+      }
+    }
+  }
+}
+
+void fillSquircle(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
+                  int x1, int y1, uint8_t value) {
+  const int radius = std::max(1, std::min(x1 - x0, y1 - y0) * 9 / 20);
+  fillRoundedRect(indices, imageSize, x0, y0, x1, y1, radius, value);
+}
+
+void fillClassy(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
+                int x1, int y1, int radius, ModuleNeighbors neighbors,
+                uint8_t value) {
+  const bool roundTL = !neighbors.north && !neighbors.west;
+  const bool roundTR = !neighbors.north && !neighbors.east;
+  const bool roundBR = !neighbors.south && !neighbors.east;
+  const bool roundBL = !neighbors.south && !neighbors.west;
+  if (!roundTL && !roundTR && !roundBR && !roundBL) {
+    fillRect(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  const int width = x1 - x0;
+  const int height = y1 - y0;
+  const int cornerRadius =
+      std::min({std::max(radius, 1), std::max(0, (width - 1) / 2),
+                std::max(0, (height - 1) / 2)});
+  const int leftArc = x0 + cornerRadius;
+  const int rightArc = x1 - cornerRadius - 1;
+  const int topArc = y0 + cornerRadius;
+  const int bottomArc = y1 - cornerRadius - 1;
+  const int radiusSquared = cornerRadius * cornerRadius;
+  for (int y = y0; y < y1; y++) {
+    for (int x = x0; x < x1; x++) {
+      const bool inTL = x < leftArc && y < topArc;
+      const bool inTR = x > rightArc && y < topArc;
+      const bool inBR = x > rightArc && y > bottomArc;
+      const bool inBL = x < leftArc && y > bottomArc;
+      bool inside = true;
+      if (inTL && roundTL) {
+        const int dx = x - leftArc;
+        const int dy = y - topArc;
+        inside = dx * dx + dy * dy <= radiusSquared;
+      } else if (inTR && roundTR) {
+        const int dx = x - rightArc;
+        const int dy = y - topArc;
+        inside = dx * dx + dy * dy <= radiusSquared;
+      } else if (inBR && roundBR) {
+        const int dx = x - rightArc;
+        const int dy = y - bottomArc;
+        inside = dx * dx + dy * dy <= radiusSquared;
+      } else if (inBL && roundBL) {
+        const int dx = x - leftArc;
+        const int dy = y - bottomArc;
+        inside = dx * dx + dy * dy <= radiusSquared;
+      }
+      if (inside) {
+        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
+                static_cast<size_t>(x)] = value;
+      }
+    }
+  }
+}
+
 void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
                 int x1, int y1, ModuleShape shape, int gap, int cornerRadius,
-                uint8_t value = 1) {
+                uint8_t value = 1, ModuleNeighbors neighbors = {}) {
   const int maxGap = std::max(0, (std::min(x1 - x0, y1 - y0) - 1) / 2);
   const int inset = std::min(gap, maxGap);
   x0 += inset;
@@ -461,6 +555,21 @@ void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
 
   if (shape == ModuleShape::Circle) {
     fillCircle(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  if (shape == ModuleShape::Diamond) {
+    fillDiamond(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  if (shape == ModuleShape::Squircle) {
+    fillSquircle(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  if (shape == ModuleShape::Classy) {
+    const int resolvedRadius =
+        cornerRadius < 0 ? std::min(x1 - x0, y1 - y0) / 3 : cornerRadius;
+    fillClassy(indices, imageSize, x0, y0, x1, y1, resolvedRadius, neighbors,
+               value);
     return;
   }
   if (shape == ModuleShape::Rounded) {
@@ -494,7 +603,16 @@ void fillFinderShape(std::vector<uint8_t> &indices, int imageSize, int x0,
     fillCircle(indices, imageSize, x0, y0, x1, y1, value);
     return;
   }
-  if (shape == ModuleShape::Rounded || cornerRadius >= 0) {
+  if (shape == ModuleShape::Diamond) {
+    fillDiamond(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  if (shape == ModuleShape::Squircle) {
+    fillSquircle(indices, imageSize, x0, y0, x1, y1, value);
+    return;
+  }
+  if (shape == ModuleShape::Classy || shape == ModuleShape::Rounded ||
+      cornerRadius >= 0) {
     fillRoundedRect(indices, imageSize, x0, y0, x1, y1,
                     cornerRadius >= 0 ? cornerRadius
                                       : std::max(1, (x1 - x0) / 5),
@@ -823,6 +941,14 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   const int imageSize = std::max(options.size, totalModules);
   std::vector<uint8_t> indices(static_cast<size_t>(imageSize) *
                                static_cast<size_t>(imageSize));
+  const auto isDark = [&matrix](int x, int y) {
+    if (x < 0 || y < 0 || x >= matrix.size || y >= matrix.size) {
+      return false;
+    }
+    return matrix.modules[static_cast<size_t>(y) *
+                              static_cast<size_t>(matrix.size) +
+                          static_cast<size_t>(x)] == 1;
+  };
 
   const ModuleShape moduleShape = parseShape(options.moduleShape, "shape");
   const ModuleShape eyePatternShape =
@@ -875,14 +1001,19 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
           layer = 3;
         }
       }
+      const ModuleNeighbors neighbors{
+          isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
+          isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
       if (!eyeModule && options.stroke != defaultColor) {
-        drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2);
+        drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2,
+                   neighbors);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap + strokeInset,
-                   radius, 1);
+                   radius, 1, neighbors);
         continue;
       }
-      drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, layer);
+      drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, layer,
+                 neighbors);
     }
   }
   if (drawGroupedFinderEyes) {

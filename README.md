@@ -71,8 +71,9 @@ matching Nitro object methods). Existing base64 and data-URI helpers stay;
 they now wrap raw PNG bytes. Native RGBA export (gradients, layered colors,
 logo-area clearing) uses vendored `fpng`, so those PNG files can differ in
 size and compressed bytes from 0.7.x while decoding to the same pixels. Flat
-two-color codes still use the 1-bit indexed zlib writer. There are no
-breaking JavaScript API changes.
+two-color codes still use the 1-bit indexed zlib writer. New optional looks
+are `classy`, `mosaic`, and `fluid` (`diamond`, `squircle`, and neighbor-aware
+`classy` shapes). There are no breaking JavaScript API changes.
 
 ### Upgrade from 0.7.0
 
@@ -150,7 +151,7 @@ export function BrandedCode() {
     <QRCode
       value="https://example.com/app"
       size={260}
-      preset="branded"
+      preset="classy"
       foregroundColor="#111827"
       backgroundColor="#FFFFFF"
       eyeColor="#1E40AF"
@@ -329,6 +330,10 @@ Option loss and platform differences:
   PNGs. Gradients, layered colors, and logo-area clearing use vendored `fpng`
   for RGBA. The QR matrix still comes from Project Nayuki. Web PNG stays on
   canvas `toDataURL`.
+- **Styled modules** stay on the standard QR matrix. `classy` connects
+  neighbors, `diamond` draws rhombi, and `squircle` uses extra-rounded cells.
+  Rust crates such as `qr-code-styling` and `modo-rs` were not vendored; the
+  existing C++/canvas rasterizer draws these shapes.
 
 ## Rendering, Logos, And Errors
 
@@ -460,7 +465,8 @@ Main exports:
 | `gradient`             | Linear or radial foreground gradient with 2 through 8 colors.                                                                        |
 | `orbit`                | Deprecated no-op retained for source compatibility.                                                                                  |
 | `shapeOptions`         | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
-| `preset`               | `default`, `rounded`, `dots`, or `branded`.                                                                                          |
+| `preset`               | `default`, `rounded`, `dots`, `branded`, `classy`, `mosaic`, or `fluid`.                                                              |
+| `shapeOptions.shape`   | `square`, `circle`, `rounded`, `diamond`, `squircle`, or `classy`. Finder shapes accept the same set.                                |
 | `logo`                 | React node overlaid above the generated image; not embedded in exports.                                                              |
 | `logoAreaSize`         | Cleared center area in points; integer 0 through `size`.                                                                             |
 | `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`.                                                                              |

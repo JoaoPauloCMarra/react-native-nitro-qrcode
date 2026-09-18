@@ -1,6 +1,13 @@
 import type { QRCodeShapeOptions } from "./validation";
 
-export type QRCodePreset = "default" | "rounded" | "dots" | "branded";
+export type QRCodePreset =
+  | "default"
+  | "rounded"
+  | "dots"
+  | "branded"
+  | "classy"
+  | "mosaic"
+  | "fluid";
 
 export const DEFAULT_SIZE = 512;
 
@@ -76,6 +83,35 @@ export const PRESET_SHAPE_OPTIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
     eyePatternGap: 1,
     cornerRadius: 6,
     eyePatternCornerRadius: 6,
+  },
+  classy: {
+    shape: "classy",
+    eyeFrameShape: "rounded",
+    eyeballShape: "rounded",
+    gap: 0,
+    eyePatternGap: 0,
+    cornerRadius: 8,
+    eyePatternCornerRadius: 10,
+  },
+  mosaic: {
+    shape: "diamond",
+    eyeFrameShape: "rounded",
+    eyeballShape: "circle",
+    gap: 1,
+    eyePatternGap: 0,
+    bodyDensity: "balanced",
+    cornerRadius: 0,
+    eyePatternCornerRadius: 8,
+  },
+  fluid: {
+    shape: "squircle",
+    eyeFrameShape: "circle",
+    eyeballShape: "circle",
+    gap: 1,
+    eyePatternGap: 1,
+    bodyDensity: "sparse",
+    cornerRadius: 0,
+    eyePatternCornerRadius: 0,
   },
 };
 

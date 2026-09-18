@@ -83,6 +83,7 @@ Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
 | `zlib-ng` default level | 2.94 ms / 117 KB | Reject (large vendor for one path `fpng` already covers) |
 | `fpnge` | AVX2-only | Reject |
 | Nayuki Rust / `qrcode` crate | Same matrix algorithm, extra FFI next to Nitro | Reject |
+| Rust `qr-code-styling` / `modo-rs` | Useful styled-dot algorithms, extra FFI next to Nitro | Reject; ported classy/diamond/squircle into `core/` |
 | `zxing-cpp` | Useful decoder, too large to vendor | Reject |
 | `quirc` | Decoded a real Nayuki matrix (`found=1 matched=1`) | Keep as host C++ scan-back only |
 

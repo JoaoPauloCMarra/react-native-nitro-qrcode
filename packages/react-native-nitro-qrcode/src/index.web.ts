@@ -17,7 +17,11 @@ import {
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
-import { createRenderPlan, type RenderPlan } from "./render-plan";
+import {
+  createRenderPlan,
+  type RenderNeighbors,
+  type RenderPlan,
+} from "./render-plan";
 import {
   normalizeOptions,
   validateOptions,
@@ -471,6 +475,7 @@ function drawPlanRows(
           module.shape,
           module.gap,
           module.cornerRadius,
+          module.neighbors,
         );
         context.fillStyle = resolvePlanFill(
           options,
@@ -486,6 +491,7 @@ function drawPlanRows(
           module.shape,
           module.strokeGap,
           module.cornerRadius,
+          module.neighbors,
         );
         continue;
       }
@@ -503,6 +509,7 @@ function drawPlanRows(
         module.shape,
         module.gap,
         module.cornerRadius,
+        module.neighbors,
       );
     }
   }
@@ -801,7 +808,22 @@ function drawFinderShape(
     context.fill();
     return;
   }
-  if (shape === "rounded" || cornerRadius >= 0) {
+  if (shape === "diamond") {
+    drawDiamond(context, rect.x, rect.y, rect.size, rect.size);
+    return;
+  }
+  if (shape === "squircle") {
+    drawRoundedRect(
+      context,
+      rect.x,
+      rect.y,
+      rect.size,
+      rect.size,
+      Math.max(1, (rect.size * 9) / 20),
+    );
+    return;
+  }
+  if (shape === "rounded" || shape === "classy" || cornerRadius >= 0) {
     drawRoundedRect(
       context,
       rect.x,
@@ -824,6 +846,7 @@ function drawModule(
   shape: QRCodeShape,
   gap: number,
   cornerRadius: number,
+  neighbors: RenderNeighbors,
 ): void {
   const maxGap = Math.max(0, (Math.min(x1 - x0, y1 - y0) - 1) / 2);
   const inset = Math.min(gap, maxGap);
@@ -833,6 +856,33 @@ function drawModule(
   const height = Math.max(0, y1 - y0 - inset * 2);
   if (shape === "circle") {
     drawEllipse(context, left, top, width, height);
+    return;
+  }
+  if (shape === "diamond") {
+    drawDiamond(context, left, top, width, height);
+    return;
+  }
+  if (shape === "squircle") {
+    drawRoundedRect(
+      context,
+      left,
+      top,
+      width,
+      height,
+      Math.max(1, (Math.min(width, height) * 9) / 20),
+    );
+    return;
+  }
+  if (shape === "classy") {
+    drawClassy(
+      context,
+      left,
+      top,
+      width,
+      height,
+      cornerRadius >= 0 ? cornerRadius : Math.min(width, height) / 3,
+      neighbors,
+    );
     return;
   }
   if (shape === "rounded" || cornerRadius >= 0) {
@@ -866,6 +916,79 @@ function clearLogoArea(
   drawRoundedRect(context, left, top, areaSize, areaSize, borderRadius);
   context.restore();
   context.fillStyle = foregroundFill;
+}
+
+function drawDiamond(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  context.beginPath();
+  context.moveTo(x + width / 2, y);
+  context.lineTo(x + width, y + height / 2);
+  context.lineTo(x + width / 2, y + height);
+  context.lineTo(x, y + height / 2);
+  context.closePath();
+  context.fill();
+}
+
+function drawClassy(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  neighbors: RenderNeighbors,
+): void {
+  const roundTL = !neighbors.north && !neighbors.west;
+  const roundTR = !neighbors.north && !neighbors.east;
+  const roundBR = !neighbors.south && !neighbors.east;
+  const roundBL = !neighbors.south && !neighbors.west;
+  if (!roundTL && !roundTR && !roundBR && !roundBL) {
+    context.fillRect(x, y, width, height);
+    return;
+  }
+  const corner = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  if (roundTL) {
+    context.moveTo(x + corner, y);
+  } else {
+    context.moveTo(x, y);
+  }
+  if (roundTR) {
+    context.lineTo(x + width - corner, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + corner);
+  } else {
+    context.lineTo(x + width, y);
+  }
+  if (roundBR) {
+    context.lineTo(x + width, y + height - corner);
+    context.quadraticCurveTo(
+      x + width,
+      y + height,
+      x + width - corner,
+      y + height,
+    );
+  } else {
+    context.lineTo(x + width, y + height);
+  }
+  if (roundBL) {
+    context.lineTo(x + corner, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - corner);
+  } else {
+    context.lineTo(x, y + height);
+  }
+  if (roundTL) {
+    context.lineTo(x, y + corner);
+    context.quadraticCurveTo(x, y, x + corner, y);
+  } else {
+    context.lineTo(x, y);
+  }
+  context.closePath();
+  context.fill();
 }
 
 function drawEllipse(

@@ -174,7 +174,11 @@ void badLayout;
 
 expectFalse<IsAssignable<"maximum", ErrorCorrectionLevel>>();
 expectFalse<IsAssignable<"solid", QRCodeBodyDensity>>();
-expectFalse<IsAssignable<"diamond", QRCodeBodyShape>>();
+const modernShape: QRCodeBodyShape = "diamond";
+const modernPreset: QRCodePreset = "fluid";
+void modernShape;
+void modernPreset;
+expectFalse<IsAssignable<"hexagon", QRCodeBodyShape>>();
 expectFalse<IsAssignable<"custom", QRCodePreset>>();
 expectFalse<IsAssignable<"always", NonNullable<QRCodeOptions["scanSafe"]>>>();
 expectFalse<IsAssignable<"unknown", QRCodeKnownValidationErrorCode>>();

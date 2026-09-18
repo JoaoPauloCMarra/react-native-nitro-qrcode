@@ -47,13 +47,22 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export type QRCodeBodyShape = "square" | "circle" | "rounded";
+export const QR_MODULE_SHAPES = [
+  "square",
+  "circle",
+  "rounded",
+  "diamond",
+  "squircle",
+  "classy",
+] as const;
+
+export type QRCodeBodyShape = (typeof QR_MODULE_SHAPES)[number];
 
 export type QRCodeShape = QRCodeBodyShape;
 
-export type QRCodeEyeFrameShape = "square" | "circle" | "rounded";
+export type QRCodeEyeFrameShape = QRCodeBodyShape;
 
-export type QRCodeEyeBallShape = "square" | "circle" | "rounded";
+export type QRCodeEyeBallShape = QRCodeBodyShape;
 
 export type QRCodeEyePatternShape = QRCodeEyeFrameShape;
 
@@ -467,17 +476,20 @@ export function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
   return resolved;
 }
 
+function isModuleShape(value: string): value is QRCodeBodyShape {
+  return (QR_MODULE_SHAPES as readonly string[]).includes(value);
+}
+
+const MODULE_SHAPE_ERROR =
+  "must be square, circle, rounded, diamond, squircle, or classy.";
+
 export function sanitizeShape(
   value: QRCodeBodyShape | undefined,
   name: string,
 ): QRCodeBodyShape {
   const resolved = value ?? DEFAULT_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error(`${name} must be square, circle, or rounded.`);
+  if (!isModuleShape(resolved)) {
+    throw new Error(`${name} ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
@@ -486,12 +498,8 @@ export function sanitizeEyeFrameShape(
   value: QRCodeEyeFrameShape | undefined,
 ): QRCodeEyeFrameShape {
   const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error("eyeFrameShape must be square, circle, or rounded.");
+  if (!isModuleShape(resolved)) {
+    throw new Error(`eyeFrameShape ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
@@ -500,12 +508,8 @@ export function sanitizeEyeballShape(
   value: QRCodeEyeBallShape | undefined,
 ): QRCodeEyeBallShape {
   const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
-  if (
-    resolved !== "square" &&
-    resolved !== "circle" &&
-    resolved !== "rounded"
-  ) {
-    throw new Error("eyeballShape must be square, circle, or rounded.");
+  if (!isModuleShape(resolved)) {
+    throw new Error(`eyeballShape ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }

@@ -942,9 +942,8 @@ void testShapeLimits() {
     assert(didThrow);
   };
 
-  for (const auto &shape : {"diamond", "hexagon", "octagon", "star",
-                            "heart",   "scallop", "leaf",    "clover",
-                            "triangle"}) {
+  for (const auto &shape : {"hexagon", "octagon", "star", "heart", "scallop",
+                            "leaf", "clover", "triangle"}) {
     options.moduleShape = shape;
     assertThrows([&]() {
       generator.renderPngBase64("https://example.com/shape", options);
@@ -964,6 +963,25 @@ void testShapeLimits() {
   assertThrows([&]() {
     generator.renderPngBase64("https://example.com/layout", options);
   });
+
+  for (const auto &shape : {"diamond", "squircle", "classy"}) {
+    options = GenerateOptions{};
+    options.size = 160;
+    options.moduleShape = shape;
+    options.eyePatternShape = shape;
+    options.eyeballShape = shape;
+    const std::vector<uint8_t> png =
+        generator.renderPngBytes("https://example.com/modern", options);
+    assert(png.size() > 8);
+    assert(png[0] == 137);
+    assert(png[1] == 80);
+    options.logoAreaSize = 36;
+    options.logoAreaBorderRadius = 8;
+    const std::vector<uint8_t> logoPng =
+        generator.renderPngBytes("https://example.com/modern-logo", options);
+    assert(logoPng.size() > 8);
+    assert(logoPng[0] == 137);
+  }
 }
 
 void testSvgGeneration() {

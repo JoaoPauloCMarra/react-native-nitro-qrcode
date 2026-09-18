@@ -21,6 +21,9 @@ Breaking changes are always listed first in each release section.
 - Host C++ tests decode a real Nayuki matrix with vendored `quirc` so
   scan-back stays independent of the generator. `quirc` is test-only and is
   not linked into the published iOS or Android libraries.
+- `diamond`, `squircle`, and `classy` module and finder shapes, plus `classy`,
+  `mosaic`, and `fluid` presets. Classy rounds only outer corners so adjacent
+  modules connect. Rust styling crates were measured and not vendored.
 
 ### Changed
 

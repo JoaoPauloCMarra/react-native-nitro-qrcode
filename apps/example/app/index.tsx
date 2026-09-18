@@ -30,6 +30,7 @@ import {
   type QRCodeEyeFrameShape,
   type QRCodeGradient,
   type QRCodeOptions,
+  type QRCodePreset,
   type QRCodeShapeOptions,
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,20 +40,80 @@ const INITIAL_URL =
 const PREVIEW_SIZE = 244;
 const APP_ICON = require("../assets/icon.png");
 const PAYLOAD_INITIAL_SELECTION = { start: 0, end: 0 };
-const CONFIG_TABS = ["color", "shapes", "logo"] as const;
+const CONFIG_TABS = ["looks", "color", "shapes", "logo"] as const;
+const LOOK_PRESETS = [
+  "default",
+  "rounded",
+  "dots",
+  "branded",
+  "classy",
+  "mosaic",
+  "fluid",
+] as const satisfies readonly QRCodePreset[];
+const LOOK_SHAPES: Record<
+  (typeof LOOK_PRESETS)[number],
+  {
+    bodyShape: QRCodeBodyShape;
+    eyeFrameShape: QRCodeEyeFrameShape;
+    eyeballShape: QRCodeEyeBallShape;
+    bodyDensity: QRCodeBodyDensity;
+  }
+> = {
+  default: {
+    bodyShape: "square",
+    eyeFrameShape: "square",
+    eyeballShape: "square",
+    bodyDensity: "dense",
+  },
+  rounded: {
+    bodyShape: "rounded",
+    eyeFrameShape: "rounded",
+    eyeballShape: "rounded",
+    bodyDensity: "dense",
+  },
+  dots: {
+    bodyShape: "circle",
+    eyeFrameShape: "circle",
+    eyeballShape: "circle",
+    bodyDensity: "dense",
+  },
+  branded: {
+    bodyShape: "rounded",
+    eyeFrameShape: "square",
+    eyeballShape: "rounded",
+    bodyDensity: "dense",
+  },
+  classy: {
+    bodyShape: "classy",
+    eyeFrameShape: "rounded",
+    eyeballShape: "rounded",
+    bodyDensity: "dense",
+  },
+  mosaic: {
+    bodyShape: "diamond",
+    eyeFrameShape: "rounded",
+    eyeballShape: "circle",
+    bodyDensity: "balanced",
+  },
+  fluid: {
+    bodyShape: "squircle",
+    eyeFrameShape: "circle",
+    eyeballShape: "circle",
+    bodyDensity: "sparse",
+  },
+};
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
 const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
-const BODY_SHAPES = ["square", "rounded", "circle"] as const;
-const EYE_FRAME_SHAPES = [
+const BODY_SHAPES = [
   "square",
   "rounded",
   "circle",
-] as const satisfies readonly QRCodeEyeFrameShape[];
-const EYE_BALL_SHAPES = [
-  "square",
-  "rounded",
-  "circle",
-] as const satisfies readonly QRCodeEyeBallShape[];
+  "diamond",
+  "squircle",
+  "classy",
+] as const;
+const EYE_FRAME_SHAPES = BODY_SHAPES satisfies readonly QRCodeEyeFrameShape[];
+const EYE_BALL_SHAPES = BODY_SHAPES satisfies readonly QRCodeEyeBallShape[];
 
 type ConfigTab = (typeof CONFIG_TABS)[number];
 type LogoPaddingPreset = (typeof LOGO_PADDING_PRESETS)[number];
@@ -158,12 +219,13 @@ export default function DemoScreen() {
   const [eyeballConfig, setEyeballConfig] = useState<SolidColorConfig>(
     DEFAULT_EYEBALL_CONFIG,
   );
-  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("color");
-  const [bodyShape, setBodyShape] = useState<QRCodeBodyShape>("square");
+  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("looks");
+  const [look, setLook] = useState<QRCodePreset>("classy");
+  const [bodyShape, setBodyShape] = useState<QRCodeBodyShape>("classy");
   const [eyeFrameShape, setEyeFrameShape] =
-    useState<QRCodeEyeFrameShape>("square");
+    useState<QRCodeEyeFrameShape>("rounded");
   const [eyeballShape, setEyeballShape] =
-    useState<QRCodeEyeBallShape>("square");
+    useState<QRCodeEyeBallShape>("rounded");
   const [bodyDensity, setBodyDensity] = useState<QRCodeBodyDensity>("dense");
   const [showLogo, setShowLogo] = useState(false);
   const [logoPadding, setLogoPadding] = useState<LogoPaddingPreset>("medium");
@@ -317,6 +379,7 @@ export default function DemoScreen() {
                       setQrError(error.message);
                     }}
                     scanSafe
+                    preset={look}
                     errorCorrectionLevel={showLogo ? "H" : "M"}
                     foregroundColor={foregroundColor}
                     backgroundColor={backgroundColor}
@@ -509,6 +572,19 @@ export default function DemoScreen() {
 
           <View style={styles.controls}>
             <ConfigTabs value={activeConfigTab} onChange={setActiveConfigTab} />
+            {activeConfigTab === "looks" ? (
+              <LooksConfigPanel
+                look={look}
+                onLookChange={(nextLook) => {
+                  const next = LOOK_SHAPES[nextLook];
+                  setLook(nextLook);
+                  setBodyShape(next.bodyShape);
+                  setEyeFrameShape(next.eyeFrameShape);
+                  setEyeballShape(next.eyeballShape);
+                  setBodyDensity(next.bodyDensity);
+                }}
+              />
+            ) : null}
             {activeConfigTab === "color" ? (
               <ColorConfigPanel
                 foregroundConfig={foregroundConfig}
@@ -769,6 +845,52 @@ function SolidColorSection({
   );
 }
 
+function LooksConfigPanel({
+  look,
+  onLookChange,
+}: {
+  look: QRCodePreset;
+  onLookChange: (value: QRCodePreset) => void;
+}) {
+  return (
+    <View style={styles.builderPanel}>
+      <ControlGroup label="Modern looks">
+        <View style={styles.shapeGrid}>
+          {LOOK_PRESETS.map((option) => {
+            const selected = option === look;
+            return (
+              <Pressable
+                testID={`look-${option}`}
+                accessibilityRole="button"
+                aria-selected={selected}
+                accessibilityState={{ selected }}
+                accessibilityLabel={getShapeLabel(option)}
+                key={option}
+                onPress={() => {
+                  onLookChange(option);
+                }}
+                style={[
+                  styles.lookButton,
+                  selected && styles.shapeButtonSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.lookButtonText,
+                    selected && styles.lookButtonTextSelected,
+                  ]}
+                >
+                  {getShapeLabel(option)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ControlGroup>
+    </View>
+  );
+}
+
 function ShapeConfigPanel({
   bodyShape,
   eyeFrameShape,
@@ -867,6 +989,9 @@ function ShapeIcon({ shape }: { shape: string }) {
         styles.shapeIcon,
         shape === "circle" && styles.shapeIconCircle,
         shape === "rounded" && styles.shapeIconRounded,
+        shape === "diamond" && styles.shapeIconDiamond,
+        shape === "squircle" && styles.shapeIconSquircle,
+        shape === "classy" && styles.shapeIconClassy,
       ]}
     />
   );
@@ -1508,6 +1633,35 @@ const styles = StyleSheet.create({
   },
   shapeIconRounded: {
     borderRadius: 5,
+  },
+  shapeIconDiamond: {
+    borderRadius: 2,
+    transform: [{ rotate: "45deg" }],
+  },
+  shapeIconSquircle: {
+    borderRadius: 8,
+  },
+  shapeIconClassy: {
+    borderBottomRightRadius: 10,
+    borderTopLeftRadius: 10,
+  },
+  lookButton: {
+    alignItems: "center",
+    backgroundColor: "#181B19",
+    borderColor: "#303532",
+    borderRadius: 6,
+    borderWidth: 1,
+    minHeight: 40,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  lookButtonText: {
+    color: "#CBD2CD",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  lookButtonTextSelected: {
+    color: "#F8FAF8",
   },
   colorSection: {
     backgroundColor: "#151A18",

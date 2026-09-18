@@ -483,7 +483,9 @@ describe("native QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be square, circle, or rounded");
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
@@ -501,13 +503,17 @@ describe("native QRCode API", () => {
         value: "x",
         shapeOptions: { eyePatternShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({
         value: "x",
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeballShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       toPngBase64({
         value: "x",
@@ -2171,19 +2177,25 @@ describe("web QRCode API", () => {
         value: "x",
         shapeOptions: { shape: "triangle" as "square" },
       }),
-    ).toThrow("shape must be square, circle, or rounded");
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
         shapeOptions: { eyePatternShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeFrameShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
         shapeOptions: { eyeballShape: "triangle" as "square" },
       }),
-    ).toThrow("eyeballShape must be square, circle, or rounded");
+    ).toThrow(
+      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
     expect(() =>
       Web.toSvgString({
         value: "x",
@@ -3040,6 +3052,35 @@ describe("web transparent and geometry rendering", () => {
     expect(canvas.height).toBe(64);
   });
 
+  it("accepts modern module shapes and rejects unknown ones", () => {
+    expect(() =>
+      toPngBase64({
+        value: "modern-classy",
+        shapeOptions: { shape: "classy" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-mosaic",
+        shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-fluid",
+        shapeOptions: { shape: "squircle", eyeFrameShape: "circle" },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      toPngBase64({
+        value: "modern-hexagon",
+        shapeOptions: { shape: "hexagon" as "square" },
+      }),
+    ).toThrow(
+      "shape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+  });
+
   it("draws circle modules as inscribed ellipses matching native geometry", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -3062,6 +3103,61 @@ describe("web transparent and geometry rendering", () => {
       expect(startAngle).toBe(0);
       expect(endAngle).toBe(Math.PI * 2);
     }
+  });
+
+  it("draws diamond modules as four-point paths", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+    });
+
+    expect(context.lineTo).toHaveBeenCalled();
+    expect(context.closePath).toHaveBeenCalled();
+  });
+
+  it("draws classy modules with selective rounded corners", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: { shape: "classy", eyeFrameShape: "rounded" },
+    });
+    Web.clearQRCodeCache();
+    Web.toPngDataUri({
+      value: "Hello classy radius",
+      size: 64,
+      shapeOptions: {
+        shape: "classy",
+        eyeFrameShape: "rounded",
+        cornerRadius: 6,
+      },
+    });
+
+    expect(context.quadraticCurveTo).toHaveBeenCalled();
+  });
+
+  it("draws squircle modules and diamond finders", () => {
+    const context = createMockContext();
+    installCanvas(() => context);
+
+    Web.toPngDataUri({
+      value: "Hello",
+      size: 64,
+      shapeOptions: {
+        shape: "squircle",
+        eyeFrameShape: "diamond",
+        eyeballShape: "squircle",
+      },
+    });
+
+    expect(context.lineTo).toHaveBeenCalled();
+    expect(context.quadraticCurveTo).toHaveBeenCalled();
   });
 });
 });

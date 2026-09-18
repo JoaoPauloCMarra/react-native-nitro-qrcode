@@ -22,6 +22,9 @@ const PRESETS: readonly QRCodePreset[] = [
   "rounded",
   "dots",
   "branded",
+  "classy",
+  "mosaic",
+  "fluid",
 ];
 
 type LabResult = {

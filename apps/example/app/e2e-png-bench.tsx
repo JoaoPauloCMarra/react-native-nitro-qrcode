@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import {
   clearQRCodeCache,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   type QRCodeOptions,
@@ -20,11 +22,6 @@ type BenchRow = {
   samples: number[];
 };
 
-type BenchApi = {
-  toPngArrayBuffer?: (options: QRCodeOptions) => ArrayBuffer;
-  toPngArrayBufferAsync?: (options: QRCodeOptions) => Promise<ArrayBuffer>;
-};
-
 const LARGE_PAYLOAD = `https://example.com/nitro-qrcode/bench?${"A".repeat(240)}`;
 const WARMUP = 3;
 const ITERATIONS = 20;
@@ -36,6 +33,30 @@ const PAYLOADS = [
     size: 256,
   },
   { id: "large-high-res", value: LARGE_PAYLOAD, size: 1024 },
+  {
+    id: "classy",
+    value: "https://example.com/classy",
+    size: 256,
+    shapeOptions: { shape: "classy", eyeFrameShape: "rounded" },
+  },
+  {
+    id: "mosaic-logo",
+    value: "https://example.com/mosaic-logo",
+    size: 256,
+    shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+    logoAreaSize: 48,
+    logoAreaBorderRadius: 10,
+  },
+  {
+    id: "fluid",
+    value: "https://example.com/fluid",
+    size: 256,
+    shapeOptions: {
+      shape: "squircle",
+      eyeFrameShape: "circle",
+      bodyDensity: "sparse",
+    },
+  },
 ] as const;
 
 function nowMs(): number {
@@ -91,17 +112,17 @@ async function measure(
   };
 }
 
-function loadOptionalApi(): BenchApi {
-  return require("react-native-nitro-qrcode") as BenchApi;
-}
-
 async function runBench(): Promise<BenchRow[]> {
-  const optional = loadOptionalApi();
   const rows: BenchRow[] = [];
   for (const payload of PAYLOADS) {
     const options: QRCodeOptions = {
       value: payload.value,
       size: payload.size,
+      ...("shapeOptions" in payload ? { shapeOptions: payload.shapeOptions } : {}),
+      ...("logoAreaSize" in payload ? { logoAreaSize: payload.logoAreaSize } : {}),
+      ...("logoAreaBorderRadius" in payload
+        ? { logoAreaBorderRadius: payload.logoAreaBorderRadius }
+        : {}),
     };
     rows.push(
       await measure(payload.id, "sync-base64", () => {
@@ -113,22 +134,16 @@ async function runBench(): Promise<BenchRow[]> {
         return (await toPngBase64Async(options)).length;
       }),
     );
-    if (optional.toPngArrayBuffer) {
-      const generate = optional.toPngArrayBuffer;
-      rows.push(
-        await measure(payload.id, "sync-arraybuffer", () => {
-          return generate(options).byteLength;
-        }),
-      );
-    }
-    if (optional.toPngArrayBufferAsync) {
-      const generate = optional.toPngArrayBufferAsync;
-      rows.push(
-        await measure(payload.id, "async-arraybuffer", async () => {
-          return (await generate(options)).byteLength;
-        }),
-      );
-    }
+    rows.push(
+      await measure(payload.id, "sync-arraybuffer", () => {
+        return toPngArrayBuffer(options).byteLength;
+      }),
+    );
+    rows.push(
+      await measure(payload.id, "async-arraybuffer", async () => {
+        return (await toPngArrayBufferAsync(options)).byteLength;
+      }),
+    );
   }
   return rows;
 }
