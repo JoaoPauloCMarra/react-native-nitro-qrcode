@@ -190,7 +190,9 @@ describe("generation metrics", () => {
     toPngBase64({ value: "metrics-api" });
 
     expect(nativeGetQRCodeMetrics().requests).toBe(1);
+    expect(nativeGetQRCodeMetrics().cacheBytes).toBe(256);
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(1);
+    expect(NitroQRCode.getQRCodeMetrics().cacheBytes).toBe(256);
     expect(NitroQRCode.getCacheBytes()).toBe(256);
     NitroQRCode.resetQRCodeMetrics();
     expect(NitroQRCode.getQRCodeMetrics().requests).toBe(0);

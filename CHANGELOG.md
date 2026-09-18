@@ -31,6 +31,8 @@ Breaking changes are always listed first in each release section.
 
 ### Changed
 
+- Native `getQRCodeMetrics()` now reports live `cacheBytes` from the output
+  cache, matching the web entry.
 - Native `generatePngBase64Object` / `generatePngDataUriObject` (and their
   async and deprecated positional wrappers) now encode from the PNG byte path
   instead of caching a pre-encoded base64 string.

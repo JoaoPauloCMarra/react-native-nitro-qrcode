@@ -2,7 +2,7 @@ import {
   isQRCodeMetricsEnabled,
   nowMilliseconds,
   recordGenerationRequest,
-  getQRCodeMetrics,
+  getQRCodeMetrics as readQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "./metrics";
@@ -59,7 +59,6 @@ export {
   validateOptions,
 } from "./validation";
 export {
-  getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
   type QRCodeMetricsSnapshot,
@@ -272,6 +271,14 @@ export function getQRCodeCacheSize(): number {
 
 export function getQRCodeCacheBytes(): number {
   return NativeQRCode.getCacheBytes();
+}
+
+export function getQRCodeMetrics() {
+  const snapshot = readQRCodeMetrics();
+  if (!snapshot.enabled) {
+    return snapshot;
+  }
+  return { ...snapshot, cacheBytes: NativeQRCode.getCacheBytes() };
 }
 
 export const QRCode: ForwardRefExoticComponent<

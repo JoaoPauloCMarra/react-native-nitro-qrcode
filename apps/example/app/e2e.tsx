@@ -62,6 +62,16 @@ export default function QrcodeE2eScreen() {
           <Text style={styles.renderLinkText}>Open scanability wall</Text>
         </Pressable>
       </Link>
+      <Link href={"/e2e-combo" as Href} asChild>
+        <Pressable
+          testID="open-e2e-combo"
+          accessibilityRole="link"
+          accessibilityLabel="Open combo sweep"
+          style={styles.renderLink}
+        >
+          <Text style={styles.renderLinkText}>Open combo sweep</Text>
+        </Pressable>
+      </Link>
       <Link href={"/e2e-png-bench" as Href} asChild>
         <Pressable
           testID="open-e2e-png-bench"
