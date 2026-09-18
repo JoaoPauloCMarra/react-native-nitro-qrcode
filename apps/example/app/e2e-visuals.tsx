@@ -3,6 +3,8 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import {
   QRCode,
   getQRCodeMetrics,
+  type QRCodeBodyShape,
+  type QRCodeColor,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +14,12 @@ type Specimen = {
   label: string;
   preset: QRCodePreset;
   logo: boolean;
+  alignmentColor?: QRCodeColor;
+  timingColor?: QRCodeColor;
+  quietZoneColor?: QRCodeColor;
+  finderInnerColor?: QRCodeColor;
+  alignmentShape?: QRCodeBodyShape;
+  timingShape?: QRCodeBodyShape;
 };
 
 const PRESETS: readonly QRCodePreset[] = [
@@ -24,10 +32,24 @@ const PRESETS: readonly QRCodePreset[] = [
   "fluid",
 ];
 
-const SPECIMENS: readonly Specimen[] = PRESETS.flatMap((preset) => [
-  { id: `${preset}-plain`, label: `${preset} · no logo`, preset, logo: false },
-  { id: `${preset}-logo`, label: `${preset} · logo`, preset, logo: true },
-]);
+const SPECIMENS: readonly Specimen[] = [
+  ...PRESETS.flatMap((preset) => [
+    { id: `${preset}-plain`, label: `${preset} · no logo`, preset, logo: false },
+    { id: `${preset}-logo`, label: `${preset} · logo`, preset, logo: true },
+  ]),
+  {
+    id: "regions",
+    label: "regions · custom parts",
+    preset: "classy",
+    logo: false,
+    alignmentColor: "#B45309",
+    timingColor: "#0F766E",
+    quietZoneColor: "#F1F5F9",
+    finderInnerColor: "#FFF7ED",
+    alignmentShape: "diamond",
+    timingShape: "circle",
+  },
+];
 
 const APP_ICON = require("../assets/icon.png");
 
@@ -112,6 +134,19 @@ export default function QrcodeE2eVisualsScreen() {
               value={`https://nitro.dev/visual/${specimen.id}`}
               size={120}
               preset={specimen.preset}
+              alignmentColor={specimen.alignmentColor}
+              timingColor={specimen.timingColor}
+              quietZoneColor={specimen.quietZoneColor}
+              finderInnerColor={specimen.finderInnerColor}
+              shapeOptions={
+                specimen.alignmentShape === undefined &&
+                specimen.timingShape === undefined
+                  ? undefined
+                  : {
+                      alignmentShape: specimen.alignmentShape,
+                      timingShape: specimen.timingShape,
+                    }
+              }
               scanSafe
               errorCorrectionLevel={specimen.logo ? "H" : "M"}
               logoAreaSize={specimen.logo ? 32 : 0}

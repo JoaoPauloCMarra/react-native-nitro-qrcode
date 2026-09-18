@@ -7,13 +7,20 @@ import {
   isFullyTransparent,
   toSvgColor,
 } from "./colors";
+import {
+  isAlignmentModule,
+  isFinderModule,
+  isTimingModule,
+} from "./qr-regions";
 import type { NormalizedOptions, QRCodeShape } from "./validation";
 
 export type RenderLayer =
   | "foreground"
   | "stroke"
   | "eye"
-  | "eyeball";
+  | "eyeball"
+  | "alignment"
+  | "timing";
 
 export type RenderNeighbors = {
   north: boolean;
@@ -47,6 +54,7 @@ export type RenderPlanRow = {
 
 export type RenderPlan = {
   background: RenderBackground;
+  quietZoneFill: RenderBackground | undefined;
   rows: RenderPlanRow[];
   drawGroupedFinders: boolean;
   logoArea:
@@ -77,11 +85,16 @@ export function createRenderPlan(
     Math.round((moduleIndex * pixelSize) / totalModules);
   const geometry: RenderPixelGeometry = { modulePixel, totalModules };
   const rows = buildModuleRows(options, model, geometry);
+  const background = planBackground(options.backgroundColor);
+  const quietZoneFill = areRgbaColorsEqual(
+    options.quietZoneColor,
+    options.backgroundColor,
+  )
+    ? undefined
+    : planBackground(options.quietZoneColor);
   return {
-    background:
-      isFullyTransparent(options.backgroundColor)
-        ? { type: "transparent" }
-        : { type: "color", color: toSvgColor(options.backgroundColor) },
+    background,
+    quietZoneFill,
     rows,
     drawGroupedFinders: shouldDrawGroupedFinderEyes(options),
     logoArea:
@@ -106,11 +119,13 @@ function isDark(model: QRCodeModuleModel, x: number, y: number): boolean {
 }
 
 function isEyeModule(x: number, y: number, matrixSize: number): boolean {
-  const top = y >= 0 && y < 7;
-  const left = x >= 0 && x < 7;
-  const right = x >= matrixSize - 7 && x < matrixSize;
-  const bottom = y >= matrixSize - 7 && y < matrixSize;
-  return (top && left) || (top && right) || (bottom && left);
+  return isFinderModule(x, y, matrixSize);
+}
+
+function planBackground(color: string): RenderBackground {
+  return isFullyTransparent(color)
+    ? { type: "transparent" }
+    : { type: "color", color: toSvgColor(color) };
 }
 
 function getEyeOrigin(
@@ -158,7 +173,8 @@ function shouldDrawGroupedFinderEyes(
     options.shapeOptions.eyeballShape !== "square" ||
     !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
     !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
-    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL)
+    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL) ||
+    !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
   );
 }
 
@@ -205,14 +221,22 @@ function buildModuleRows(
         continue;
       }
       const eyeballModule = isEyeBallModule(moduleX, moduleY, matrixSize);
+      const alignmentModule = isAlignmentModule(moduleX, moduleY, matrixSize);
+      const timingModule = isTimingModule(moduleX, moduleY, matrixSize);
       const shape: QRCodeShape = eyeballModule
         ? options.shapeOptions.eyeballShape
         : eyeModule
           ? options.shapeOptions.eyeFrameShape
-          : options.shapeOptions.shape;
+          : alignmentModule
+            ? options.shapeOptions.alignmentShape
+            : timingModule
+              ? options.shapeOptions.timingShape
+              : options.shapeOptions.shape;
       const gap = eyeModule
         ? options.shapeOptions.eyePatternGap
-        : resolveBodyGap(options, x1 - x0, y1 - y0);
+        : alignmentModule || timingModule
+          ? 0
+          : resolveBodyGap(options, x1 - x0, y1 - y0);
       const cornerRadius = eyeModule
         ? options.shapeOptions.eyePatternCornerRadius
         : options.shapeOptions.cornerRadius;
@@ -220,7 +244,11 @@ function buildModuleRows(
         ? "eyeball"
         : eyeModule
           ? "eye"
-          : "foreground";
+          : alignmentModule
+            ? "alignment"
+            : timingModule
+              ? "timing"
+              : "foreground";
       const plan: RenderModulePlan = {
         x0,
         y0,
@@ -237,7 +265,10 @@ function buildModuleRows(
           west: isDark(model, moduleX - 1, moduleY),
         },
       };
-      if (!eyeModule && !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE)) {
+      if (
+        layer === "foreground" &&
+        !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE)
+      ) {
         plan.stroke = "stroke";
         plan.strokeGap = gap + Math.max(1, (x1 - x0) * 0.18);
       }

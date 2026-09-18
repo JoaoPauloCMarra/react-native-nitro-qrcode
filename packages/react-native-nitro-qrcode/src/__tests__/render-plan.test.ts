@@ -85,3 +85,78 @@ describe("render plan color identity", () => {
     },
   );
 });
+
+function filledModel(size: number) {
+  return {
+    modules: {
+      size,
+      data: new Array(size * size).fill(true),
+    },
+  };
+}
+
+describe("render plan region tokens", () => {
+  it("styles alignment and timing independently from body modules", () => {
+    const plan = createRenderPlan(
+      normalizeOptions({
+        value: "region-tokens",
+        alignmentColor: "#CC0000",
+        timingColor: "#00AA00",
+        shapeOptions: {
+          shape: "square",
+          alignmentShape: "diamond",
+          timingShape: "circle",
+        },
+      }),
+      filledModel(25),
+      200,
+    );
+    const modules = plan.rows.flatMap((row) => row.modules);
+
+    expect(
+      modules.some(
+        (module) => module.layer === "alignment" && module.shape === "diamond",
+      ),
+    ).toBe(true);
+    expect(
+      modules.some(
+        (module) => module.layer === "timing" && module.shape === "circle",
+      ),
+    ).toBe(true);
+    expect(
+      modules.some(
+        (module) => module.layer === "foreground" && module.shape === "square",
+      ),
+    ).toBe(true);
+    expect(plan.quietZoneFill).toBeUndefined();
+  });
+
+  it("keeps version 1 codes free of alignment modules", () => {
+    const plan = createRenderPlan(
+      normalizeOptions({
+        value: "version-1-regions",
+        shapeOptions: { alignmentShape: "diamond" },
+      }),
+      filledModel(21),
+      128,
+    );
+    const modules = plan.rows.flatMap((row) => row.modules);
+
+    expect(modules.some((module) => module.layer === "alignment")).toBe(false);
+    expect(modules.some((module) => module.layer === "timing")).toBe(true);
+  });
+
+  it("plans a distinct quiet-zone fill when it differs from the background", () => {
+    const plan = createRenderPlan(
+      normalizeOptions({
+        value: "quiet-zone-color",
+        backgroundColor: "#FFFFFF",
+        quietZoneColor: "#E2E8F0",
+      }),
+      filledModel(21),
+      128,
+    );
+
+    expect(plan.quietZoneFill).toEqual({ type: "color", color: "#E2E8F0" });
+  });
+});

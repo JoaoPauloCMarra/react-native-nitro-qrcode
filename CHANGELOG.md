@@ -24,6 +24,10 @@ Breaking changes are always listed first in each release section.
 - `diamond`, `squircle`, and `classy` module and finder shapes, plus `classy`,
   `mosaic`, and `fluid` presets. Classy rounds only outer corners so adjacent
   modules connect. Rust styling crates were measured and not vendored.
+- Optional `alignmentColor`, `timingColor`, `quietZoneColor`, and
+  `finderInnerColor`, plus `shapeOptions.alignmentShape` /
+  `shapeOptions.timingShape`, so every QR region can be styled without moving
+  the matrix. Omitted values keep the previous body/background look.
 
 ### Changed
 

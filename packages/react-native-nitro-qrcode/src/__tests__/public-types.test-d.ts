@@ -60,10 +60,18 @@ const validOptions: QRCodeOptions = {
   size: 4096,
   foregroundColor: hexColor,
   backgroundColor: transparentBackground,
+  alignmentColor: hexColor,
+  timingColor: hexColor,
+  quietZoneColor: transparentBackground,
+  finderInnerColor: transparentBackground,
   gradient: validGradient,
   minVersion: version,
   mask,
   orbit: true,
+  shapeOptions: {
+    alignmentShape: "diamond",
+    timingShape: "circle",
+  },
 };
 
 const validProps: QRCodeProps = {
@@ -120,6 +128,22 @@ const badForegroundOption: QRCodeOptions = {
   // @ts-expect-error only backgrounds can be transparent.
   foregroundColor: "transparent",
 };
+
+const badAlignmentOption: QRCodeOptions = {
+  value: "x",
+  // @ts-expect-error alignment colors must be hex colors.
+  alignmentColor: "transparent",
+};
+
+void badAlignmentOption;
+
+const badTimingOption: QRCodeOptions = {
+  value: "x",
+  // @ts-expect-error timing colors must be hex colors.
+  timingColor: "transparent",
+};
+
+void badTimingOption;
 
 void badForegroundOption;
 

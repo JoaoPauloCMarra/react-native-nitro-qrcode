@@ -148,9 +148,15 @@ std::string legacyCacheRequest(const std::string &value,
   appendColor(options.eye);
   appendColor(options.eyeStroke);
   appendColor(options.eyeball);
+  appendColor(options.alignment);
+  appendColor(options.timing);
+  appendColor(options.quietZoneFill);
+  appendColor(options.finderInner);
   appendLegacyCachePart(request, options.moduleShape);
   appendLegacyCachePart(request, options.eyePatternShape);
   appendLegacyCachePart(request, options.eyeballShape);
+  appendLegacyCachePart(request, options.alignmentShape);
+  appendLegacyCachePart(request, options.timingShape);
   appendLegacyCacheNumber(request, options.gap);
   appendLegacyCacheNumber(request, options.eyePatternGap);
   appendLegacyCachePart(request, options.bodyDensity);
@@ -799,6 +805,10 @@ void testTransparentBackgroundPng() {
   options.quietZone = 4;
   options.backgroundColor = "transparent";
   options.background = parseColor("transparent");
+  options.quietZoneColor = "transparent";
+  options.quietZoneFill = options.background;
+  options.finderInnerColor = "transparent";
+  options.finderInner = options.background;
   const std::string encoded =
       generator.renderPngBase64("https://example.com/transparent", options);
 
@@ -982,6 +992,39 @@ void testShapeLimits() {
     assert(logoPng.size() > 8);
     assert(logoPng[0] == 137);
   }
+}
+
+void testRegionTokens() {
+  QRCodeGenerator generator;
+  GenerateOptions options;
+  options.size = 192;
+  const std::vector<uint8_t> baseline =
+      generator.renderPngBytes("https://example.com/regions", options);
+
+  options.alignmentColor = "#CC0000";
+  options.alignment = parseColor(options.alignmentColor);
+  options.timingColor = "#00AA00";
+  options.timing = parseColor(options.timingColor);
+  options.quietZoneColor = "#E2E8F0";
+  options.quietZoneFill = parseColor(options.quietZoneColor);
+  options.finderInnerColor = "#FFF7ED";
+  options.finderInner = parseColor(options.finderInnerColor);
+  options.alignmentShape = "diamond";
+  options.timingShape = "circle";
+  const std::vector<uint8_t> styled =
+      generator.renderPngBytes("https://example.com/regions", options);
+  assert(styled.size() > 8);
+  assert(styled[0] == 137);
+  assert(styled != baseline);
+
+  options.alignmentShape = "hexagon";
+  bool didThrow = false;
+  try {
+    generator.renderPngBytes("https://example.com/regions", options);
+  } catch (const std::invalid_argument &) {
+    didThrow = true;
+  }
+  assert(didThrow);
 }
 
 void testSvgGeneration() {
@@ -1272,6 +1315,7 @@ int main() {
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();
+  testRegionTokens();
   testMatrixCacheLru();
   testCacheIdentityAndMemoryAccounting();
   testSvgGeneration();

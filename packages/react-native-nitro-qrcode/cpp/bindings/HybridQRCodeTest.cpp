@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
+#include <optional>
 using margelo::nitro::NitroQRCode::GenerateOptions;
 using margelo::nitro::NitroQRCode::HybridQRCode;
 namespace {
@@ -10,7 +11,8 @@ GenerateOptions makeOptions() {
       "https://example.com/hybrid", 128, 4, "M", "#000000", "#FFFFFF",
       "#000000", "#000000", "#000000", "#000000", 1, 40, -1, true,
       "square", "square", "square", 0, 0, "dense", -1, -1, "matrix", 0,
-      0, "none", {}, {}, 0, 0, 1, 1);
+      0, "none", {}, {}, 0, 0, 1, 1, std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt, std::nullopt, std::nullopt);
 }
 void testHybridQRCodeMethods() {
   auto qrCode = std::make_shared<HybridQRCode>();

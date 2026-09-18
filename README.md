@@ -74,7 +74,9 @@ logo-area clearing) uses vendored `fpng`, so those PNG files can differ in
 size and compressed bytes from 0.7.x while decoding to the same pixels. Flat
 two-color codes still use the 1-bit indexed zlib writer. New optional looks
 are `classy`, `mosaic`, and `fluid` (`diamond`, `squircle`, and neighbor-aware
-`classy` shapes). There are no breaking JavaScript API changes.
+`classy` shapes). Alignment, timing, quiet-zone, and finder-inner colors/shapes
+are independently optional; omitted values keep the previous body/background
+look. There are no breaking JavaScript API changes.
 
 ### Upgrade from 0.7.0
 
@@ -163,10 +165,16 @@ export function BrandedCode() {
         start: { x: 0, y: 0 },
         end: { x: 1, y: 1 },
       }}
+      alignmentColor="#B45309"
+      timingColor="#0F766E"
+      quietZoneColor="#F8FAFC"
+      finderInnerColor="#FFF7ED"
       shapeOptions={{
         shape: "rounded",
         eyeFrameShape: "rounded",
         eyeballShape: "circle",
+        alignmentShape: "diamond",
+        timingShape: "circle",
         gap: 1,
         bodyDensity: "dense",
       }}
@@ -310,8 +318,9 @@ Generation input bounds:
 Option loss and platform differences:
 
 - **SVG output** encodes the matrix with quiet zone, background, foreground,
-  and gradient only. Body shape, gaps, density, stroke, eye, eyeball colors,
-  and logo-area clearing do not apply to the SVG path.
+  and gradient only. Body shape, gaps, density, stroke, eye, eyeball,
+  alignment, timing, quiet-zone, finder-inner colors, and logo-area clearing
+  do not apply to the SVG path.
 - **Web PNG transparency** uses an alpha-cleared background; transparent
   pixels are truly transparent instead of black.
 - **Circle geometry** is defined as an ellipse inscribed in the module cell on
@@ -463,11 +472,17 @@ Main exports:
 | `eyeColor`             | Finder frame fill color.                                                                                                             |
 | `eyeStrokeColor`       | Finder frame stroke color.                                                                                                           |
 | `eyeballColor`         | Finder center color.                                                                                                                 |
+| `alignmentColor`       | Alignment-pattern color; defaults to `foregroundColor`.                                                                              |
+| `timingColor`          | Timing-pattern color; defaults to `foregroundColor`.                                                                                 |
+| `quietZoneColor`       | Quiet-zone color; defaults to `backgroundColor`.                                                                                     |
+| `finderInnerColor`     | Finder inner-ring color; defaults to `backgroundColor`.                                                                              |
 | `gradient`             | Linear or radial foreground gradient with 2 through 8 colors.                                                                        |
 | `orbit`                | Deprecated no-op retained for source compatibility.                                                                                  |
-| `shapeOptions`         | Body, finder, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
+| `shapeOptions`         | Body, finder, alignment, timing, gap, density, and radius controls; component rasterization scales visual gaps and radii before generator bounds apply. |
 | `preset`               | `default`, `rounded`, `dots`, `branded`, `classy`, `mosaic`, or `fluid`.                                                              |
-| `shapeOptions.shape`   | `square`, `circle`, `rounded`, `diamond`, `squircle`, or `classy`. Finder shapes accept the same set.                                |
+| `shapeOptions.shape`   | `square`, `circle`, `rounded`, `diamond`, `squircle`, or `classy`. Finder, alignment, and timing shapes accept the same set.         |
+| `shapeOptions.alignmentShape` | Alignment-pattern shape; defaults to `shape`.                                                                                 |
+| `shapeOptions.timingShape` | Timing-pattern shape; defaults to `shape`.                                                                                         |
 | `logo`                 | React node overlaid above the generated image; not embedded in exports.                                                              |
 | `logoAreaSize`         | Cleared center area in points; integer 0 through `size`.                                                                             |
 | `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`.                                                                              |

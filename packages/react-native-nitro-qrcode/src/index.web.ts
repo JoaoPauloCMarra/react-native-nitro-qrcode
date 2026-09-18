@@ -416,11 +416,24 @@ function preparePngCanvas(
   useLayerColors: boolean;
 } {
   const pixelSize = plan.pixelSize;
-  if (plan.background.type === "transparent") {
+  const canvasFill = plan.quietZoneFill ?? plan.background;
+  if (canvasFill.type === "transparent") {
     context.clearRect(0, 0, pixelSize, pixelSize);
   } else {
-    context.fillStyle = toSvgColor(plan.background.color);
+    context.fillStyle = toSvgColor(canvasFill.color);
     context.fillRect(0, 0, pixelSize, pixelSize);
+  }
+  if (plan.quietZoneFill !== undefined) {
+    const inset = Math.round(
+      (plan.quietZone * pixelSize) / plan.totalModules,
+    );
+    const inner = pixelSize - inset * 2;
+    if (plan.background.type === "transparent") {
+      context.clearRect(inset, inset, inner, inner);
+    } else {
+      context.fillStyle = toSvgColor(plan.background.color);
+      context.fillRect(inset, inset, inner, inner);
+    }
   }
   const foregroundFill = createForegroundFill(
     context,
@@ -518,13 +531,19 @@ function drawPlanRows(
 function resolvePlanFill(
   options: NormalizedOptions,
   foregroundFill: CanvasFill,
-  layer: "foreground" | "stroke" | "eye" | "eyeball",
+  layer: "foreground" | "stroke" | "eye" | "eyeball" | "alignment" | "timing",
 ): CanvasFill {
   if (layer === "eyeball") {
     return toSvgColor(options.eyeballColor);
   }
   if (layer === "eye") {
     return toSvgColor(options.eyeColor);
+  }
+  if (layer === "alignment") {
+    return toSvgColor(options.alignmentColor);
+  }
+  if (layer === "timing") {
+    return toSvgColor(options.timingColor);
   }
   return foregroundFill;
 }
@@ -619,7 +638,11 @@ function hasCustomLayerColors(options: NormalizedOptions): boolean {
     !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE) ||
     !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
     !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
-    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL)
+    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL) ||
+    !areRgbaColorsEqual(options.alignmentColor, options.foregroundColor) ||
+    !areRgbaColorsEqual(options.timingColor, options.foregroundColor) ||
+    !areRgbaColorsEqual(options.quietZoneColor, options.backgroundColor) ||
+    !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
   );
 }
 
@@ -762,7 +785,7 @@ function drawGroupedFinder(
     context,
     rect(1, 5),
     frameShape,
-    toSvgColor(options.backgroundColor),
+    toSvgColor(options.finderInnerColor),
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -1125,6 +1148,10 @@ function cacheRequest(
           options.eyeColor,
           options.eyeStrokeColor,
           options.eyeballColor,
+          options.alignmentColor,
+          options.timingColor,
+          options.quietZoneColor,
+          options.finderInnerColor,
         ]
       : [
           rgbaColorBytes(options.foregroundColor),
@@ -1133,6 +1160,10 @@ function cacheRequest(
           rgbaColorBytes(options.eyeColor),
           rgbaColorBytes(options.eyeStrokeColor),
           rgbaColorBytes(options.eyeballColor),
+          rgbaColorBytes(options.alignmentColor),
+          rgbaColorBytes(options.timingColor),
+          rgbaColorBytes(options.quietZoneColor),
+          rgbaColorBytes(options.finderInnerColor),
         ];
   const gradientColors =
     output === "svg" && !canonicalColors
@@ -1157,6 +1188,8 @@ function cacheRequest(
     options.shapeOptions.bodyDensity,
     options.shapeOptions.cornerRadius,
     options.shapeOptions.eyePatternCornerRadius,
+    options.shapeOptions.alignmentShape,
+    options.shapeOptions.timingShape,
     options.shapeOptions.layout,
     options.logoAreaSize,
     options.logoAreaBorderRadius,

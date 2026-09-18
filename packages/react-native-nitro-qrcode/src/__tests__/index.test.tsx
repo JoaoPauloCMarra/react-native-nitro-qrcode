@@ -170,6 +170,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
+      quietZoneColor: "#FFFFFF",
+      finderInnerColor: "#FFFFFF",
       minVersion: 1,
       maxVersion: 40,
       mask: -1,
@@ -182,6 +186,8 @@ describe("native QRCode API", () => {
       bodyDensity: "dense",
       cornerRadius: -1,
       eyePatternCornerRadius: -1,
+      alignmentShape: "square",
+      timingShape: "square",
       layout: "matrix",
       logoAreaSize: 0,
       logoAreaBorderRadius: 0,
@@ -234,6 +240,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#111111",
+      timingColor: "#111111",
+      quietZoneColor: "#EEEEEE",
+      finderInnerColor: "#EEEEEE",
       minVersion: 2,
       maxVersion: 8,
       mask: 3,
@@ -246,6 +256,8 @@ describe("native QRCode API", () => {
       bodyDensity: "balanced",
       cornerRadius: 3,
       eyePatternCornerRadius: 4,
+      alignmentShape: "rounded",
+      timingShape: "rounded",
       layout: "matrix",
       logoAreaSize: 48,
       logoAreaBorderRadius: 8,
@@ -283,6 +295,10 @@ describe("native QRCode API", () => {
       eyeColor: "#000000",
       eyeStrokeColor: "#000000",
       eyeballColor: "#000000",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
+      quietZoneColor: "#FFFFFF",
+      finderInnerColor: "#FFFFFF",
       minVersion: 1,
       maxVersion: 40,
       mask: -1,
@@ -295,6 +311,8 @@ describe("native QRCode API", () => {
       bodyDensity: "dense",
       cornerRadius: -1,
       eyePatternCornerRadius: -1,
+      alignmentShape: "square",
+      timingShape: "square",
       layout: "matrix",
       logoAreaSize: 0,
       logoAreaBorderRadius: 0,
@@ -513,6 +531,22 @@ describe("native QRCode API", () => {
       }),
     ).toThrow(
       "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { alignmentShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      toPngBase64({
+        value: "x",
+        shapeOptions: { timingShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
     );
     expect(() =>
       toPngBase64({
@@ -2004,10 +2038,14 @@ describe("web QRCode API", () => {
     const first = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#0B8E79",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
     });
     const second = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#D9F104",
+      alignmentColor: "#000000",
+      timingColor: "#000000",
     });
 
     expect(second).not.toBe(first);
@@ -2195,6 +2233,22 @@ describe("web QRCode API", () => {
       }),
     ).toThrow(
       "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { alignmentShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
+    );
+    expect(() =>
+      Web.toSvgString({
+        value: "x",
+        shapeOptions: { timingShape: "triangle" as "square" },
+      }),
+    ).toThrow(
+      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
     );
     expect(() =>
       Web.toSvgString({

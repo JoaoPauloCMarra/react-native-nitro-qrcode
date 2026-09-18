@@ -82,6 +82,8 @@ export type QRCodeShapeOptions = {
   bodyDensity?: QRCodeBodyDensity;
   cornerRadius?: number;
   eyePatternCornerRadius?: number;
+  alignmentShape?: QRCodeBodyShape;
+  timingShape?: QRCodeBodyShape;
 };
 
 export type QRCodeGradientType = "linear" | "radial";
@@ -168,6 +170,10 @@ export type QRCodeOptions = {
   eyeColor?: QRCodeColor;
   eyeStrokeColor?: QRCodeColor;
   eyeballColor?: QRCodeColor;
+  alignmentColor?: QRCodeColor;
+  timingColor?: QRCodeColor;
+  quietZoneColor?: QRCodeBackgroundColor;
+  finderInnerColor?: QRCodeBackgroundColor;
   gradient?: QRCodeGradient;
   minVersion?: QRCodeVersion;
   maxVersion?: QRCodeVersion;
@@ -356,6 +362,22 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
       options.eyeballColor ?? DEFAULT_EYEBALL,
       "eyeballColor",
     ),
+    alignmentColor: sanitizeColor(
+      options.alignmentColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "alignmentColor",
+    ),
+    timingColor: sanitizeColor(
+      options.timingColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      "timingColor",
+    ),
+    quietZoneColor: sanitizeBackgroundColor(
+      options.quietZoneColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "quietZoneColor",
+    ),
+    finderInnerColor: sanitizeBackgroundColor(
+      options.finderInnerColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
+      "finderInnerColor",
+    ),
     gradient: normalizeGradient(options.gradient),
     minVersion,
     maxVersion,
@@ -419,9 +441,10 @@ export function normalizeGradient(
 export function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
 ): Required<QRCodeShapeOptions> {
+  const shape = sanitizeShape(options?.shape, "shape");
   return {
     layout: sanitizeLayout(options?.layout),
-    shape: sanitizeShape(options?.shape, "shape"),
+    shape,
     eyeFrameShape: sanitizeEyeFrameShape(
       options?.eyeFrameShape ?? options?.eyePatternShape,
     ),
@@ -450,6 +473,11 @@ export function normalizeShapeOptions(
       0,
       256,
     ),
+    alignmentShape: sanitizeShape(
+      options?.alignmentShape ?? shape,
+      "alignmentShape",
+    ),
+    timingShape: sanitizeShape(options?.timingShape ?? shape, "timingShape"),
   };
 }
 
@@ -644,6 +672,8 @@ export function scaleShapeOptions(
       options.eyePatternCornerRadius === undefined
         ? undefined
         : Math.round(options.eyePatternCornerRadius * scale),
+    alignmentShape: options.alignmentShape,
+    timingShape: options.timingShape,
   };
 }
 

@@ -33,6 +33,12 @@ export interface GenerateOptions {
   gradientStartY: number;
   gradientEndX: number;
   gradientEndY: number;
+  alignmentColor?: string;
+  timingColor?: string;
+  quietZoneColor?: string;
+  finderInnerColor?: string;
+  alignmentShape?: string;
+  timingShape?: string;
 }
 
 export interface MatrixObject {

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <iomanip>
 #include <limits>
 #include <mutex>
@@ -19,6 +20,10 @@ namespace NitroQRCode {
 namespace {
 
 constexpr uint8_t TransparentLayer = 6;
+constexpr uint8_t AlignmentLayer = 7;
+constexpr uint8_t TimingLayer = 8;
+constexpr uint8_t FinderInnerLayer = 9;
+constexpr uint8_t QuietZoneLayer = 10;
 
 enum class ModuleShape {
   Square,
@@ -173,7 +178,11 @@ double gradientProgressAt(const GradientOptions &gradient, int imageSize, int x,
 bool hasCustomLayerColors(const GenerateOptions &options) {
   constexpr Color defaultColor = {0, 0, 0, 255};
   return options.stroke != defaultColor || options.eye != defaultColor ||
-         options.eyeStroke != defaultColor || options.eyeball != defaultColor;
+         options.eyeStroke != defaultColor || options.eyeball != defaultColor ||
+         options.alignment != options.foreground ||
+         options.timing != options.foreground ||
+         options.quietZoneFill != options.background ||
+         options.finderInner != options.background;
 }
 
 Color colorForLayer(uint8_t layer, const GenerateOptions &options,
@@ -187,6 +196,14 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
     return options.eyeStroke;
   case 5:
     return options.eyeball;
+  case AlignmentLayer:
+    return options.alignment;
+  case TimingLayer:
+    return options.timing;
+  case FinderInnerLayer:
+    return options.finderInner;
+  case QuietZoneLayer:
+    return options.quietZoneFill;
   case 1:
     return hasGradient(options)
                ? interpolateColor(
@@ -352,6 +369,8 @@ void validateOptions(const std::string &value, const GenerateOptions &options) {
   parseShape(options.moduleShape, "shape");
   parseEyePatternShape(options.eyePatternShape);
   parseEyeballShape(options.eyeballShape);
+  parseShape(options.alignmentShape, "alignmentShape");
+  parseShape(options.timingShape, "timingShape");
   parseBodyDensity(options.bodyDensity);
   if (options.gap < 0 || options.gap > 256) {
     throw std::invalid_argument("gap must be between 0 and 256.");
@@ -402,6 +421,55 @@ bool isEyeBallModule(int x, int y, int matrixSize) {
   const int localX = x - originX;
   const int localY = y - originY;
   return localX >= 2 && localX <= 4 && localY >= 2 && localY <= 4;
+}
+
+std::vector<int> alignmentPatternPositions(int matrixSize) {
+  const int version = (matrixSize - 17) / 4;
+  if (version < 2 || (matrixSize - 17) % 4 != 0) {
+    return {};
+  }
+  const int numAlign = version / 7 + 2;
+  const int step =
+      (version * 8 + numAlign * 3 + 5) / (numAlign * 4 - 4) * 2;
+  std::vector<int> result;
+  for (int index = 0, pos = matrixSize - 7; index < numAlign - 1;
+       ++index, pos -= step) {
+    result.insert(result.begin(), pos);
+  }
+  result.insert(result.begin(), 6);
+  return result;
+}
+
+bool isFinderAlignmentCenter(int x, int y, int matrixSize) {
+  return (x == 6 && y == 6) || (x == 6 && y == matrixSize - 7) ||
+         (x == matrixSize - 7 && y == 6);
+}
+
+bool isAlignmentModule(int x, int y, int matrixSize,
+                       const std::vector<int> &positions) {
+  if (isEyeModule(x, y, matrixSize)) {
+    return false;
+  }
+  for (int centerY : positions) {
+    for (int centerX : positions) {
+      if (isFinderAlignmentCenter(centerX, centerY, matrixSize)) {
+        continue;
+      }
+      if (std::abs(x - centerX) <= 2 && std::abs(y - centerY) <= 2) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool isTimingModule(int x, int y, int matrixSize,
+                    const std::vector<int> &positions) {
+  if (x != 6 && y != 6) {
+    return false;
+  }
+  return !isEyeModule(x, y, matrixSize) &&
+         !isAlignmentModule(x, y, matrixSize, positions);
 }
 
 void fillRect(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
@@ -626,7 +694,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
                        int moduleX, int moduleY, int quietZone,
                        int totalModules, ModuleShape frameShape,
                        ModuleShape eyeballShape, int cornerRadius,
-                       bool useEyeStrokeLayer) {
+                       bool useEyeStrokeLayer, uint8_t holeLayer) {
   const auto modulePosition = [imageSize, quietZone,
                                totalModules](int module, double offset) {
     return static_cast<int>(
@@ -649,7 +717,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
   if (useEyeStrokeLayer) {
     drawShape(strokeInset, 7.0 - strokeInset * 2.0, frameShape, 3);
   }
-  drawShape(1.0, 5.0, frameShape, 0);
+  drawShape(1.0, 5.0, frameShape, holeLayer);
   const bool useCircleFrameSquareEyeball =
       frameShape == ModuleShape::Circle && eyeballShape == ModuleShape::Square;
   const double eyeballOffset =
@@ -666,15 +734,17 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
 void drawGroupedFinders(std::vector<uint8_t> &indices, int imageSize,
                         int matrixSize, int quietZone, int totalModules,
                         ModuleShape frameShape, ModuleShape eyeballShape,
-                        int cornerRadius, bool useEyeStrokeLayer) {
+                        int cornerRadius, bool useEyeStrokeLayer,
+                        uint8_t holeLayer) {
   drawGroupedFinder(indices, imageSize, 0, 0, quietZone, totalModules,
-                    frameShape, eyeballShape, cornerRadius, useEyeStrokeLayer);
+                    frameShape, eyeballShape, cornerRadius, useEyeStrokeLayer,
+                    holeLayer);
   drawGroupedFinder(indices, imageSize, matrixSize - 7, 0, quietZone,
                     totalModules, frameShape, eyeballShape, cornerRadius,
-                    useEyeStrokeLayer);
+                    useEyeStrokeLayer, holeLayer);
   drawGroupedFinder(indices, imageSize, 0, matrixSize - 7, quietZone,
                     totalModules, frameShape, eyeballShape, cornerRadius,
-                    useEyeStrokeLayer);
+                    useEyeStrokeLayer, holeLayer);
 }
 
 void clearLogoArea(std::vector<uint8_t> &indices, int imageSize,
@@ -954,13 +1024,27 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   const ModuleShape eyePatternShape =
       parseEyePatternShape(options.eyePatternShape);
   const ModuleShape eyeballShape = parseEyeballShape(options.eyeballShape);
+  const ModuleShape alignmentShape =
+      parseShape(options.alignmentShape, "alignmentShape");
+  const ModuleShape timingShape =
+      parseShape(options.timingShape, "timingShape");
+  const std::vector<int> alignmentPositions =
+      alignmentPatternPositions(matrix.size);
   constexpr Color defaultColor = {0, 0, 0, 255};
   const bool useCustomFinderColors = options.eye != defaultColor ||
                                      options.eyeStroke != defaultColor ||
-                                     options.eyeball != defaultColor;
+                                     options.eyeball != defaultColor ||
+                                     options.finderInner != options.background;
   const bool drawGroupedFinderEyes =
       eyePatternShape != ModuleShape::Square ||
       eyeballShape != ModuleShape::Square || useCustomFinderColors;
+  if (options.quietZoneFill != options.background) {
+    std::fill(indices.begin(), indices.end(), QuietZoneLayer);
+    const int inner0 = (options.quietZone * imageSize) / totalModules;
+    const int inner1 =
+        ((matrix.size + options.quietZone) * imageSize) / totalModules;
+    fillRect(indices, imageSize, inner0, inner0, inner1, inner1, 0);
+  }
 
   for (int moduleY = 0; moduleY < matrix.size; moduleY++) {
     const int y0 = ((moduleY + options.quietZone) * imageSize) / totalModules;
@@ -986,25 +1070,34 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
         continue;
       }
       const bool eyeballModule = isEyeBallModule(moduleX, moduleY, matrix.size);
+      const bool alignmentModule =
+          isAlignmentModule(moduleX, moduleY, matrix.size, alignmentPositions);
+      const bool timingModule =
+          isTimingModule(moduleX, moduleY, matrix.size, alignmentPositions);
       const ModuleShape shape =
           eyeballModule ? eyeballShape
-                        : (eyeModule ? eyePatternShape : moduleShape);
+          : eyeModule   ? eyePatternShape
+          : alignmentModule ? alignmentShape
+          : timingModule    ? timingShape
+                            : moduleShape;
       const int gap = eyeModule ? options.eyePatternGap
-                                : resolveBodyGap(options, x1 - x0, y1 - y0);
+                      : alignmentModule || timingModule
+                          ? 0
+                          : resolveBodyGap(options, x1 - x0, y1 - y0);
       const int radius =
           eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
       uint8_t layer = 1;
       if (eyeModule) {
-        if (eyeballModule) {
-          layer = 5;
-        } else {
-          layer = 3;
-        }
+        layer = eyeballModule ? 5 : 3;
+      } else if (alignmentModule) {
+        layer = AlignmentLayer;
+      } else if (timingModule) {
+        layer = TimingLayer;
       }
       const ModuleNeighbors neighbors{
           isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
           isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
-      if (!eyeModule && options.stroke != defaultColor) {
+      if (layer == 1 && options.stroke != defaultColor) {
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2,
                    neighbors);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
@@ -1020,7 +1113,10 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
     drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
                        totalModules, eyePatternShape, eyeballShape,
                        options.eyePatternCornerRadius,
-                       options.eyeStroke != defaultColor);
+                       options.eyeStroke != defaultColor,
+                       options.finderInner == options.background
+                           ? 0
+                           : FinderInnerLayer);
   }
   clearLogoArea(indices, imageSize, options.logoAreaSize,
                 options.logoAreaBorderRadius);
@@ -1192,9 +1288,15 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendColor(options.eye);
   appendColor(options.eyeStroke);
   appendColor(options.eyeball);
+  appendColor(options.alignment);
+  appendColor(options.timing);
+  appendColor(options.quietZoneFill);
+  appendColor(options.finderInner);
   appendCachePart(request, options.moduleShape);
   appendCachePart(request, options.eyePatternShape);
   appendCachePart(request, options.eyeballShape);
+  appendCachePart(request, options.alignmentShape);
+  appendCachePart(request, options.timingShape);
   appendCacheNumber(request, options.gap);
   appendCacheNumber(request, options.eyePatternGap);
   appendCachePart(request, options.bodyDensity);

@@ -201,6 +201,10 @@ export function createQRCodeComponent(
       eyeColor,
       eyeStrokeColor,
       eyeballColor,
+      alignmentColor,
+      timingColor,
+      quietZoneColor,
+      finderInnerColor,
       gradient,
       minVersion,
       maxVersion,
@@ -246,6 +250,8 @@ export function createQRCodeComponent(
     const shapeOptionsCornerRadius = shapeOptions?.cornerRadius;
     const shapeOptionsEyePatternCornerRadius =
       shapeOptions?.eyePatternCornerRadius;
+    const shapeOptionsAlignmentShape = shapeOptions?.alignmentShape;
+    const shapeOptionsTimingShape = shapeOptions?.timingShape;
     const gradientType = gradient?.type;
     const gradientColors = gradient?.colors;
     const gradientColor0 = gradientColors?.[0];
@@ -284,6 +290,8 @@ export function createQRCodeComponent(
               bodyDensity: shapeOptionsBodyDensity,
               cornerRadius: shapeOptionsCornerRadius,
               eyePatternCornerRadius: shapeOptionsEyePatternCornerRadius,
+              alignmentShape: shapeOptionsAlignmentShape,
+              timingShape: shapeOptionsTimingShape,
             },
       [
         hasShapeOptions,
@@ -297,6 +305,8 @@ export function createQRCodeComponent(
         shapeOptionsBodyDensity,
         shapeOptionsCornerRadius,
         shapeOptionsEyePatternCornerRadius,
+        shapeOptionsAlignmentShape,
+        shapeOptionsTimingShape,
       ],
     );
     const stableGradient = useMemo<QRCodeGradient | undefined>(() => {
@@ -372,6 +382,10 @@ export function createQRCodeComponent(
         eyeColor,
         eyeStrokeColor,
         eyeballColor,
+        alignmentColor,
+        timingColor,
+        quietZoneColor,
+        finderInnerColor,
         gradient: stableGradient,
         minVersion,
         maxVersion,
@@ -400,6 +414,10 @@ export function createQRCodeComponent(
         eyeColor,
         eyeStrokeColor,
         eyeballColor,
+        alignmentColor,
+        timingColor,
+        quietZoneColor,
+        finderInnerColor,
         stableGradient,
         minVersion,
         maxVersion,
