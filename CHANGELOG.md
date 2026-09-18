@@ -29,6 +29,11 @@ Breaking changes are always listed first in each release section.
   `shapeOptions.timingShape`, so every QR region can be styled without moving
   the matrix. Omitted values keep the previous body/background look.
 
+### Fixed
+
+- x86/x64 clang 18 host builds compile vendored `fpng` with SSE4.1+pclmul
+  through `fpng_unity.cpp`, matching fpng's documented flags.
+
 ### Changed
 
 - Native `getQRCodeMetrics()` now reports live `cacheBytes` from the output
