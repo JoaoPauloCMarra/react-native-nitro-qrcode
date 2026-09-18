@@ -34,6 +34,10 @@ Synchronization policy:
   error correction) must re-run `scripts/generate-parity-corpus.js` and the
   native/web parity corpus tests before the update is accepted.
 
+This directory is the QR matrix encoder only. Native RGBA PNG export lives in
+`cpp/vendor/fpng`. Indexed two-color PNGs still use the zlib writer in
+`cpp/core`. Host C++ scan-back tests live in `cpp/tests/quirc`.
+
 
 Features
 --------

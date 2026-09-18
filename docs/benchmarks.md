@@ -62,3 +62,31 @@ length. Encode work dominates medium and large payloads, so those medians sit
 inside run-to-run noise of the previous base64 path. The small-text sync
 ArrayBuffer median was 1.027 ms on this device versus 1.935 ms for the
 previous sync base64 path.
+
+Those iPhone rows are Dev Client + JSI + `clearQRCodeCache` costs, not the
+isolated C++ encoder. `bun run benchmark:cpp` is the process that measures
+native PNG encode.
+
+## Encoder bake-off (Apple Silicon ARM64, `-O2`)
+
+Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
+
+| Candidate | Result | Decision |
+| --- | --- | --- |
+| Nayuki `QR-Code-generator` (already vendored) | Correct mixed-mode matrix; `quirc` decoded it | Keep |
+| Current 1-bit indexed zlib PNG | 0.19 ms / 1949 B for a 1024 px flat QR | Keep |
+| Current zlib RGBA (`Z_BEST_SPEED`) | 3.56 ms / 48.9 KB flat, 4.90 ms / 185 KB gradient | Replaced for RGBA |
+| `fpng` two-pass (`FPNG_ENCODE_SLOWER`) | 1.68 ms / 49.7 KB flat (SSE4.1 unavailable) | Keep for RGBA |
+| `fpng` one-pass | 1.64 ms but 102 KB flat | Reject (size) |
+| Apple zlib `Z_RLE` / `Z_HUFFMAN_ONLY` | 11–19 ms and much larger | Reject |
+| `zlib-ng` `Z_BEST_SPEED` | 2.50 ms but 374 KB | Reject (size + vendor weight) |
+| `zlib-ng` default level | 2.94 ms / 117 KB | Reject (large vendor for one path `fpng` already covers) |
+| `fpnge` | AVX2-only | Reject |
+| Nayuki Rust / `qrcode` crate | Same matrix algorithm, extra FFI next to Nitro | Reject |
+| `zxing-cpp` | Useful decoder, too large to vendor | Reject |
+| `quirc` | Decoded a real Nayuki matrix (`found=1 matched=1`) | Keep as host C++ scan-back only |
+
+Do not treat the bake-off table as an iPhone 17e result. Re-run
+`bun run benchmark:cpp` on the same machine after PNG encoder changes. The
+`rgba-gradient-png-cold` and `preview-styled-png-cold` rows are the `fpng`
+path; `indexed-png-*` rows stay on the 1-bit zlib writer.

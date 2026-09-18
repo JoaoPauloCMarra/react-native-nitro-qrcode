@@ -5,7 +5,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 ## Workspace Map
 
 - Monorepo layout: `packages/react-native-nitro-qrcode` (library), `apps/example` (Expo Router example).
-- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored encoder).
+- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored Nayuki encoder, `vendor/fpng/` RGBA PNG writer). Host-only `cpp/tests/quirc` is for C++ scan-back tests.
 - Native shell: `packages/react-native-nitro-qrcode/android`; iOS is wired through the podspec plus generated Nitrogen files.
 - Expo config plugin: `packages/react-native-nitro-qrcode/app.plugin.js`.
 
@@ -28,5 +28,5 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 ## Native Code Rules
 
 - Guard `static_cast<int>` from `NaN`/`Inf`/fractional inputs in C++ option parsing.
-- Keep `cpp/qrcodegen` vendored sources unmodified; wrap changes in `core/`/`bindings/` instead. See `cpp/qrcodegen/README.nayuki.markdown` for the pinned upstream commit and synchronization policy.
+- Keep `cpp/qrcodegen` and `cpp/vendor/fpng/{fpng.cpp,fpng.h}` vendored sources unmodified; wrap changes in `core/`/`bindings/` or `fpng_unity.cpp` instead. See `cpp/qrcodegen/README.nayuki.markdown` and `cpp/vendor/fpng/README.md` for the pinned commits and synchronization policy. Do not vendor zlib-ng or replace Nayuki.
 - Cache ownership lives in `cpp/core/BoundedCache.hpp` (bounded LRU); the output cache keeps 128 entries/4 MiB and the matrix cache keeps 32 entries/512 KiB.

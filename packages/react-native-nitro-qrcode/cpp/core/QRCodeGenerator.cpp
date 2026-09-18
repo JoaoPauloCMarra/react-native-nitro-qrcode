@@ -1,12 +1,14 @@
 #include "QRCodeGenerator.hpp"
 
 #include "../qrcodegen/qrcodegen.hpp"
+#include "fpng.h"
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -776,30 +778,13 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
         "RGBA buffer size does not match PNG dimensions.");
   }
 
-  std::vector<uint8_t> raw;
-  raw.reserve((static_cast<size_t>(width) * 4 + 1) *
-              static_cast<size_t>(height));
-  for (int y = 0; y < height; y++) {
-    raw.push_back(0);
-    const size_t rowStart =
-        static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
-    raw.insert(raw.end(), rgba.begin() + static_cast<std::ptrdiff_t>(rowStart),
-               rgba.begin() + static_cast<std::ptrdiff_t>(
-                                  rowStart + static_cast<size_t>(width) * 4));
-  }
+  static std::once_flag fpngOnce;
+  std::call_once(fpngOnce, []() { fpng::fpng_init(); });
 
-  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
-  std::vector<uint8_t> ihdr;
-  writeU32(ihdr, static_cast<uint32_t>(width));
-  writeU32(ihdr, static_cast<uint32_t>(height));
-  ihdr.push_back(8);
-  ihdr.push_back(6);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  appendChunk(png, "IHDR", ihdr);
-  appendChunk(png, "IDAT", zlibCompress(raw));
-  appendChunk(png, "IEND", {});
+  std::vector<uint8_t> png;
+  if (!fpng::fpng_encode_image_to_memory(
+          rgba.data(), static_cast<uint32_t>(width),
+          static_cast<uint32_t>(height), 4, png, fpng::FPNG_ENCODE_SLOWER)) throw std::runtime_error("PNG compression failed.");
   return png;
 }
 

@@ -44,12 +44,37 @@ function runCommand(command, args) {
 fs.rmSync(buildDir, { recursive: true, force: true });
 fs.mkdirSync(buildDir, { recursive: true });
 
+const quircDir = path.join(cppDir, "tests", "quirc");
+const quircObjects = [
+  "quirc.c",
+  "decode.c",
+  "identify.c",
+  "version_db.c",
+].map((file) => {
+  const objectFile = path.join(buildDir, `${file}.o`);
+  runCommand(resolveTool("clang"), [
+    "-std=c11",
+    "-O1",
+    "-g",
+    "-fno-omit-frame-pointer",
+    "-fsanitize=address,undefined",
+    `-I${quircDir}`,
+    "-c",
+    path.join(quircDir, file),
+    "-o",
+    objectFile,
+  ]);
+  return objectFile;
+});
+
 const sources = [
   path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
   path.join(cppDir, "core", "parity-corpus.cpp"),
   path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
+  path.join(cppDir, "tests", "QRCodeScanTest.cpp"),
   path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
   path.join(cppDir, "core", "QRCodeGenerator.cpp"),
+  path.join(cppDir, "vendor", "fpng", "fpng_unity.cpp"),
   path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
 ];
 
@@ -65,7 +90,10 @@ const compileArgs = [
   `-I${path.join(cppDir, "bindings")}`,
   `-I${path.join(cppDir, "core")}`,
   `-I${path.join(cppDir, "qrcodegen")}`,
+  `-I${path.join(cppDir, "vendor", "fpng")}`,
+  `-I${quircDir}`,
   ...sources,
+  ...quircObjects,
   "-o",
   outputFile,
   "-lz",

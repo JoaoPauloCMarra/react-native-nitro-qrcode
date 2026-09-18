@@ -64,6 +64,16 @@ not override that version in the example. The baseline uses React `19.2.3` and
 Nitro Modules `0.37.1`. The wider ranges above are the package's declared peer
 compatibility.
 
+### Upgrade from 0.7.x
+
+Version 0.8.0 adds `toPngArrayBuffer` / `toPngArrayBufferAsync` (and the
+matching Nitro object methods). Existing base64 and data-URI helpers stay;
+they now wrap raw PNG bytes. Native RGBA export (gradients, layered colors,
+logo-area clearing) uses vendored `fpng`, so those PNG files can differ in
+size and compressed bytes from 0.7.x while decoding to the same pixels. Flat
+two-color codes still use the 1-bit indexed zlib writer. There are no
+breaking JavaScript API changes.
+
 ### Upgrade from 0.7.0
 
 Version 0.7.1 is a compatible patch. It pins Nitrogen and Nitro Modules
@@ -271,7 +281,7 @@ entirely byte-mode without digits, uppercase letters, or `$%*+-./:` characters,
 when version, error correction level, and mask are fixed. This contract is
 enforced by a committed parity corpus (`src/__tests__/fixtures/parity-corpus.json`,
 regenerable with `bun scripts/generate-parity-corpus.js`) plus decode-back
-tests. Automatic mask selection (`mask: -1`) can pick different but equally
+tests (JavaScript `jsqr` and host-only C++ `quirc`). Automatic mask selection (`mask: -1`) can pick different but equally
 valid masks because the two encoders interpret the ISO N4 penalty rounding
 differently; fixed masks always match.
 
@@ -313,7 +323,12 @@ Option loss and platform differences:
 - **Web async PNG helpers** render in row bands and yield to the main thread
   between bands so large canvas work does not block the UI in one step.
 - **Native sync PNG helpers** remain available through 4096 pixels for
-  compatibility; prefer `toPngBase64Async`/`toPngDataUriAsync` for UI flows.
+  compatibility; prefer `toPngArrayBufferAsync`/`toPngBase64Async`/`toPngDataUriAsync`
+  for UI flows.
+- **Native PNG encoding** writes flat two-color codes as 1-bit indexed zlib
+  PNGs. Gradients, layered colors, and logo-area clearing use vendored `fpng`
+  for RGBA. The QR matrix still comes from Project Nayuki. Web PNG stays on
+  canvas `toDataURL`.
 
 ## Rendering, Logos, And Errors
 
@@ -553,3 +568,11 @@ is proven by `bun run --cwd packages/react-native-nitro-qrcode test:cpp`).
 ## License
 
 MIT
+
+Third-party native sources shipped with this package:
+
+- `cpp/qrcodegen` — Project Nayuki QR Code generator library (MIT)
+- `cpp/vendor/fpng` — fpng RGBA PNG encoder (Unlicense)
+
+Host-only C++ tests also vendor `cpp/tests/quirc` (ISC-style). That decoder is
+not linked into the published iOS or Android libraries.

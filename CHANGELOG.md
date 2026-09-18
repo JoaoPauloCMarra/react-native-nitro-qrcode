@@ -18,12 +18,19 @@ Breaking changes are always listed first in each release section.
   `generatePngArrayBufferObject` / `generatePngArrayBufferAsyncObject` on the
   Nitro HybridObject, return PNG bytes as an owning `ArrayBuffer` without a
   base64 string crossing the JSI boundary.
+- Host C++ tests decode a real Nayuki matrix with vendored `quirc` so
+  scan-back stays independent of the generator. `quirc` is test-only and is
+  not linked into the published iOS or Android libraries.
 
 ### Changed
 
 - Native `generatePngBase64Object` / `generatePngDataUriObject` (and their
   async and deprecated positional wrappers) now encode from the PNG byte path
   instead of caching a pre-encoded base64 string.
+- Native RGBA PNG export (gradients, layered colors, and logo-area clearing)
+  now uses vendored `fpng` two-pass encoding. Flat two-color QR codes still
+  use the existing 1-bit indexed zlib writer. The Nayuki QR matrix encoder is
+  unchanged.
 
 ## [0.7.2] - 2026-09-10
 
