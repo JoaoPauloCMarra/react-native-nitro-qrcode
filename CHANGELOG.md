@@ -31,8 +31,9 @@ Breaking changes are always listed first in each release section.
 
 ### Fixed
 
-- x86/x64 clang 18 host builds compile vendored `fpng` with SSE4.1+pclmul
-  through `fpng_unity.cpp`, matching fpng's documented flags.
+- Host C++ tests compile vendored `fpng` through `FPNG_NO_SSE` in
+  `fpng_unity.cpp`, so clang 18 on baseline x86-64 no longer requires
+  SSE4.1+pclmul for the whole binary.
 
 ### Changed
 
