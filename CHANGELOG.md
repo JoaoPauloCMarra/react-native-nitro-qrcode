@@ -34,6 +34,8 @@ Breaking changes are always listed first in each release section.
   now uses vendored `fpng` two-pass encoding. Flat two-color QR codes still
   use the existing 1-bit indexed zlib writer. The Nayuki QR matrix encoder is
   unchanged.
+- The example and workspace Expo pins follow SDK 57.0.24 (`expo-doctor` /
+  `expo install --check`). React Native stays `0.86.3`.
 
 ## [0.7.2] - 2026-09-10
 
