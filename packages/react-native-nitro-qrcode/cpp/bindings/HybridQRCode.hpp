@@ -3,6 +3,7 @@
 #include "../core/QRCodeGenerator.hpp"
 #include "HybridQRCodeSpec.hpp"
 
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <string>
 #include <vector>
@@ -13,6 +14,12 @@ class HybridQRCode : public HybridQRCodeSpec {
 public:
   HybridQRCode();
   ~HybridQRCode() override = default;
+
+  std::shared_ptr<ArrayBuffer>
+  generatePngArrayBufferObject(const GenerateOptions &options) override;
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  generatePngArrayBufferAsyncObject(const GenerateOptions &options) override;
 
   std::string generatePngBase64Object(const GenerateOptions &options) override;
 

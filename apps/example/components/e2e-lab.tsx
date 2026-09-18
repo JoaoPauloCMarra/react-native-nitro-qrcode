@@ -9,6 +9,7 @@ import {
   getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
+  toPngArrayBuffer,
   toPngBase64,
   toPngDataUri,
   type QRCodePreset,
@@ -61,11 +62,12 @@ export function QrcodeE2eLab() {
     const options = { value: LAB_VALUE, size: 96 };
     const png = toPngDataUri(options);
     const base64 = toPngBase64(options);
+    const bytes = toPngArrayBuffer(options);
     const svg = NitroQRCode.toSvgString(options);
     const matrix = NitroQRCode.getMatrix(options);
     setResults((current) => ({
       ...current,
-      helpers: `ok:png=${png.length}:b64=${base64.length}:svg=${svg.length}:matrix=${matrix.size}`,
+      helpers: `ok:png=${png.length}:b64=${base64.length}:bytes=${bytes.byteLength}:svg=${svg.length}:matrix=${matrix.size}`,
     }));
   };
 

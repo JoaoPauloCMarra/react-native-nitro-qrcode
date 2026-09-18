@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.8.0] - 2026-09-18
+
+### Breaking changes
+
+- None.
+
+### Added
+
+- Native and web `toPngArrayBuffer` / `toPngArrayBufferAsync` helpers, plus
+  `generatePngArrayBufferObject` / `generatePngArrayBufferAsyncObject` on the
+  Nitro HybridObject, return PNG bytes as an owning `ArrayBuffer` without a
+  base64 string crossing the JSI boundary.
+
+### Changed
+
+- Native `generatePngBase64Object` / `generatePngDataUriObject` (and their
+  async and deprecated positional wrappers) now encode from the PNG byte path
+  instead of caching a pre-encoded base64 string.
+
 ## [0.7.2] - 2026-09-10
 
 ### Breaking changes

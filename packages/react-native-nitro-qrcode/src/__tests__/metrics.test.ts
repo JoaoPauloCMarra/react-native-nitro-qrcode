@@ -9,6 +9,8 @@ import {
 } from "../metrics";
 
 const mockHybridObject = {
+  generatePngArrayBufferObject: jest.fn(() => new ArrayBuffer(8)),
+  generatePngArrayBufferAsyncObject: jest.fn(async () => new ArrayBuffer(8)),
   generatePngBase64Object: jest.fn(() => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),

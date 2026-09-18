@@ -85,6 +85,8 @@ public:
 
   explicit QRCodeGenerator(CacheKeyHasher cacheKeyHasher = {},
                            size_t maxCacheBytes = DefaultMaxCacheBytes);
+  std::vector<uint8_t> renderPngBytes(const std::string &value,
+                                      const GenerateOptions &options);
   std::string renderPngBase64(const std::string &value,
                                 const GenerateOptions &options);
   std::string renderPngDataUri(const std::string &value,

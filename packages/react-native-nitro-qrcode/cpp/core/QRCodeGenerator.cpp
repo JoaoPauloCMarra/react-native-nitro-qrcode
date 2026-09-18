@@ -824,12 +824,13 @@ Matrix QRCodeGenerator::createMatrix(const std::string &value,
   return matrix;
 }
 
-std::string QRCodeGenerator::renderPngBase64(const std::string &value,
-                                               const GenerateOptions &options) {
-  const std::string request = cacheRequest(value, options, "png-base64");
+std::vector<uint8_t>
+QRCodeGenerator::renderPngBytes(const std::string &value,
+                                const GenerateOptions &options) {
+  const std::string request = cacheRequest(value, options, "png-bytes");
   const std::string key = cacheKey(request);
   if (const auto cached = getCacheEntry(key, request)) {
-    return *cached;
+    return std::vector<uint8_t>(cached->begin(), cached->end());
   }
 
   const Matrix matrix = createMatrix(value, options);
@@ -911,16 +912,20 @@ std::string QRCodeGenerator::renderPngBase64(const std::string &value,
   const bool useRgbaOutput =
       hasGradient(options) || hasCustomLayerColors(options) ||
       options.logoAreaSize > 0;
-  const std::string encoded =
+  const std::vector<uint8_t> png =
       useRgbaOutput
-          ? base64Encode(
-                encodePngRgba(imageSize, imageSize,
-                              renderLayeredRgba(indices, imageSize, options)))
-          : base64Encode(encodePngIndexed1(imageSize, imageSize, indices,
-                                           options.foreground,
-                                           options.background));
-  storeCacheEntry(key, request, encoded);
-  return encoded;
+          ? encodePngRgba(imageSize, imageSize,
+                          renderLayeredRgba(indices, imageSize, options))
+          : encodePngIndexed1(imageSize, imageSize, indices, options.foreground,
+                              options.background);
+  storeCacheEntry(key, request,
+                  std::string(png.begin(), png.end()));
+  return png;
+}
+
+std::string QRCodeGenerator::renderPngBase64(const std::string &value,
+                                               const GenerateOptions &options) {
+  return base64Encode(renderPngBytes(value, options));
 }
 
 std::string

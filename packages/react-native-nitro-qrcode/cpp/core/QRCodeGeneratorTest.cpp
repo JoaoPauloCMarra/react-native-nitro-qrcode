@@ -293,11 +293,23 @@ void testPngGeneration() {
   QRCodeGenerator generator;
   GenerateOptions options;
   options.size = 128;
+  const std::vector<uint8_t> png =
+      generator.renderPngBytes("https://example.com", options);
+  assert(png.size() >= 8);
+  assert(png[0] == 0x89);
+  assert(png[1] == 0x50);
+  assert(png[2] == 0x4E);
+  assert(png[3] == 0x47);
+  assert(png[4] == 0x0D);
+  assert(png[5] == 0x0A);
+  assert(png[6] == 0x1A);
+  assert(png[7] == 0x0A);
   const std::string base64 =
       generator.renderPngBase64("https://example.com", options);
   assert(!base64.empty());
   assertPngHeader(base64);
   assertPngCrcs(base64);
+  assert(base64Encode(png) == base64);
 
   const std::string cached =
       generator.renderPngBase64("https://example.com", options);

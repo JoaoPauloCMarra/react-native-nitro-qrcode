@@ -15,6 +15,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="e2e" />
         <Stack.Screen name="e2e-render" />
+        <Stack.Screen name="e2e-png-bench" />
       </Stack>
     </View>
   );

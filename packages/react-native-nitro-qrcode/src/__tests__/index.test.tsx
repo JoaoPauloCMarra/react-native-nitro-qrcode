@@ -4,7 +4,13 @@ import jsQR from "jsqr";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+const PNG_SIGNATURE = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
+]);
+
 const mockHybridObject = {
+  generatePngArrayBufferObject: jest.fn(() => PNG_SIGNATURE.buffer),
+  generatePngArrayBufferAsyncObject: jest.fn(async () => PNG_SIGNATURE.buffer),
   generatePngBase64Object: jest.fn(() => "png-base64"),
   generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
   generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
@@ -81,6 +87,8 @@ import {
   NitroQRCode,
   QRCode,
   type QRCodeRef,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -121,12 +129,32 @@ describe("entrypoint export parity", () => {
 describe("native QRCode API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHybridObject.generatePngArrayBufferAsyncObject.mockImplementation(
+      async () => PNG_SIGNATURE.buffer,
+    );
     mockHybridObject.generatePngBase64AsyncObject.mockImplementation(
       async () => "png-base64",
     );
     mockHybridObject.generatePngDataUriAsyncObject.mockImplementation(
       async () => "data:image/png;base64,png-base64",
     );
+  });
+
+  it("generates PNG ArrayBuffer without a base64 round-trip", () => {
+    const png = toPngArrayBuffer({ value: "https://example.com" });
+    expect(new Uint8Array(png).subarray(0, 8)).toEqual(
+      PNG_SIGNATURE.subarray(0, 8),
+    );
+    expect(mockHybridObject.generatePngArrayBufferObject).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(mockHybridObject.generatePngBase64Object).not.toHaveBeenCalled();
+  });
+
+  it("generates PNG ArrayBuffer asynchronously", async () => {
+    await expect(
+      toPngArrayBufferAsync({ value: "async-bytes" }),
+    ).resolves.toBe(PNG_SIGNATURE.buffer);
   });
 
   it("generates PNG base64 with normalized defaults", () => {
@@ -1912,6 +1940,23 @@ describe("web QRCode API", () => {
     expect(matrix.packedBase64.length).toBeGreaterThan(0);
     expect(Web.NitroQRCode.getMatrix({ value: "Hello" }).size).toBe(
       matrix.size,
+    );
+  });
+
+  it("decodes web PNG data URIs into ArrayBuffers", async () => {
+    const canvas = installCanvas();
+    canvas.toDataURL.mockReturnValue(
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    );
+    const png = Web.toPngArrayBuffer({ value: "array-buffer" });
+    expect(new Uint8Array(png).subarray(0, 8)).toEqual(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+    const asyncPng = await Web.toPngArrayBufferAsync({
+      value: "array-buffer-async",
+    });
+    expect(new Uint8Array(asyncPng).subarray(0, 8)).toEqual(
+      Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     );
   });
 

@@ -92,6 +92,67 @@ public:
 }
 `,
 );
+writeHeader("ArrayBuffer.hpp", `#pragma once
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <vector>
+namespace margelo::nitro {
+class ArrayBuffer {
+  std::vector<uint8_t> data_;
+public:
+  explicit ArrayBuffer(std::vector<uint8_t>&& data) : data_(std::move(data)) {}
+  static std::shared_ptr<ArrayBuffer> copy(const uint8_t* data, size_t size) {
+    return std::make_shared<ArrayBuffer>(std::vector<uint8_t>(data, data + size));
+  }
+  static std::shared_ptr<ArrayBuffer> copy(const std::vector<uint8_t>& data) {
+    return std::make_shared<ArrayBuffer>(std::vector<uint8_t>(data));
+  }
+  static std::shared_ptr<ArrayBuffer> move(std::vector<uint8_t>&& data) {
+    return std::make_shared<ArrayBuffer>(std::move(data));
+  }
+  uint8_t* data() { return data_.data(); }
+  const uint8_t* data() const { return data_.data(); }
+  size_t size() const { return data_.size(); }
+  bool isOwner() const { return true; }
+  size_t getExternalMemorySize() const { return data_.size(); }
+};
+}
+`,
+);
+writeHeader("JSIConverter+ArrayBuffer.hpp", `#pragma once
+#include "ArrayBuffer.hpp"
+#include "JSIConverter.hpp"
+#include <jsi/jsi.h>
+#include <memory>
+#include <vector>
+namespace margelo::nitro {
+using namespace facebook;
+template <>
+struct JSIConverter<std::shared_ptr<ArrayBuffer>> final {
+  static inline std::shared_ptr<ArrayBuffer> fromJSI(jsi::Runtime&, const jsi::Value&) {
+    return ArrayBuffer::move(std::vector<uint8_t>{});
+  }
+  static inline jsi::Value toJSI(jsi::Runtime&, const std::shared_ptr<ArrayBuffer>&) {
+    return jsi::Value::undefined();
+  }
+  static inline bool canConvert(jsi::Runtime&, const jsi::Value&) {
+    return false;
+  }
+};
+}
+`,
+);
+const jsCallbackHeader = path.join(nitroVirtualDir, "JSCallback.hpp");
+if (fs.existsSync(jsCallbackHeader)) {
+  const contents = fs.readFileSync(jsCallbackHeader, "utf8");
+  if (!contents.includes("NitroLogger.hpp")) {
+    fs.writeFileSync(
+      jsCallbackHeader,
+      `#include "NitroLogger.hpp"\n${contents}`,
+    );
+  }
+}
 
 const generatedDir = path.join(packageDir, "nitrogen", "generated", "shared", "c++");
 const matrixObjectHeader = path.join(generatedDir, "MatrixObject.hpp");

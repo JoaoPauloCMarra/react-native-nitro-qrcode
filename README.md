@@ -182,6 +182,8 @@ export function BrandedCode() {
 import {
   getMatrix,
   getQRCodeCacheBytes,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -196,8 +198,10 @@ const options = {
   backgroundColor: "#FFFFFF",
 } as const;
 
+const pngBytes = toPngArrayBuffer(options);
 const png = toPngBase64(options);
 const uri = toPngDataUri(options);
+const asyncPngBytes = await toPngArrayBufferAsync(options);
 const asyncPng = await toPngBase64Async(options);
 const svg = toSvgString(options);
 const matrix = getMatrix(options);
@@ -209,8 +213,11 @@ generation completes.
 The exported `NitroQRCode` object exposes the same PNG, SVG, matrix, validation,
 cache, and metrics helpers for callers that prefer an object API. Native
 `HybridQRCode` integrations should use the object-shaped methods
+`generatePngArrayBufferObject`, `generatePngArrayBufferAsyncObject`,
 `generatePngBase64Object`, `generatePngBase64AsyncObject`,
-`generatePngDataUriObject`, and `generatePngDataUriAsyncObject`. The four older
+`generatePngDataUriObject`, and `generatePngDataUriAsyncObject`. Prefer the
+ArrayBuffer methods when the caller can consume PNG bytes directly; the
+base64 and data-URI methods remain thin wrappers over that byte path. The four older
 positional PNG methods remain available only as deprecated compatibility
 wrappers; they are not used by the JavaScript entrypoints.
 
@@ -405,8 +412,8 @@ Main exports:
 
 - `QRCode` React component.
 - `NitroQRCode` object with the same generation helpers.
-- `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
-- `toPngBase64Async` and `toPngDataUriAsync`.
+- `toPngArrayBuffer`, `toPngBase64`, `toPngDataUri`, `toSvgString`, and `getMatrix`.
+- `toPngArrayBufferAsync`, `toPngBase64Async`, and `toPngDataUriAsync`.
 - `validateOptions`.
 - `clearQRCodeCache`, `getQRCodeCacheSize`, and `getQRCodeCacheBytes`.
 - `getQRCodeMetrics`, `resetQRCodeMetrics`, and

@@ -41,6 +41,12 @@ export interface MatrixObject {
 }
 
 export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
+  generatePngArrayBufferObject(options: GenerateOptions): ArrayBuffer;
+
+  generatePngArrayBufferAsyncObject(
+    options: GenerateOptions,
+  ): Promise<ArrayBuffer>;
+
   generatePngBase64Object(options: GenerateOptions): string;
 
   generatePngBase64AsyncObject(options: GenerateOptions): Promise<string>;

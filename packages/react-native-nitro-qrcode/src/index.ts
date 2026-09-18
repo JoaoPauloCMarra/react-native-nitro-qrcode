@@ -187,6 +187,26 @@ function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
   ];
 }
 
+export function toPngArrayBuffer(options: QRCodeOptions): ArrayBuffer {
+  const normalized = normalizeOptions(options);
+  return measuredSync(() =>
+    NativeQRCode.generatePngArrayBufferObject(
+      toNativeGenerateOptions(normalized),
+    ),
+  );
+}
+
+export async function toPngArrayBufferAsync(
+  options: QRCodeOptions,
+): Promise<ArrayBuffer> {
+  const normalized = normalizeOptions(options);
+  return measuredAsync(() =>
+    NativeQRCode.generatePngArrayBufferAsyncObject(
+      toNativeGenerateOptions(normalized),
+    ),
+  );
+}
+
 export function toPngBase64(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   return measuredSync(() =>
@@ -258,6 +278,8 @@ export const QRCode: ForwardRefExoticComponent<
 });
 
 export const NitroQRCode: NitroQRCodeApi = {
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngDataUri,
   toPngBase64Async,

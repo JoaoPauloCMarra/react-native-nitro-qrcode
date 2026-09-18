@@ -25,6 +25,8 @@ import {
   NitroQRCode,
   getMatrix,
   getQRCodeCacheBytes,
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngBase64Async,
   toPngDataUri,
@@ -79,12 +81,15 @@ const validProps: QRCodeProps = {
 
 void validProps;
 
+const pngBytes: ArrayBuffer = toPngArrayBuffer(validOptions);
 const pngBase64: string = toPngBase64(validOptions);
 const pngDataUri: string = toPngDataUri(validOptions);
 const svg: string = toSvgString(validOptions);
 const matrix: QRCodeMatrix = getMatrix(validOptions);
 const cacheBytes: number = getQRCodeCacheBytes();
 const validation: QRCodeValidationResult = validateOptions(validOptions);
+const asyncPngBytes: Promise<ArrayBuffer> =
+  toPngArrayBufferAsync(validOptions);
 const asyncPngBase64: Promise<string> = toPngBase64Async(validOptions);
 const asyncPngDataUri: Promise<string> = toPngDataUriAsync(validOptions);
 const api: NitroQRCodeApi = NitroQRCode;
@@ -93,10 +98,12 @@ const ref: QRCodeRef = {
   toPngBase64: () => pngBase64,
 };
 
+void pngBytes;
 void svg;
 void matrix;
 void cacheBytes;
 void validation;
+void asyncPngBytes;
 void asyncPngBase64;
 void asyncPngDataUri;
 void api;

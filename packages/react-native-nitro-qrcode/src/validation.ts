@@ -215,6 +215,8 @@ export type NormalizedOptions = Required<
 };
 
 export type NitroQRCodeApi = Readonly<{
+  toPngArrayBuffer: (options: QRCodeOptions) => ArrayBuffer;
+  toPngArrayBufferAsync: (options: QRCodeOptions) => Promise<ArrayBuffer>;
   toPngBase64: (options: QRCodeOptions) => string;
   toPngDataUri: (options: QRCodeOptions) => string;
   toPngBase64Async: (options: QRCodeOptions) => Promise<string>;

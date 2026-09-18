@@ -18,9 +18,10 @@ namespace margelo::nitro::NitroQRCode { struct GenerateOptions; }
 // Forward declaration of `MatrixObject` to properly resolve imports.
 namespace margelo::nitro::NitroQRCode { struct MatrixObject; }
 
-#include <string>
+#include <NitroModules/ArrayBuffer.hpp>
 #include "GenerateOptions.hpp"
 #include <NitroModules/Promise.hpp>
+#include <string>
 #include <vector>
 #include "MatrixObject.hpp"
 
@@ -55,6 +56,8 @@ namespace margelo::nitro::NitroQRCode {
 
     public:
       // Methods
+      virtual std::shared_ptr<ArrayBuffer> generatePngArrayBufferObject(const GenerateOptions& options) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> generatePngArrayBufferAsyncObject(const GenerateOptions& options) = 0;
       virtual std::string generatePngBase64Object(const GenerateOptions& options) = 0;
       virtual std::shared_ptr<Promise<std::string>> generatePngBase64AsyncObject(const GenerateOptions& options) = 0;
       virtual std::string generatePngDataUriObject(const GenerateOptions& options) = 0;

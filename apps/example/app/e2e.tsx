@@ -42,6 +42,16 @@ export default function QrcodeE2eScreen() {
           <Text style={styles.renderLinkText}>Open render wall</Text>
         </Pressable>
       </Link>
+      <Link href={"/e2e-png-bench" as Href} asChild>
+        <Pressable
+          testID="open-e2e-png-bench"
+          accessibilityRole="link"
+          accessibilityLabel="Open PNG bench"
+          style={styles.renderLink}
+        >
+          <Text style={styles.renderLinkText}>Open PNG bench</Text>
+        </Pressable>
+      </Link>
     </ScrollView>
   );
 }

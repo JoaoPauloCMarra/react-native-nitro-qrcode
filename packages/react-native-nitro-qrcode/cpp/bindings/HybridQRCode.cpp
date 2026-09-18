@@ -21,6 +21,23 @@ namespace margelo::nitro::NitroQRCode {
 
 HybridQRCode::HybridQRCode() : HybridObject(TAG), HybridQRCodeSpec() {}
 
+std::shared_ptr<ArrayBuffer> HybridQRCode::generatePngArrayBufferObject(
+    const GenerateOptions &options) {
+  return ArrayBuffer::move(generator_.renderPngBytes(
+      options.value, makeGenerateOptions(options)));
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridQRCode::generatePngArrayBufferAsyncObject(
+    const GenerateOptions &options) {
+  auto self = shared_cast<HybridQRCode>();
+  return Promise<std::shared_ptr<ArrayBuffer>>::async(
+      [self, options]() mutable {
+        return ArrayBuffer::move(self->generator_.renderPngBytes(
+            options.value, makeGenerateOptions(options)));
+      });
+}
+
 std::string HybridQRCode::generatePngBase64Object(
     const GenerateOptions &options) {
   return generator_.renderPngBase64(options.value,

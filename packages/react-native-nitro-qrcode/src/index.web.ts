@@ -162,6 +162,26 @@ const webCache = createBoundedCache<string>(
 );
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
 
+function dataUriToArrayBuffer(uri: string): ArrayBuffer {
+  const encoded = uri.slice("data:image/png;base64,".length);
+  const binary = globalThis.atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+export function toPngArrayBuffer(options: QRCodeOptions): ArrayBuffer {
+  return dataUriToArrayBuffer(toPngDataUri(options));
+}
+
+export async function toPngArrayBufferAsync(
+  options: QRCodeOptions,
+): Promise<ArrayBuffer> {
+  return dataUriToArrayBuffer(await toPngDataUriAsync(options));
+}
+
 export function toPngBase64(options: QRCodeOptions): string {
   const uri = toPngDataUri(options);
   return uri.slice("data:image/png;base64,".length);
@@ -366,6 +386,8 @@ export const QRCode: ForwardRefExoticComponent<
 });
 
 export const NitroQRCode: NitroQRCodeApi = {
+  toPngArrayBuffer,
+  toPngArrayBufferAsync,
   toPngBase64,
   toPngDataUri,
   toPngBase64Async,
