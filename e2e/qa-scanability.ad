@@ -1,6 +1,5 @@
-open "com.qrcode.example" --relaunch
-wait id="open-e2e-lab"
-open "qrcode://e2e-scanability"
+open "com.qrcode.example" "qrcode://e2e-scanability" --relaunch
+
 wait text "ready:default"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/default.png"
