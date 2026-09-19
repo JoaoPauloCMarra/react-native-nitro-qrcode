@@ -14,6 +14,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 - Package manager: `bun` / `bunx`. Bun workspaces are the only orchestration layer; root scripts delegate with `bun run --cwd ...` (no Turborepo).
 - Root quality gate: `bun run check` (includes the device-free `example:smoke:ci` self-check). CI gate: `bun run check:ci` (adds C++ sanitizers). Release gate: `bun run release:preflight` (adds benchmark, package audit, dry-run publish, and `example:smoke` with per-platform terminal-state reporting).
 - Example checks: `bun run example:check`; native builds via `example:android:assemble` / `example:ios:build` after `example:prebuild`.
+- Example E2E scripts open labs by scheme (`qrcode://e2e`, `qrcode://e2e-render`, …). Do not route flows through the home `open-e2e-lab` gate. On a physical iPhone use `bun run example:e2e:ios-device -- <udid>` (`scripts/run-ios-device-e2e.sh`), which launches via CoreDevice `--payload-url` then attaches agent-device.
 - LLVM: CI pins LLVM 18; the C++ scripts prefer `clang++-18`/`llvm-profdata-18`/`llvm-cov-18` and fall back to unversioned tools.
 
 ## Universal Rules

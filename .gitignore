@@ -94,6 +94,8 @@ tmp-*.png
 
 .pack-docs-state/
 /.agent-device/
+.github/context-mode/
+.artifacts/
 
 # Editors and OS
 .idea/
