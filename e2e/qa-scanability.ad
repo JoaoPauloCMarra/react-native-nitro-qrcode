@@ -32,6 +32,22 @@ wait text "ready:branded"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/branded.png"
 press id="scan-next"
+wait text "ready:classy"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/classy.png"
+press id="scan-next"
+wait text "ready:mosaic"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/mosaic.png"
+press id="scan-next"
+wait text "ready:fluid"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/fluid.png"
+press id="scan-next"
+wait text "ready:classy-logo"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/classy-logo.png"
+press id="scan-next"
 wait text "ready:linear"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/linear.png"
