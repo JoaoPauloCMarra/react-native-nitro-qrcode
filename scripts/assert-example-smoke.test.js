@@ -15,7 +15,7 @@ function writeExecutable(filePath, contents) {
   fs.chmodSync(filePath, 0o755);
 }
 
-function runSmoke({ which, adb, xcrun, idb, env = {} } = {}) {
+function runSmoke({ which, adb, xcrun, idb, agentDevice, env = {} } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nitro-qrcode-smoke-"));
   const bin = path.join(root, "bin");
   fs.mkdirSync(bin);
@@ -23,6 +23,7 @@ function runSmoke({ which, adb, xcrun, idb, env = {} } = {}) {
     adb === undefined ? null : "adb",
     xcrun === undefined ? null : "xcrun",
     idb === undefined ? null : "idb",
+    agentDevice === undefined ? null : "agent-device",
   ].filter((command) => command !== null);
   writeExecutable(
     path.join(bin, "which"),
@@ -35,6 +36,7 @@ esac`,
   if (adb !== undefined) writeExecutable(path.join(bin, "adb"), adb);
   if (xcrun !== undefined) writeExecutable(path.join(bin, "xcrun"), xcrun);
   if (idb !== undefined) writeExecutable(path.join(bin, "idb"), idb);
+  if (agentDevice !== undefined) writeExecutable(path.join(bin, "agent-device"), agentDevice);
 
   try {
     const baseEnv = { ...process.env };
@@ -43,6 +45,8 @@ esac`,
       "QRCODE_SMOKE_STRICT",
       "ANDROID_SERIAL",
       "IOS_UDID",
+      "IOS_DEVICE_UDID",
+      "AGENT_DEVICE_BIN",
     ]) {
       delete baseEnv[variable];
     }
@@ -217,4 +221,34 @@ test("resets iOS app before launch so home assertions cannot reuse the e2e route
   } finally {
     fs.rmSync(routeStatePath, { force: true });
   }
+});
+
+test("fails a requested physical iPhone without agent-device", () => {
+  const result = runSmoke({ env: { IOS_DEVICE_UDID: "physical-iphone" } });
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /ios: FAILED.*agent-device/);
+});
+
+test("rejects ambiguous physical and simulator selectors", () => {
+  const result = runSmoke({ env: { IOS_DEVICE_UDID: "physical-iphone", IOS_UDID: "simulator" } });
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /ios: FAILED.*only one/);
+});
+
+test("requires rendered QR content on a physical iPhone", () => {
+  const result = runSmoke({
+    agentDevice: `printf '%s' '{"success":true,"data":"QR Builder Live output Ready nitro-qrcode-preview QR code for"}'`,
+    env: { IOS_DEVICE_UDID: "physical-iphone" },
+  });
+  assert.equal(result.status, 0, result.stdout);
+  assert.match(result.stdout, /ios: PASSED/);
+});
+
+test("fails physical iPhone smoke on a blank accessibility snapshot", () => {
+  const result = runSmoke({
+    agentDevice: `printf '%s' '{"success":true,"data":""}'`,
+    env: { IOS_DEVICE_UDID: "physical-iphone" },
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stdout, /ios: FAILED.*did not find/);
 });

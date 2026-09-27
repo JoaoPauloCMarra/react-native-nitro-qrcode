@@ -1301,7 +1301,93 @@ void testValidation() {
 
 } // namespace
 
+void testGradientStopBounds() {
+  QRCodeGenerator generator;
+  for (const std::string type : {"linear", "radial"}) {
+    GenerateOptions options;
+    options.size = 201;
+    options.gradient.type = type;
+    options.gradient.startX = 0;
+    options.gradient.startY = 0;
+    options.gradient.endX = 1;
+    options.gradient.endY = 0;
+    if (type == "radial") {
+      options.gradient.startX = 0.5;
+      options.gradient.startY = 0.5;
+      options.gradient.endY = 0.5;
+    }
+    options.gradient.colors = {parseColor("#FF0000"), parseColor("#FF0000")};
+    options.gradient.locations = {0.0, 1.0};
+    int width = 0, height = 0;
+    const auto mask = decodeRgbaPng(generator.renderPngBase64("gradient-bounds", options), width, height);
+    for (const bool alpha : {false, true}) {
+      options.gradient.colors = {parseColor(alpha ? "#00000040" : "#000000"),
+                                 parseColor(alpha ? "#FFFFFFC0" : "#FFFFFF")};
+      options.gradient.locations = {0.3, 0.8};
+      const auto rgba = decodeRgbaPng(generator.renderPngBase64("gradient-bounds", options), width, height);
+      int before = 0, after = 0, interior = 0;
+      for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+          const size_t offset = (static_cast<size_t>(y) * width + x) * 4;
+          if (mask[offset] != 255 || mask[offset + 1] != 0 || mask[offset + 2] != 0) continue;
+          const double nx = static_cast<double>(x) / (width - 1);
+          const double ny = static_cast<double>(y) / (height - 1);
+          const double t = type == "linear" ? nx : std::hypot(nx - 0.5, ny - 0.5) / 0.5;
+          const double progress = std::clamp((t - 0.3) / 0.5, 0.0, 1.0);
+          const auto expected = static_cast<uint8_t>(std::lround(255 * progress));
+          assert(rgba[offset] == expected);
+          assert(rgba[offset + 1] == expected);
+          assert(rgba[offset + 2] == expected);
+          assert(rgba[offset + 3] == (alpha ? static_cast<uint8_t>(std::lround(64 + 128 * progress)) : 255));
+          if (t <= 0.3) ++before;
+          else if (t >= 0.8) ++after;
+          else ++interior;
+        }
+      }
+      assert(before > 0 && after > 0 && interior > 0);
+    }
+
+    int sampleX = -1;
+    int sampleY = -1;
+    double exactStop = 0.0;
+    for (int y = 0; y < height && sampleX < 0; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const size_t offset = (static_cast<size_t>(y) * width + x) * 4;
+        if (mask[offset] != 255 || mask[offset + 1] != 0 ||
+            mask[offset + 2] != 0) {
+          continue;
+        }
+        const double nx = static_cast<double>(x) / (width - 1);
+        const double ny = static_cast<double>(y) / (height - 1);
+        const double t = type == "linear"
+                             ? nx
+                             : std::hypot(nx - 0.5, ny - 0.5) / 0.5;
+        if (t > 0.1 && t < 0.9) {
+          sampleX = x;
+          sampleY = y;
+          exactStop = t;
+          break;
+        }
+      }
+    }
+    assert(sampleX >= 0 && sampleY >= 0);
+    options.gradient.colors = {parseColor("#000000"), parseColor("#FF0000"),
+                               parseColor("#FFFFFF")};
+    options.gradient.locations = {0.0, exactStop, exactStop};
+    const auto duplicateStop = decodeRgbaPng(
+        generator.renderPngBase64("gradient-duplicate-stop", options), width,
+        height);
+    const size_t sampleOffset =
+        (static_cast<size_t>(sampleY) * width + sampleX) * 4;
+    assert(duplicateStop[sampleOffset] == 255);
+    assert(duplicateStop[sampleOffset + 1] == 0);
+    assert(duplicateStop[sampleOffset + 2] == 0);
+    assert(duplicateStop[sampleOffset + 3] == 255);
+  }
+}
+
 int main() {
+  testGradientStopBounds();
   testPngGeneration();
   testDataUriAndCache();
   testCollisionSafeCache();

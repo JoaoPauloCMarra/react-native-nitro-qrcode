@@ -47,11 +47,11 @@ std::vector<uint8_t> decodeBase64(const std::string &encoded) {
   return output;
 }
 
-void testQuircDecodesNayukiMatrix() {
+void testQuircDecodesNayukiMatrix(
+    const std::string &payload, GenerateOptions options = GenerateOptions{},
+    int expectedVersion = 0, int expectedEccLevel = -1) {
   QRCodeGenerator generator;
-  GenerateOptions options;
   options.size = 256;
-  const std::string payload = "https://example.com/quirc-real";
   const int matrixSize = generator.getMatrixSize(payload, options);
   const std::vector<uint8_t> packed =
       decodeBase64(generator.getMatrixPackedBase64(payload, options));
@@ -99,7 +99,17 @@ void testQuircDecodesNayukiMatrix() {
     quirc_data data{};
     quirc_extract(qr, index, &code);
     if (quirc_decode(&code, &data) == QUIRC_SUCCESS) {
-      matched = payload == reinterpret_cast<const char *>(data.payload);
+      const std::string decoded(
+          reinterpret_cast<const char *>(data.payload), data.payload_len);
+      if (payload == decoded) {
+        if (expectedVersion > 0) {
+          assert(data.version == expectedVersion);
+        }
+        if (expectedEccLevel >= 0) {
+          assert(data.ecc_level == expectedEccLevel);
+        }
+        matched = true;
+      }
     }
   }
   quirc_destroy(qr);
@@ -109,6 +119,15 @@ void testQuircDecodesNayukiMatrix() {
 } // namespace
 
 void runQRCodeScanTests() {
-  testQuircDecodesNayukiMatrix();
+  testQuircDecodesNayukiMatrix("https://example.com/quirc-real");
+  testQuircDecodesNayukiMatrix(std::string("hello\0world", 11));
+  GenerateOptions boundedHighEcl;
+  boundedHighEcl.minVersion = 2;
+  boundedHighEcl.maxVersion = 2;
+  boundedHighEcl.errorCorrectionLevel = "H";
+  boundedHighEcl.boostEcl = false;
+  testQuircDecodesNayukiMatrix(
+      std::string("\xC3\xA9\0\xF0\x9F\x98\x80", 7), boundedHighEcl, 2,
+      2);
   std::cout << "QRCode scan-back tests passed" << std::endl;
 }

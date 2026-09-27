@@ -97,6 +97,7 @@ import {
   validateOptions,
 } from "../index";
 import * as Web from "../index.web";
+import { mergePresetShapeOptions, PRESET_SHAPE_OPTIONS } from "../defaults";
 import { validateLogoDimensions } from "../validation";
 
 function nativeOptions(options: unknown): Parameters<typeof toPngBase64>[0] {
@@ -2398,6 +2399,120 @@ describe("web QRCode API", () => {
     expect(context.quadraticCurveTo).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["alignment modules", { alignmentShape: "circle" }, "ellipse"],
+    ["timing modules", { timingShape: "circle" }, "ellipse"],
+    ["body corner radius", { cornerRadius: 2 }, "quadraticCurveTo"],
+    [
+      "finder corner radius",
+      { eyePatternCornerRadius: 2 },
+      "quadraticCurveTo",
+    ],
+  ] as const)(
+    "uses equivalent sync and async geometry when %s needs the general renderer",
+    async (_region, shapeOptions, operation) => {
+      const options: Web.QRCodeOptions = {
+        value: "v2",
+        size: 128,
+        minVersion: 2,
+        maxVersion: 2,
+        shapeOptions,
+      };
+      const syncContext = createMockContext();
+      installCanvas(() => syncContext);
+      Web.clearQRCodeCache();
+      Web.toPngDataUri(options);
+
+      const asyncContext = createMockContext();
+      installCanvas(() => asyncContext);
+      Web.clearQRCodeCache();
+      await Web.toPngDataUriAsync(options);
+
+      const calls = (context: typeof syncContext) => ({
+        arc: context.arc.mock.calls,
+        beginPath: context.beginPath.mock.calls,
+        bezierCurveTo: context.bezierCurveTo.mock.calls,
+        closePath: context.closePath.mock.calls,
+        ellipse: context.ellipse.mock.calls,
+        fill: context.fill.mock.calls,
+        fillRect: context.fillRect.mock.calls,
+        lineTo: context.lineTo.mock.calls,
+        moveTo: context.moveTo.mock.calls,
+        quadraticCurveTo: context.quadraticCurveTo.mock.calls,
+      });
+      expect(calls(asyncContext)).toEqual(calls(syncContext));
+      if (operation === "ellipse") {
+        expect(syncContext.ellipse).toHaveBeenCalled();
+      } else {
+        expect(syncContext.quadraticCurveTo).toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("keeps rounded preset geometry for native and web component generators", async () => {
+    const shapeOptions = {
+      layout: undefined,
+      shape: undefined,
+      eyeFrameShape: undefined,
+      eyeballShape: undefined,
+      eyePatternShape: undefined,
+      gap: 0,
+      eyePatternGap: undefined,
+      bodyDensity: undefined,
+      cornerRadius: undefined,
+      eyePatternCornerRadius: undefined,
+      alignmentShape: undefined,
+      timingShape: undefined,
+    };
+    const componentProps = {
+      value: "rounded-preset-undefined-overrides",
+      size: 128,
+      preset: "rounded" as const,
+      shapeOptions: shapeOptions as unknown as NonNullable<
+        Parameters<typeof Web.toPngDataUri>[0]["shapeOptions"]
+      >,
+    };
+
+    mockHybridObject.generatePngDataUriAsyncObject.mockClear();
+    let nativeTree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      nativeTree = TestRenderer.create(
+        React.createElement(QRCode, componentProps),
+      );
+      await Promise.resolve();
+    });
+    const nativeOptions = (
+      mockHybridObject.generatePngDataUriAsyncObject.mock.calls as unknown[][]
+    ).at(-1)?.[0] as
+      | {
+          moduleShape?: string;
+          gap?: number;
+          cornerRadius?: number;
+          eyePatternCornerRadius?: number;
+        }
+      | undefined;
+    expect(nativeOptions).toMatchObject({
+      moduleShape: "rounded",
+      gap: 0,
+      cornerRadius: 16,
+      eyePatternCornerRadius: 16,
+    });
+    await act(async () => nativeTree?.unmount());
+
+    const webContext = createMockContext();
+    installCanvas(() => webContext);
+    Web.clearQRCodeCache();
+    let webTree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      webTree = TestRenderer.create(
+        React.createElement(Web.QRCode, componentProps),
+      );
+      await flushMacrotasks(50);
+    });
+    expect(webContext.quadraticCurveTo).toHaveBeenCalled();
+    await act(async () => webTree?.unmount());
+  });
+
   it("reserves a transparent logo footprint on web PNG output", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -2913,6 +3028,45 @@ function decodeMatrix(matrix: { size: number; packedBase64: string }) {
   return jsQR(rgba, width, width);
 }
 
+describe("preset shape options", () => {
+  it("keeps preset values when optional overrides are explicitly undefined", () => {
+    expect(
+      mergePresetShapeOptions(
+        {
+          layout: undefined,
+          shape: undefined,
+          eyeFrameShape: undefined,
+          eyeballShape: undefined,
+          eyePatternShape: undefined,
+          gap: 0,
+          eyePatternGap: undefined,
+          bodyDensity: undefined,
+          cornerRadius: undefined,
+          eyePatternCornerRadius: undefined,
+          alignmentShape: undefined,
+          timingShape: undefined,
+        },
+        "rounded",
+      ),
+    ).toEqual({ ...PRESET_SHAPE_OPTIONS.rounded, gap: 0 });
+  });
+
+  it.each([
+    ["shape", "square"],
+    ["eyeFrameShape", "square"],
+    ["eyePatternShape", "square"],
+    ["eyeballShape", "square"],
+    ["alignmentShape", "square"],
+    ["timingShape", "square"],
+    ["cornerRadius", 0],
+    ["eyePatternCornerRadius", 0],
+  ] as const)("applies a defined %s override", (key, value) => {
+    expect(
+      mergePresetShapeOptions({ [key]: value }, "rounded"),
+    ).toMatchObject({ ...PRESET_SHAPE_OPTIONS.rounded, [key]: value });
+  });
+});
+
 describe("encoder parity corpus", () => {
   const corpus = readParityCorpus();
 
@@ -3034,6 +3188,24 @@ describe("encoder parity corpus", () => {
           entry.boostEcl === false,
       )?.packedBase64,
     );
+  });
+
+  it("enforces non-fixed web version bounds and independently decodes bounded output", () => {
+    const bounded = Web.getMatrix({ value: "hello", minVersion: 10, maxVersion: 12, mask: 2 });
+    expect(bounded.size).toBe(57);
+    expect(decodeMatrix(bounded)?.data).toBe("hello");
+    expect(() => Web.getMatrix({ value: "a".repeat(100), minVersion: 1, maxVersion: 2 })).toThrow();
+    const exact = Web.getMatrix({ value: "hello", minVersion: 10, maxVersion: 10, mask: 2 });
+    expect(bounded).toEqual(exact);
+  });
+
+  it("boosts L to M at the selected version when Q cannot fit", () => {
+    const base = { value: "a".repeat(12), minVersion: 1 as const, maxVersion: 1 as const, mask: 2 as const };
+    const boosted = Web.getMatrix({ ...base, errorCorrectionLevel: "L", boostEcl: true });
+    const medium = Web.getMatrix({ ...base, errorCorrectionLevel: "M", boostEcl: false });
+    expect(boosted).toEqual(medium);
+    expect(boosted).not.toEqual(Web.getMatrix({ ...base, errorCorrectionLevel: "L", boostEcl: false }));
+    expect(decodeMatrix(boosted)?.data).toBe(base.value);
   });
 
   it("keeps the requested error correction level when boosting is impossible", () => {

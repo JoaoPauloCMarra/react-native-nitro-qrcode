@@ -281,7 +281,7 @@ Development builds expose opt-in generation metrics through
 disabled in production builds; when disabled they return a zeroed snapshot.
 The snapshot counts requests, async requests, failed generations, cache
 hits/misses and cache bytes (web only), plus total and last generation
-milliseconds. No production logging is performed.
+milliseconds. Generation attempts that reach the encoder are counted once, including failures and completed work whose result a component supersedes. Validation rejections are excluded; web PNG cache hits update cache counters without adding a generation sample. Named and grouped web metrics expose the same cache byte count. No production logging is performed.
 
 ## Encoding Parity And Limits
 
@@ -297,7 +297,7 @@ differently; fixed masks always match.
 
 `boostEcl` is honored on both platforms. On web the encoder tries the same
 version at higher error correction levels and keeps the highest level that
-fits, mirroring the native behavior.
+fits, mirroring the native behavior. Version bounds are applied before boosting; a payload that cannot fit `maxVersion` is rejected. Native payloads preserve embedded NUL bytes.
 
 Generation input bounds:
 
@@ -314,6 +314,8 @@ Generation input bounds:
 | Gradient colors            | 2 through 8 valid hex colors                                                                                                                   |
 | Gradient locations         | Same count as colors, finite values from 0 through 1 in non-decreasing order                                                                   |
 | Gradient points            | Finite `x` and `y` values from 0 through 1                                                                                                     |
+
+Undefined component props do not erase preset defaults. Explicit values, including zero radii, override the preset. Native gradients use the first or last stop color outside the declared stop range.
 
 Option loss and platform differences:
 
@@ -556,6 +558,10 @@ skipped (with a reason), or failed and never passes silently; use
 `bun run example:smoke -- --strict` when a release must fail if no Android
 device or booted iOS simulator is available. `bun run example:smoke:ci`
 verifies the terminal-state reporting without devices and runs in `check`.
+For a physical iPhone, set `IOS_DEVICE_UDID` and install `agent-device` (or set
+`AGENT_DEVICE_BIN` to its executable). This uses the same rendered-content
+assertions and closes its own session. Use `IOS_UDID` for a simulator; do not
+set both selectors. An unavailable explicitly selected target fails the smoke.
 
 With the example's Metro server running, `bun run example:e2e:image-swap
 --device "RN Expo MidRange"` records 12 QR values at two-second intervals.
