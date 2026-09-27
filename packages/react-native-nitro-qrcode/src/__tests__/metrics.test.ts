@@ -7,6 +7,8 @@ import {
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "../metrics";
+import { createElement } from "react";
+import TestRenderer, { act } from "react-test-renderer";
 
 const mockHybridObject = {
   generatePngArrayBufferObject: jest.fn(() => new ArrayBuffer(8)),
@@ -36,6 +38,7 @@ import {
   clearQRCodeCache,
   getQRCodeMetrics as nativeGetQRCodeMetrics,
   NitroQRCode,
+  QRCode,
   resetQRCodeMetrics as nativeResetQRCodeMetrics,
   setQRCodeMetricsEnabled as nativeSetQRCodeMetricsEnabled,
   toPngBase64,
@@ -47,6 +50,7 @@ describe("generation metrics", () => {
   afterEach(() => {
     setQRCodeMetricsEnabled(false);
     resetQRCodeMetrics();
+    Web.clearQRCodeCache();
   });
 
   it("records sync and async native requests with timing and failures", async () => {
@@ -67,6 +71,66 @@ describe("generation metrics", () => {
     );
   });
 
+  it("counts completed generation when a component discards a superseded result", async () => {
+    setQRCodeMetricsEnabled(true);
+    resetQRCodeMetrics();
+    let resolveOlder!: (value: string) => void;
+    let resolveLatest!: (value: string) => void;
+    const older = new Promise<string>((resolve) => {
+      resolveOlder = resolve;
+    });
+    const latest = new Promise<string>((resolve) => {
+      resolveLatest = resolve;
+    });
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockImplementationOnce(() => older)
+      .mockImplementationOnce(() => latest);
+    const onReady = jest.fn();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+
+    await act(async () => {
+      tree = TestRenderer.create(
+        createElement(QRCode, { value: "older-metrics-result", onReady }),
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      tree?.update(
+        createElement(QRCode, { value: "latest-metrics-result", onReady }),
+      );
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      resolveOlder("data:image/png;base64,older");
+      await older;
+    });
+    expect(onReady).not.toHaveBeenCalled();
+    expect(nativeGetQRCodeMetrics()).toMatchObject({
+      requests: 1,
+      asyncRequests: 1,
+      failedRequests: 0,
+    });
+
+    await act(async () => {
+      resolveLatest("data:image/png;base64,latest");
+      await latest;
+    });
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onReady).toHaveBeenCalledWith("data:image/png;base64,latest");
+    expect(
+      tree?.root.findAll(
+        (node) => node.props.source?.uri === "data:image/png;base64,latest",
+      ),
+    ).not.toHaveLength(0);
+    expect(nativeGetQRCodeMetrics()).toMatchObject({
+      requests: 2,
+      asyncRequests: 2,
+      failedRequests: 0,
+    });
+    await act(async () => tree?.unmount());
+  });
+
   it("handles disabled and failed native generation paths", async () => {
     setQRCodeMetricsEnabled(false);
     resetQRCodeMetrics();
@@ -85,6 +149,18 @@ describe("generation metrics", () => {
     const snapshot = getQRCodeMetrics();
     expect(snapshot.requests).toBe(1);
     expect(snapshot.failedRequests).toBe(1);
+
+    resetQRCodeMetrics();
+    mockHybridObject.generatePngBase64AsyncObject.mockRejectedValueOnce(
+      new Error("native-async-metrics-fail"),
+    );
+    await expect(toPngBase64Async({ value: "metrics-failing-async" })).rejects.toThrow(
+      "native-async-metrics-fail",
+    );
+    const asyncSnapshot = getQRCodeMetrics();
+    expect(asyncSnapshot.requests).toBe(1);
+    expect(asyncSnapshot.asyncRequests).toBe(1);
+    expect(asyncSnapshot.failedRequests).toBe(1);
   });
 
   it("is disabled by default outside development and reports zeroed state", () => {
@@ -143,6 +219,62 @@ describe("generation metrics", () => {
     expect(snapshot.cacheMisses).toBe(1);
     expect(snapshot.cacheHits).toBe(1);
     expect(snapshot.cacheBytes).toBeGreaterThan(0);
+  });
+
+  it("reports the same browser cache bytes through named and grouped metrics", () => {
+    const originalDocument = globalThis.document;
+    const context = {
+      fillStyle: "",
+      fillRect: jest.fn(),
+      clearRect: jest.fn(),
+    };
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        createElement: jest.fn(() => ({
+          width: 0,
+          height: 0,
+          getContext: jest.fn(() => context),
+          toDataURL: jest.fn(() => "data:image/png;base64,metrics-png"),
+        })),
+      },
+    });
+
+    try {
+      Web.clearQRCodeCache();
+      Web.setQRCodeMetricsEnabled(true);
+      Web.resetQRCodeMetrics();
+      Web.toSvgString({ value: "metrics-cache-svg" });
+      Web.toPngDataUri({ value: "metrics-cache-png" });
+
+      expect(Web.getQRCodeMetrics()).toEqual(
+        Web.NitroQRCode.getQRCodeMetrics(),
+      );
+      expect(Web.getQRCodeMetrics().cacheBytes).toBeGreaterThan(0);
+
+      Web.clearQRCodeCache();
+      expect(Web.getQRCodeMetrics().cacheBytes).toBe(0);
+      expect(Web.getQRCodeMetrics()).toEqual(
+        Web.NitroQRCode.getQRCodeMetrics(),
+      );
+
+      Web.resetQRCodeMetrics();
+      expect(Web.getQRCodeMetrics()).toEqual(
+        Web.NitroQRCode.getQRCodeMetrics(),
+      );
+      expect(Web.getQRCodeMetrics().requests).toBe(0);
+
+      Web.setQRCodeMetricsEnabled(false);
+      expect(Web.getQRCodeMetrics()).toEqual(
+        Web.NitroQRCode.getQRCodeMetrics(),
+      );
+      expect(Web.getQRCodeMetrics().cacheBytes).toBe(0);
+    } finally {
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: originalDocument,
+      });
+    }
   });
 
   it("measures and counts failed web generations", () => {

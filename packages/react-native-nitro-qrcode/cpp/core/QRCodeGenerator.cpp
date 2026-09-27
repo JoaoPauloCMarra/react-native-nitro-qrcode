@@ -117,6 +117,9 @@ double resolveGradientLocation(const GradientOptions &gradient, size_t index) {
 
 Color interpolateColor(const GradientOptions &gradient, double t) {
   const double clamped = std::clamp(t, 0.0, 1.0);
+  if (clamped <= resolveGradientLocation(gradient, 0)) {
+    return gradient.colors.front();
+  }
   for (size_t index = 1; index < gradient.colors.size(); index++) {
     const double end = resolveGradientLocation(gradient, index);
     if (clamped <= end) {
@@ -979,8 +982,12 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
 Matrix QRCodeGenerator::createMatrix(const std::string &value,
                                      const GenerateOptions &options) const {
   validateOptions(value, options);
+  const auto segments = value.find('\0') == std::string::npos
+      ? qrcodegen::QrSegment::makeSegments(value.c_str())
+      : std::vector<qrcodegen::QrSegment>{qrcodegen::QrSegment::makeBytes(
+            std::vector<uint8_t>(value.begin(), value.end()))};
   const auto qr = qrcodegen::QrCode::encodeSegments(
-      qrcodegen::QrSegment::makeSegments(value.c_str()),
+      segments,
       parseEcc(options.errorCorrectionLevel), options.minVersion,
       options.maxVersion, options.mask, options.boostEcl);
 

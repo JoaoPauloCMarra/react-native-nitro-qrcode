@@ -284,6 +284,14 @@ function resetIosRoute(udid) {
 }
 
 function smokeIos() {
+  const physicalUdid = process.env.IOS_DEVICE_UDID;
+  if (physicalUdid) {
+    if (process.env.IOS_UDID) {
+      throw new Error("Set only one of IOS_DEVICE_UDID and IOS_UDID.");
+    }
+    smokePhysicalIos(physicalUdid);
+    return;
+  }
   const requestedUdid = process.env.IOS_UDID;
   if (!commandExists("xcrun")) {
     if (requestedUdid !== undefined && requestedUdid !== "") {
@@ -342,6 +350,37 @@ function smokeIos() {
   resetIosRoute(udid);
   run("xcrun", ["simctl", "launch", udid, IOS_BUNDLE_ID]);
   waitForIosUi(udid);
+  recordResult("ios", "passed");
+}
+
+function smokePhysicalIos(udid) {
+  const binary = process.env.AGENT_DEVICE_BIN || "agent-device";
+  if (!commandExists(binary)) {
+    throw new Error("IOS_DEVICE_UDID requires agent-device for accessibility assertions.");
+  }
+  const session = `nitro-qrcode-smoke-${process.pid}`;
+  function command(args) {
+    const output = execFileSync(binary, [
+      "--platform", "ios", "--udid", udid, "--session", session,
+      ...args, "--json",
+    ], { encoding: "utf8", timeout: 60000 });
+    const response = JSON.parse(output);
+    if (response.success !== true) {
+      throw new Error(`agent-device ${args[0]} did not succeed.`);
+    }
+    return output;
+  }
+  let opened = false;
+  try {
+    command(["open", IOS_BUNDLE_ID, "--relaunch"]);
+    opened = true;
+    for (const text of REQUIRED_TEXT) {
+      command(text === "nitro-qrcode-preview" ? ["wait", `id=${text}`] : ["wait", "text", text]);
+    }
+    assertVisible(command(["snapshot"]), "iOS");
+  } finally {
+    if (opened) command(["close"]);
+  }
   recordResult("ios", "passed");
 }
 

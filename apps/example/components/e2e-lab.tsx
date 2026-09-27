@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   NitroQRCode,
   QRCode,
@@ -28,6 +28,7 @@ const PRESETS: readonly QRCodePreset[] = [
 ];
 
 type LabResult = {
+  audit: string;
   helpers: string;
   namespace: string;
   cache: string;
@@ -39,6 +40,7 @@ type LabResult = {
 };
 
 const EMPTY: LabResult = {
+  audit: "(idle)",
   helpers: "(idle)",
   namespace: "(idle)",
   cache: "(idle)",
@@ -57,9 +59,45 @@ export function QrcodeE2eLab() {
   const [keepPrevious, setKeepPrevious] = useState(true);
   const [scanSafeStrict, setScanSafeStrict] = useState(false);
   const [forceEmpty, setForceEmpty] = useState(false);
+  const [auditUri, setAuditUri] = useState<string>();
   const [results, setResults] = useState<LabResult>(EMPTY);
 
   const liveValue = forceEmpty ? "" : LAB_VALUE;
+
+  const runAudit = async () => {
+    try {
+      clearQRCodeCache();
+      const bounded = NitroQRCode.getMatrix({ value: "hello", minVersion: 10, maxVersion: 12 });
+      if (bounded.size !== 57) throw new Error("minimum version was not honored");
+      let rejected = false;
+      try {
+        NitroQRCode.getMatrix({ value: "a".repeat(100), minVersion: 1, maxVersion: 2 });
+      } catch {
+        rejected = true;
+      }
+      if (!rejected) throw new Error("maximum version was not enforced");
+      const fixed = { value: "a".repeat(12), minVersion: 1, maxVersion: 1, mask: 0 } as const;
+      const boosted = NitroQRCode.getMatrix({ ...fixed, errorCorrectionLevel: "L", boostEcl: true });
+      const medium = NitroQRCode.getMatrix({ ...fixed, errorCorrectionLevel: "M", boostEcl: false });
+      if (JSON.stringify(boosted) !== JSON.stringify(medium)) throw new Error("error correction boost differs");
+      setQRCodeMetricsEnabled(true);
+      resetQRCodeMetrics();
+      await NitroQRCode.toPngDataUriAsync({ value: "audit-metrics", size: 96 });
+      try {
+        await NitroQRCode.toPngDataUriAsync({ value: "a".repeat(100), size: 96, maxVersion: 1 });
+      } catch {
+        // Expected capacity failure; verify it is counted exactly once below.
+      }
+      const metrics = getQRCodeMetrics();
+      if (metrics.requests !== 2 || metrics.asyncRequests !== 2 || metrics.failedRequests !== 1)
+        throw new Error(`async request accounting differs: ${JSON.stringify(metrics)}`);
+      const uri = toPngDataUri({ value: "before\0after", size: 256, errorCorrectionLevel: "H" });
+      setAuditUri(uri);
+      setResults((current) => ({ ...current, audit: "ok:bounds:boost:metrics:nul-image-ready" }));
+    } catch (error) {
+      setResults((current) => ({ ...current, audit: `fail:${error instanceof Error ? error.message : "audit"}` }));
+    }
+  };
 
   const runHelpers = () => {
     const options = { value: LAB_VALUE, size: 96 };
@@ -257,6 +295,9 @@ export function QrcodeE2eLab() {
         <LabButton testID="e2e-run-stress" label="Stress PNG" onPress={runStress} />
       </View>
 
+      <LabButton testID="e2e-run-audit" label="Audit regressions" onPress={() => { void runAudit(); }} />
+      <ResultRow testID="e2e-audit-result" value={results.audit} />
+      {auditUri ? <Image testID="e2e-audit-nul-image" accessibilityLabel="Embedded NUL payload" source={{ uri: auditUri }} style={{ width: 256, height: 256 }} /> : null}
       <ResultRow testID="e2e-helpers-result" value={results.helpers} />
       <ResultRow testID="e2e-namespace-result" value={results.namespace} />
       <ResultRow testID="e2e-cache-result" value={results.cache} />

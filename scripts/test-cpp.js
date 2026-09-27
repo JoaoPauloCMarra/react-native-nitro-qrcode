@@ -1,6 +1,7 @@
-const { execFileSync, execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { resolveLlvmTool } = require("./llvm-tools.js");
 
 const packageDir = path.join(
   __dirname,
@@ -13,29 +14,6 @@ const buildDir = path.join(cppDir, "build");
 const outputFile = path.join(buildDir, "qrcode_generator_test");
 const profileRawFile = path.join(buildDir, "qrcode_generator.profraw");
 const profileDataFile = path.join(buildDir, "qrcode_generator.profdata");
-
-const PINNED_LLVM_VERSION = 18;
-
-function resolveTool(name) {
-  const pinnedName = `${name}-${PINNED_LLVM_VERSION}`;
-  try {
-    return execSync(`command -v ${pinnedName}`, { encoding: "utf8" }).trim();
-  } catch {
-    try {
-      return execSync(`command -v ${name}`, { encoding: "utf8" }).trim();
-    } catch {
-      if (process.platform !== "darwin") {
-        throw new Error(
-          `${name} was not found on PATH; install LLVM ${PINNED_LLVM_VERSION} (${pinnedName}).`,
-        );
-      }
-
-      return execFileSync("xcrun", ["--find", name], {
-        encoding: "utf8",
-      }).trim();
-    }
-  }
-}
 
 function runCommand(command, args, options = {}) {
   execFileSync(command, args, {
@@ -170,7 +148,7 @@ const quircObjects = [
   "version_db.c",
 ].map((file) => {
   const objectFile = path.join(buildDir, `${file}.o`);
-  runCommand(resolveTool("clang"), [
+  runCommand(resolveLlvmTool("clang"), [
     "-std=c11",
     "-O0",
     "-g",
@@ -227,7 +205,7 @@ const compileArgs = [
 ];
 
 console.log("Compiling C++ QRCode tests...");
-runCommand(resolveTool("clang++"), compileArgs);
+runCommand(resolveLlvmTool("clang++"), compileArgs);
 
 console.log("Running C++ QRCode tests...");
 runCommand(outputFile, [], {
@@ -238,8 +216,8 @@ runCommand(outputFile, [], {
 });
 
 console.log("Checking C++ QRCode coverage...");
-const llvmProfdata = resolveTool("llvm-profdata");
-const llvmCov = resolveTool("llvm-cov");
+const llvmProfdata = resolveLlvmTool("llvm-profdata");
+const llvmCov = resolveLlvmTool("llvm-cov");
 runCommand(llvmProfdata, [
   "merge",
   "-sparse",

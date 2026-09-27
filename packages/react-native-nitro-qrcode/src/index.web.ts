@@ -1,10 +1,9 @@
 import { createBoundedCache } from "./cache";
 import {
-  getQRCodeMetrics,
-  isQRCodeMetricsEnabled,
-  nowMilliseconds,
+  getQRCodeMetrics as readQRCodeMetrics,
+  measuredAsync,
+  measuredSync,
   recordCacheLookup,
-  recordGenerationRequest,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "./metrics";
@@ -74,60 +73,13 @@ export {
   validateOptions,
 } from "./validation";
 export {
-  getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
   type QRCodeMetricsSnapshot,
 } from "./metrics";
 
-function measuredSync<T>(generate: () => T): T {
-  if (!isQRCodeMetricsEnabled()) {
-    return generate();
-  }
-  const started = nowMilliseconds();
-  try {
-    const result = generate();
-    recordGenerationRequest({
-      async: false,
-      durationMs: nowMilliseconds() - started,
-      failed: false,
-    });
-    return result;
-  } catch (error) {
-    recordGenerationRequest({
-      async: false,
-      durationMs: nowMilliseconds() - started,
-      failed: true,
-    });
-    throw error;
-  }
-}
-
-async function measuredAsync<T>(generate: () => Promise<T>): Promise<T> {
-  if (!isQRCodeMetricsEnabled()) {
-    return generate();
-  }
-  const started = nowMilliseconds();
-  try {
-    const result = await generate();
-    recordGenerationRequest({
-      async: true,
-      durationMs: nowMilliseconds() - started,
-      failed: false,
-    });
-    return result;
-  } catch (error) {
-    recordGenerationRequest({
-      async: true,
-      durationMs: nowMilliseconds() - started,
-      failed: true,
-    });
-    throw error;
-  }
-}
-
-function webGetQRCodeMetrics() {
-  const snapshot = getQRCodeMetrics();
+export function getQRCodeMetrics() {
+  const snapshot = readQRCodeMetrics();
   if (!snapshot.enabled) {
     return snapshot;
   }
@@ -402,7 +354,7 @@ export const NitroQRCode: NitroQRCodeApi = {
   clearCache: clearQRCodeCache,
   getCacheSize: getQRCodeCacheSize,
   getCacheBytes: getQRCodeCacheBytes,
-  getQRCodeMetrics: webGetQRCodeMetrics,
+  getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 };
@@ -553,13 +505,21 @@ function yieldToMainThread(): Promise<void> {
 }
 
 function createModel(options: NormalizedOptions): QRCodeModel {
-  const base = createModelAt(options, options.errorCorrectionLevel);
+  let base = createModelAt(options, options.errorCorrectionLevel);
+  let version = (base.modules.size - 17) / 4;
+  if (version > options.maxVersion) {
+    throw new Error("QR payload exceeds maxVersion capacity.");
+  }
+  if (version < options.minVersion) {
+    version = options.minVersion;
+    base = createModelAt(options, options.errorCorrectionLevel, version);
+  }
   if (!options.boostEcl || options.errorCorrectionLevel === "H") {
     return base;
   }
-  const version = (base.modules.size - 17) / 4;
   let boosted: QRCodeModel | undefined;
-  for (const candidate of ["Q", "H"] as const) {
+  const levels = ["L", "M", "Q", "H"] as const;
+  for (const candidate of levels.slice(levels.indexOf(options.errorCorrectionLevel) + 1)) {
     try {
       boosted = createModelAt(options, candidate, version);
     } catch {
@@ -672,9 +632,14 @@ function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
   return (
     options.shape === "square" &&
     options.eyeFrameShape === "square" &&
+    options.eyePatternShape === "square" &&
     options.eyeballShape === "square" &&
+    options.alignmentShape === "square" &&
+    options.timingShape === "square" &&
     options.gap === 0 &&
     options.eyePatternGap === 0 &&
+    options.cornerRadius < 0 &&
+    options.eyePatternCornerRadius < 0 &&
     options.bodyDensity === "dense"
   );
 }

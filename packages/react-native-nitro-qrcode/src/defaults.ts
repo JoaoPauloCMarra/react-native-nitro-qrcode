@@ -119,5 +119,10 @@ export function mergePresetShapeOptions(
   options: QRCodeShapeOptions | undefined,
   preset: QRCodePreset | undefined,
 ): QRCodeShapeOptions {
-  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...options };
+  const definedOptions = options === undefined
+    ? undefined
+    : Object.fromEntries(
+        Object.entries(options).filter(([, value]) => value !== undefined),
+      );
+  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...definedOptions };
 }

@@ -1,7 +1,8 @@
-const { execFileSync, execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { resolveLlvmTool } = require("./llvm-tools.js");
 
 const packageDir = path.join(
   __dirname,
@@ -21,29 +22,6 @@ if (packageManifest.name !== "react-native-nitro-qrcode") {
   throw new Error(
     `Benchmark setup failed: expected react-native-nitro-qrcode, got ${packageManifest.name}.`,
   );
-}
-
-const PINNED_LLVM_VERSION = 18;
-
-function resolveTool(name) {
-  const pinnedName = `${name}-${PINNED_LLVM_VERSION}`;
-  try {
-    return execSync(`command -v ${pinnedName}`, { encoding: "utf8" }).trim();
-  } catch {
-    try {
-      return execSync(`command -v ${name}`, { encoding: "utf8" }).trim();
-    } catch {
-      if (process.platform !== "darwin") {
-        throw new Error(
-          `${name} was not found on PATH; install LLVM ${PINNED_LLVM_VERSION} (${pinnedName}).`,
-        );
-      }
-
-      return execFileSync("xcrun", ["--find", name], {
-        encoding: "utf8",
-      }).trim();
-    }
-  }
 }
 
 function runCommand(command, args) {
@@ -98,7 +76,7 @@ const compileArgs = [
 
 console.log("Compiling optimized C++ QRCode benchmark...");
 try {
-  runCommand(resolveTool("clang++"), compileArgs);
+  runCommand(resolveLlvmTool("clang++"), compileArgs);
 
   console.log(
     `Benchmark package: ${packageManifest.name}@${packageManifest.version}`,

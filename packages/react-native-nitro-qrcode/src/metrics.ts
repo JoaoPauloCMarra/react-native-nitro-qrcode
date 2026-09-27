@@ -93,3 +93,51 @@ export function nowMilliseconds(): number {
   }
   return Date.now();
 }
+
+export function measuredSync<T>(generate: () => T): T {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = generate();
+    recordGenerationRequest({
+      async: false,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async: false,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
+
+export async function measuredAsync<T>(
+  generate: () => Promise<T>,
+): Promise<T> {
+  if (!isQRCodeMetricsEnabled()) {
+    return generate();
+  }
+  const started = nowMilliseconds();
+  try {
+    const result = await generate();
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: false,
+    });
+    return result;
+  } catch (error) {
+    recordGenerationRequest({
+      async: true,
+      durationMs: nowMilliseconds() - started,
+      failed: true,
+    });
+    throw error;
+  }
+}
