@@ -12,6 +12,7 @@ Breaking changes are always listed first in each release section.
 
 - None. Two output details change for the same options; neither changes an explicitly set option:
   - Unset `strokeColor`, `eyeColor`, and `eyeballColor` now default to `foregroundColor`, and an unset `eyeStrokeColor` defaults to the resolved `eyeColor`. Finder, eyeball, alignment, and timing patterns that match the foreground are painted with the foreground fill, so gradients now cover them. To keep black finders with a non-black foreground or a gradient, pass `eyeColor="#000000"` and `eyeballColor="#000000"`.
+  - An explicit `strokeColor` or `eyeStrokeColor` of `#000000` on a non-black foreground now draws a black stroke. Black previously meant "no stroke". To draw no stroke, omit the option or set it to the foreground (or `eyeColor`) value.
   - Resolvers that do not set the `react-native` condition (`node`, `import`, `require`, `default`) now receive the built web entry (`lib/*/index.web.js`) instead of the native entry. Jest setups that use the React Native preset keep the native entry. Code that relied on the old target should mock `react-native-nitro-modules` and import the package through a `react-native` condition.
 
 ### Fixed
