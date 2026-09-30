@@ -58,10 +58,9 @@ After (0.8.0 ArrayBuffer path; base64 remains a wrapper over PNG bytes):
 | large-high-res | async-arraybuffer | 18.903 | 3520 |
 
 ArrayBuffer `bytes` are raw PNG length; base64 `bytes` are the encoded string
-length. Encode work dominates medium and large payloads, so those medians sit
-inside run-to-run noise of the previous base64 path. The small-text sync
-ArrayBuffer median was 1.027 ms on this device versus 1.935 ms for the
-previous sync base64 path.
+length. Encode work dominates these payloads, so the ArrayBuffer and base64 medians
+sit inside run-to-run noise of each other. The run measured the methods in a
+fixed order, so it does not support a speed ranking between them.
 
 Those iPhone rows are Dev Client + JSI + `clearQRCodeCache` costs, not the
 isolated C++ encoder. `bun run benchmark:cpp` is the process that measures
@@ -90,4 +89,6 @@ Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
 Do not treat the bake-off table as an iPhone 17e result. Re-run
 `bun run benchmark:cpp` on the same machine after PNG encoder changes. The
 `rgba-gradient-png-cold` and `preview-styled-png-cold` rows are the `fpng`
-path; `indexed-png-*` rows stay on the 1-bit zlib writer.
+gradient path; `palette-logo-png-cold` is the 4-bit palette zlib writer used
+for layered colors and logo areas without a gradient; `indexed-png-*` rows
+stay on the 1-bit zlib writer.

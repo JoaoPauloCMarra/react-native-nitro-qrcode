@@ -48,22 +48,36 @@ bare React Native app.
 
 ## Compatibility
 
-| Package          | Supported range                                     |
-| ---------------- | --------------------------------------------------- |
-| React            | `>=18.2.0 <20.0.0`                                  |
-| React Native     | `>=0.75.0 <1.0.0`                                   |
-| Nitro Modules    | `>=0.37.0 <0.38.0`                                  |
-| Expo             | SDK 57 development builds; Expo Go is not supported |
-| React Native Web | `>=0.19.0 <1.0.0`                                   |
-| Node             | `>=18.0.0`                                          |
+| Package          | Supported range                                                     |
+| ---------------- | ------------------------------------------------------------------- |
+| React            | `>=18.2.0 <20.0.0`                                                  |
+| React Native     | `>=0.76` supported (declared peer `>=0.75.0 <1.0.0`); tested on `0.86.3` |
+| Nitro Modules    | `>=0.37.0 <0.38.0`                                                  |
+| Expo             | SDK 52 and newer development builds; tested on SDK 57; Expo Go is not supported |
+| iOS              | React Native's `min_ios_version_supported` (15.1 on RN 0.76–0.86)   |
+| Android NDK      | 27 or newer (Nitro Modules 0.37 requirement)                        |
+| React Native Web | `>=0.19.0 <1.0.0`                                                   |
+| Node             | `>=18.0.0`                                                          |
+
+React Native 0.76 and Expo SDK 52 default to NDK 26. Those apps must raise
+Android `ndkVersion` to 27 or newer: set `ndkVersion` in
+`android/build.gradle` for bare apps, or `android.ndkVersion` through
+`expo-build-properties` for Expo SDK 52.
 
 The current example and package gate use React Native `0.86.3` and Expo SDK 57
-(`expo@~57.0.25`).
+(`expo@~57.0.26`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
 Strict TypeScript compatibility. Expo SDK 57 selects React Native `0.86.3`; do
 not override that version in the example. The baseline uses React `19.2.3` and
-Nitro Modules `0.37.1`. The wider ranges above are the package's declared peer
-compatibility.
+Nitro Modules `0.37.1`. Versions below the tested baseline follow the declared
+peer ranges but have no automated coverage in this repository.
+
+### Upgrade from 0.8.1
+
+Version 0.8.2 has no API changes. Unset finder, eyeball, and stroke colors now
+follow `foregroundColor` (and its gradient). Pass `eyeColor` and
+`eyeballColor` explicitly to keep a different finder color. Non-React-Native
+resolvers (`node`, `import`, `require`, `default`) now load the web entry.
 
 ### Upgrade from 0.7.x
 
@@ -275,13 +289,12 @@ entry preserves them.
 PNG cache keys still use parsed color bytes so equivalent PNG requests can
 share entries without changing their pixels.
 
-Development builds expose opt-in generation metrics through
-`getQRCodeMetrics()`, `resetQRCodeMetrics()`, and
-`setQRCodeMetricsEnabled()`. Metrics are enabled by default in development and
-disabled in production builds; when disabled they return a zeroed snapshot.
-The snapshot counts requests, async requests, failed generations, cache
-hits/misses and cache bytes (web only), plus total and last generation
-milliseconds. Generation attempts that reach the encoder are counted once, including failures and completed work whose result a component supersedes. Validation rejections are excluded; web PNG cache hits update cache counters without adding a generation sample. Named and grouped web metrics expose the same cache byte count. No production logging is performed.
+Generation metrics are available through `getQRCodeMetrics()`,
+`resetQRCodeMetrics()`, and `setQRCodeMetricsEnabled()`. They are enabled by
+default in development builds (`__DEV__`) and disabled in production builds;
+when disabled they return a zeroed snapshot. The snapshot counts requests,
+async requests, failed generations, cache hits and misses (web only), retained
+cache bytes (all platforms), plus total and last generation milliseconds. Generation attempts that reach the encoder are counted once, including failures and completed work whose result a component supersedes. Validation rejections are excluded; web PNG cache hits update cache counters without adding a generation sample. Named and grouped web metrics expose the same cache byte count. No production logging is performed.
 
 ## Encoding Parity And Limits
 
@@ -325,10 +338,20 @@ Option loss and platform differences:
   do not apply to the SVG path.
 - **Web PNG transparency** uses an alpha-cleared background; transparent
   pixels are truly transparent instead of black.
-- **Circle geometry** is defined as an ellipse inscribed in the module cell on
-  both platforms; web rasterization uses the canvas ellipse primitive and the
-  native renderer uses distance evaluation, so edge pixels can differ by at
-  most one pixel per module (documented golden tolerance).
+- **Pixel geometry** uses the same integer rules on both platforms: module and
+  quiet-zone edges are `floor(index * pixelSize / totalModules)`, body strokes
+  inset by `max(1, floor(moduleSize / 5))`, and the logo hole starts at
+  `floor((pixelSize - logoAreaSize) / 2)`. Square modules therefore land on
+  the same pixel boundaries. Curved shapes (circles, rounded corners,
+  diamonds, squircles) are antialiased by the web canvas and rasterized per
+  pixel natively, so their edge pixels can differ by at most one pixel per
+  module.
+- **Layer colors** default to the foreground: unset `strokeColor`, `eyeColor`,
+  and `eyeballColor` use `foregroundColor`, and an unset `eyeStrokeColor`
+  uses the resolved `eyeColor`. A finder, eyeball, alignment, or timing color
+  that equals `foregroundColor` is painted with the foreground fill, so a
+  gradient covers those patterns too. Set the color explicitly to paint it as
+  a solid color.
 - **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
   shorthand expand to full hex before the native bridge). The native ABI
   itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the
@@ -339,9 +362,15 @@ Option loss and platform differences:
   compatibility; prefer `toPngArrayBufferAsync`/`toPngBase64Async`/`toPngDataUriAsync`
   for UI flows.
 - **Native PNG encoding** writes flat two-color codes as 1-bit indexed zlib
-  PNGs. Gradients, layered colors, and logo-area clearing use vendored `fpng`
-  for RGBA. The QR matrix still comes from Project Nayuki. Web PNG stays on
-  canvas `toDataURL`.
+  PNGs and layered colors or logo-area clearing as 4-bit palette PNGs with a
+  `tRNS` alpha table. Only gradients use vendored `fpng` for RGBA. The QR
+  matrix still comes from Project Nayuki. Web PNG stays on canvas `toDataURL`.
+- **Native memory** scales with the square of `size`. Host measurements of
+  the C++ renderer (macOS, `clang++ -O2`, one call) peaked at about 23 MB for
+  a two-color 4096 px code, 36 MB for a 4096 px palette code with a logo area
+  or custom layer colors, and 355 MB for a 4096 px gradient (about 90 MB at
+  2048 px). Keep gradient exports near the displayed size, and avoid running
+  many large gradient exports in parallel.
 - **Styled modules** stay on the standard QR matrix. `classy` connects
   neighbors, `diamond` draws rhombi, and `squircle` uses extra-rounded cells.
   Rust crates such as `qr-code-styling` and `modo-rs` were not vendored; the
@@ -354,9 +383,11 @@ on iOS, Android, and web. Web PNG rendering requires a browser canvas. SVG is
 available through `toSvgString`; the component itself remains PNG-backed.
 
 The component exposes accessible semantics: the generated image is
-announced as an image with the label `QR code for <value>`, the container
-reports a busy state while generation is pending, and the logo overlay is
-hidden from the accessibility tree. Screen readers announce the QR meaning
+announced as an image with the label `QR code for <value>`, where `<value>` is
+the payload of the image currently on screen. While `keepPreviousImage` shows
+an older image, the label keeps describing that image and the container
+reports a busy state until the new image is ready or generation fails. The
+logo overlay is hidden from the accessibility tree. Screen readers announce the QR meaning
 and its generation state on iOS and Android.
 
 The `logo` prop is a React node layered above the generated PNG. Only
@@ -374,10 +405,13 @@ remain. Synchronous methods throw, asynchronous methods reject, and the componen
 reports the error through `onError`. `validateOptions` returns the warnings as
 structured errors without throwing.
 
-Generation starts when normalized render options change. While it runs,
-`placeholder` is shown if no current image is available. `keepPreviousImage`
-keeps the prior QR visible until the replacement image finishes loading, and
-`hideLogoUntilReady` delays the overlay. QR images do not use Android's default
+Generation starts when normalized render options change. `placeholder` is
+shown only while no image is available. `keepPreviousImage` defaults to `true`:
+the prior QR stays visible until the replacement image finishes loading, so
+the placeholder appears on the first mount only. Pass
+`keepPreviousImage={false}` to clear the image and show the placeholder on
+every change. `hideLogoUntilReady` also defaults to `true` and delays the
+overlay until an image is ready. QR images do not use Android's default
 fade animation when the value or options change.
 `onReady` receives the successful PNG data URI. Stale or unmounted async
 completions are ignored. Identical options on a later mount reuse the package
@@ -409,7 +443,17 @@ console.log(result.warnings);
 ```
 
 `validateOptions` reports invalid values as hard errors and scanability risks as
-warnings. With `scanSafe: "strict"`, scanability warnings are also returned as
+warnings.
+
+| Code                | Kind    | Meaning                                                              |
+| ------------------- | ------- | -------------------------------------------------------------------- |
+| `invalid`           | Error   | An option is out of range, malformed, or the payload does not fit.   |
+| `too-small-size`    | Warning | The rendered size is too small for the module count to scan reliably. |
+| `bad-quiet-zone`    | Warning | The quiet zone is narrower than four modules.                        |
+| `logo-too-large`    | Warning | The logo area covers too much of the symbol.                         |
+| `low-ecl-for-logo`  | Warning | A logo area is reserved without error correction level `H`.          |
+| `low-contrast`      | Warning | The foreground or a pattern color has low contrast against an opaque background. |
+ With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
 
 Errors are deterministic: validation returns typed `QRCodeValidationResult`
@@ -461,19 +505,19 @@ Main exports:
 | Option                 | Description                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `value`                | Non-empty QR payload string. Required.                                                                                               |
-| `size`                 | Positive component layout size up to 2048 points; rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels).   |
-| `quietZone`            | Quiet-zone width in QR modules; integer 0 through 32.                                                                                |
-| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases.                                                                                      |
+| `size`                 | Positive component layout size up to 2048 points; default `180`. Rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels). Export helpers default to `512` pixels. |
+| `quietZone`            | Quiet-zone width in QR modules; integer 0 through 32; default `4`.                                                                   |
+| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases; default `M` (`H` when `scanSafe` reserves a logo area).                               |
 | `minVersion` / `maxVersion` | QR version bounds from `1` through `40`, with the minimum no larger than the maximum.                                         |
 | `mask`                 | `-1` for automatic mask selection, or a fixed mask from `0` through `7`.                                                            |
-| `boostEcl`             | Raises error correction within the selected version when the payload fits.                                                         |
+| `boostEcl`             | Raises error correction within the selected version when the payload fits; default `true`.                                          |
 | `scanSafe`             | Raises unsafe defaults; `"strict"` turns scanability warnings into errors.                                                           |
 | `foregroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color.                                                                         |
 | `backgroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`.                                                                         |
-| `strokeColor`          | Optional body-module stroke color.                                                                                                   |
-| `eyeColor`             | Finder frame fill color.                                                                                                             |
-| `eyeStrokeColor`       | Finder frame stroke color.                                                                                                           |
-| `eyeballColor`         | Finder center color.                                                                                                                 |
+| `strokeColor`          | Body-module stroke color; defaults to `foregroundColor` (no visible stroke).                                                         |
+| `eyeColor`             | Finder frame fill color; defaults to `foregroundColor`.                                                                              |
+| `eyeStrokeColor`       | Finder frame stroke color; defaults to `eyeColor` (no visible stroke).                                                               |
+| `eyeballColor`         | Finder center color; defaults to `foregroundColor`.                                                                                  |
 | `alignmentColor`       | Alignment-pattern color; defaults to `foregroundColor`.                                                                              |
 | `timingColor`          | Timing-pattern color; defaults to `foregroundColor`.                                                                                 |
 | `quietZoneColor`       | Quiet-zone color; defaults to `backgroundColor`.                                                                                     |
@@ -490,8 +534,8 @@ Main exports:
 | `logoAreaBorderRadius` | Reserved-area radius; integer 0 through half of `size`.                                                                              |
 | `logoPadding`          | Visual padding inside the logo overlay; does not enlarge the reserved area.                                                          |
 | `logoBackgroundColor`  | Overlay background color; does not change the generated PNG.                                                                         |
-| `keepPreviousImage`    | Keeps the previous image visible while the next image generates.                                                                     |
-| `hideLogoUntilReady`   | Delays logo rendering until the QR image is ready.                                                                                   |
+| `keepPreviousImage`    | Keeps the previous image visible while the next image generates; default `true`.                                                     |
+| `hideLogoUntilReady`   | Delays logo rendering until the QR image is ready; default `true`.                                                                   |
 | `onReady`              | Called with the generated PNG data URI.                                                                                              |
 | `onError`              | Called when generation fails.                                                                                                        |
 
@@ -521,7 +565,10 @@ option-by-option rules.
 | Expo     | Development builds; Expo Go is not supported for native Nitro code. |
 
 The `qrcode` npm package powers only the web entry
-(`src/index.web.ts`). Native iOS and Android builds resolve the
+(`src/index.web.ts`, built as `lib/*/index.web.js`). The package `exports` map
+sends `react-native` resolvers to the native entry and `browser`, `node`,
+`import`, `require`, and `default` resolvers to the web entry, so server
+rendering and non-React-Native tooling never load the Nitro module. Native iOS and Android builds resolve the
 platform-specific entry and never bundle it; web bundlers include it only for
 web targets. Consumers do not need `react-native-svg`, Skia, canvas packages,
 or another QR package.
@@ -546,9 +593,10 @@ or another QR package.
 bun install
 bun run check
 bun run test:types
-bun run release:preflight
+bun run example:prebuild
 bun run example:android
 bun run example:ios
+bun run release:preflight
 ```
 
 Run native example builds locally before release when changing plugin, native,
@@ -556,8 +604,10 @@ Nitro, or packaging files. GitHub CI does not build the Android or iOS example.
 `bun run example:smoke` reports each platform as executed,
 skipped (with a reason), or failed and never passes silently; use
 `bun run example:smoke -- --strict` when a release must fail if no Android
-device or booted iOS simulator is available. `bun run example:smoke:ci`
-verifies the terminal-state reporting without devices and runs in `check`.
+device or booted iOS simulator is available. `bun run release:preflight` runs
+the strict smoke after the device-free gates; the publish workflow runs
+`bun run release:preflight:ci`, which omits the device smoke, so a green
+workflow step is not device evidence.
 For a physical iPhone, set `IOS_DEVICE_UDID` and install `agent-device` (or set
 `AGENT_DEVICE_BIN` to its executable). This uses the same rendered-content
 assertions and closes its own session. Use `IOS_UDID` for a simulator; do not

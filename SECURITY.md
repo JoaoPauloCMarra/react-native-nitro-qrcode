@@ -18,9 +18,9 @@ security fixes.
   `packages/react-native-nitro-qrcode/cpp/qrcodegen/README.nayuki.markdown`
   for the exact commit, checksums, and synchronization policy. Upstream
   security fixes are adopted by bumping the pinned commit through that policy.
-- Native RGBA PNG export vendors `fpng` (Unlicense) at a pinned commit. See
-  `packages/react-native-nitro-qrcode/cpp/vendor/fpng/README.md`. Indexed
-  two-color PNGs still use zlib. Host C++ scan-back tests vendor `quirc`
+- Native RGBA gradient PNG export vendors `fpng` (Unlicense) at a pinned
+  commit. See `packages/react-native-nitro-qrcode/cpp/vendor/fpng/README.md`.
+  Indexed two-color and palette PNGs use zlib. Host C++ scan-back tests vendor `quirc`
   (ISC-style) under `cpp/tests/quirc` and do not ship in the native libraries.
 - The web entry depends on the `qrcode` npm package, which is bundled only for
   web targets. Keep it current through normal dependency updates.

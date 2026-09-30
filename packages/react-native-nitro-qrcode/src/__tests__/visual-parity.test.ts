@@ -1,6 +1,6 @@
 import * as Web from "../index.web";
 import { createRenderPlan } from "../render-plan";
-import { normalizeOptions } from "../validation";
+import { normalizeOptions, validateOptions } from "../validation";
 
 type FillCall = { op: string; args: number[]; fill: unknown };
 
@@ -117,6 +117,31 @@ describe("layer color defaults", () => {
       .map((call) => call.fill);
     expect(moduleFills.length).toBeGreaterThan(0);
     expect(moduleFills).not.toContain("#000000");
+  });
+});
+
+describe("layer color scanability", () => {
+  it("accepts inverted codes whose finders follow the foreground", () => {
+    expect(
+      validateOptions({
+        value: "inverted",
+        size: 256,
+        foregroundColor: "#FFFFFF",
+        backgroundColor: "#000000",
+        scanSafe: "strict",
+      }),
+    ).toEqual({ valid: true, warnings: [], errors: [] });
+  });
+
+  it("reports a low-contrast foreground once when finders follow it", () => {
+    const result = validateOptions({
+      value: "faint",
+      size: 256,
+      foregroundColor: "#EEEEEE",
+    });
+    expect(
+      result.warnings.filter((warning) => warning.code === "low-contrast"),
+    ).toHaveLength(1);
   });
 });
 

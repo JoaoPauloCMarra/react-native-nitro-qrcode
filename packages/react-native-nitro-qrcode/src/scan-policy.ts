@@ -1,4 +1,9 @@
-import { contrastRatio, isFullyTransparent, parseHexColor } from "./colors";
+import {
+  areRgbaColorsEqual,
+  contrastRatio,
+  isFullyTransparent,
+  parseHexColor,
+} from "./colors";
 import type { NormalizedOptions } from "./validation";
 
 export type QRCodeScanabilityWarning = {
@@ -75,12 +80,17 @@ export function scanabilityWarnings(
 
   if (!isFullyTransparent(options.backgroundColor)) {
     const background = parseHexColor(options.backgroundColor);
-    const contrastPairs: [string, string][] = [
-      [options.foregroundColor, "foregroundColor"],
+    const layerPairs: [string, string][] = [
       [options.alignmentColor, "alignmentColor"],
       [options.timingColor, "timingColor"],
       [options.eyeColor, "eyeColor"],
       [options.eyeballColor, "eyeballColor"],
+    ];
+    const contrastPairs: [string, string][] = [
+      [options.foregroundColor, "foregroundColor"],
+      ...layerPairs.filter(
+        ([color]) => !areRgbaColorsEqual(color, options.foregroundColor),
+      ),
     ];
     for (const [color, name] of contrastPairs) {
       const contrast = contrastRatio(parseHexColor(color), background);

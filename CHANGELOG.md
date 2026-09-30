@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.8.2] - 2026-09-30
+
+### Breaking changes
+
+- None. Two output details change for the same options; neither changes an explicitly set option:
+  - Unset `strokeColor`, `eyeColor`, and `eyeballColor` now default to `foregroundColor`, and an unset `eyeStrokeColor` defaults to the resolved `eyeColor`. Finder, eyeball, alignment, and timing patterns that match the foreground are painted with the foreground fill, so gradients now cover them. To keep black finders with a non-black foreground or a gradient, pass `eyeColor="#000000"` and `eyeballColor="#000000"`.
+  - Resolvers that do not set the `react-native` condition (`node`, `import`, `require`, `default`) now receive the built web entry (`lib/*/index.web.js`) instead of the native entry. Jest setups that use the React Native preset keep the native entry. Code that relied on the old target should mock `react-native-nitro-modules` and import the package through a `react-native` condition.
+
+### Fixed
+
+- Native finder colors no longer depend on which PNG encoder runs. A non-black `foregroundColor` previously turned finders black when a logo area, gradient, or custom layer color was added.
+- Inverted codes (light foreground on a dark background) no longer report `low-contrast` for finders that follow the foreground, and one low-contrast foreground now produces one warning.
+- Gradients now cover finders, eyeballs, alignment, and timing patterns on iOS, Android, and web unless those colors are set explicitly.
+- The deprecated positional native PNG methods now derive alignment, timing, quiet-zone, and finder-inner colors and shapes like the object methods, so both return identical bytes.
+- `<QRCode>` honors the deprecated `shapeOptions.eyePatternShape` alias instead of letting the preset finder shape win.
+- Web clears the logo hole at the center of the rendered canvas when `size` is smaller than the module count, so it no longer removes finder modules outside the hole.
+- Web module edges, quiet-zone edges, body-stroke insets, and logo-hole origins use the same integer rounding as native; square modules now land on the same pixel boundaries on every platform.
+- Native `toSvgString` keeps the full radial-gradient radius (for example `r="141.42%"`) to match web SVG and native PNG output.
+- The component accessibility label and busy state describe the image on screen while a regeneration is pending or after it fails.
+- Web `getMatrix` is counted in generation metrics like native.
+- The package `exports` map lists `browser` before `react-native`, so React Native Web on bare Metro and Expo server rendering load the web entry.
+- The iOS podspec uses React Native's `min_ios_version_supported` (15.1 on React Native 0.76–0.86) instead of iOS 16.4, so default bare React Native and Expo SDK 52–55 apps install.
+
+### Changed
+
+- Native PNGs with layered colors or a logo area and no gradient use a 4-bit palette encoder. A 4096 px logo-area PNG peaked at about 36 MB instead of about 355 MB in host measurements, and the files are smaller. Gradient PNGs keep the `fpng` RGBA encoder and still peak at about 355 MB at 4096 px.
+- The Android library no longer pins `kotlin-stdlib`; the app's Kotlin version applies.
+- `orbit` is marked `@deprecated` in the TypeScript types. It remains a no-op.
+- The README documents component defaults, validation codes, metrics availability, compatibility floors (React Native 0.76 and Expo SDK 52 need Android NDK 27 or newer), and pixel-geometry rules.
+
 ## [0.8.1] - 2026-09-27
 
 ### Breaking changes

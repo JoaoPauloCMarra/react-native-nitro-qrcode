@@ -111,6 +111,17 @@ int main() {
         .size();
   });
 
+  GenerateOptions palette = indexed;
+  palette.logoAreaSize = 66;
+  palette.logoAreaBorderRadius = 14;
+  palette.errorCorrectionLevel = "H";
+  runBenchmark("palette-logo-png-cold", RenderRuns, [&](int index) {
+    return generator
+        .renderPngBase64(
+            "https://example.com/palette/" + std::to_string(index), palette)
+        .size();
+  });
+
   runBenchmark("preview-styled-png-cold", RenderRuns, [&](int index) {
     return generator
         .renderPngBase64(
