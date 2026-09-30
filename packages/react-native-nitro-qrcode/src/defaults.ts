@@ -124,5 +124,10 @@ export function mergePresetShapeOptions(
     : Object.fromEntries(
         Object.entries(options).filter(([, value]) => value !== undefined),
       );
-  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...definedOptions };
+  const aliasedOptions =
+    definedOptions?.eyePatternShape !== undefined &&
+    definedOptions.eyeFrameShape === undefined
+      ? { ...definedOptions, eyeFrameShape: definedOptions.eyePatternShape }
+      : definedOptions;
+  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...aliasedOptions };
 }

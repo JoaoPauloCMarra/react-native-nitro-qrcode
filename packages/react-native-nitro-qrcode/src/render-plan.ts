@@ -1,8 +1,4 @@
 import {
-  DEFAULT_EYE,
-  DEFAULT_EYE_STROKE,
-  DEFAULT_EYEBALL,
-  DEFAULT_STROKE,
   areRgbaColorsEqual,
   isFullyTransparent,
   toSvgColor,
@@ -82,9 +78,9 @@ export function createRenderPlan(
 ): RenderPlan {
   const totalModules = model.modules.size + options.quietZone * 2;
   const modulePixel = (moduleIndex: number): number =>
-    Math.round((moduleIndex * pixelSize) / totalModules);
+    Math.floor((moduleIndex * pixelSize) / totalModules);
   const geometry: RenderPixelGeometry = { modulePixel, totalModules };
-  const rows = buildModuleRows(options, model, geometry);
+  const rows = buildModuleRows(options, model, geometry, pixelSize);
   const background = planBackground(options.backgroundColor);
   const quietZoneFill = areRgbaColorsEqual(
     options.quietZoneColor,
@@ -101,7 +97,7 @@ export function createRenderPlan(
       options.logoAreaSize === 0
         ? undefined
         : {
-            size: Math.min(options.logoAreaSize, options.size),
+            size: Math.min(options.logoAreaSize, pixelSize),
             borderRadius: options.logoAreaBorderRadius,
           },
     matrixSize: model.modules.size,
@@ -149,20 +145,29 @@ function isEyeBallModule(x: number, y: number, matrixSize: number): boolean {
   return localX >= 2 && localX <= 4 && localY >= 2 && localY <= 4;
 }
 
+export function logoAreaOrigin(pixelSize: number, areaSize: number): number {
+  return Math.floor((pixelSize - areaSize) / 2);
+}
+
 function intersectsLogoArea(
   x0: number,
   y0: number,
   x1: number,
   y1: number,
   options: NormalizedOptions,
+  pixelSize: number,
 ): boolean {
   if (options.logoAreaSize === 0) {
     return false;
   }
-  const areaSize = Math.min(options.logoAreaSize, options.size);
-  const left = (options.size - areaSize) / 2;
-  const top = (options.size - areaSize) / 2;
-  return x0 < left + areaSize && x1 > left && y0 < top + areaSize && y1 > top;
+  const areaSize = Math.min(options.logoAreaSize, pixelSize);
+  const origin = logoAreaOrigin(pixelSize, areaSize);
+  return (
+    x0 < origin + areaSize &&
+    x1 > origin &&
+    y0 < origin + areaSize &&
+    y1 > origin
+  );
 }
 
 function shouldDrawGroupedFinderEyes(
@@ -171,9 +176,15 @@ function shouldDrawGroupedFinderEyes(
   return (
     options.shapeOptions.eyeFrameShape !== "square" ||
     options.shapeOptions.eyeballShape !== "square" ||
-    !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
-    !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
-    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL) ||
+    hasCustomFinderColors(options)
+  );
+}
+
+export function hasCustomFinderColors(options: NormalizedOptions): boolean {
+  return (
+    !areRgbaColorsEqual(options.eyeColor, options.foregroundColor) ||
+    !areRgbaColorsEqual(options.eyeStrokeColor, options.eyeColor) ||
+    !areRgbaColorsEqual(options.eyeballColor, options.foregroundColor) ||
     !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
   );
 }
@@ -198,6 +209,7 @@ function buildModuleRows(
   options: NormalizedOptions,
   model: QRCodeModuleModel,
   geometry: RenderPixelGeometry,
+  pixelSize: number,
 ): RenderPlanRow[] {
   const rows: RenderPlanRow[] = [];
   const drawGroupedFinderEyes = shouldDrawGroupedFinderEyes(options);
@@ -217,7 +229,7 @@ function buildModuleRows(
       }
       const x0 = geometry.modulePixel(moduleX + options.quietZone);
       const x1 = geometry.modulePixel(moduleX + options.quietZone + 1);
-      if (intersectsLogoArea(x0, y0, x1, y1, options)) {
+      if (intersectsLogoArea(x0, y0, x1, y1, options, pixelSize)) {
         continue;
       }
       const eyeballModule = isEyeBallModule(moduleX, moduleY, matrixSize);
@@ -267,10 +279,10 @@ function buildModuleRows(
       };
       if (
         layer === "foreground" &&
-        !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE)
+        !areRgbaColorsEqual(options.strokeColor, options.foregroundColor)
       ) {
         plan.stroke = "stroke";
-        plan.strokeGap = gap + Math.max(1, (x1 - x0) * 0.18);
+        plan.strokeGap = gap + Math.max(1, Math.floor((x1 - x0) / 5));
       }
       rowModules.push(plan);
     }

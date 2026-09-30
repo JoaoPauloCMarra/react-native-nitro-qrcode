@@ -8,16 +8,14 @@ import {
   setQRCodeMetricsEnabled,
 } from "./metrics";
 import {
-  DEFAULT_EYE,
-  DEFAULT_EYEBALL,
-  DEFAULT_EYE_STROKE,
-  DEFAULT_STROKE,
   areRgbaColorsEqual,
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
 import {
   createRenderPlan,
+  hasCustomFinderColors,
+  logoAreaOrigin,
   type RenderNeighbors,
   type RenderPlan,
 } from "./render-plan";
@@ -300,7 +298,10 @@ export function toSvgString(options: QRCodeOptions): string {
 
 export function getMatrix(options: QRCodeOptions): QRCodeMatrix {
   const normalized = normalizeOptions(options);
-  const model = createModel(normalized);
+  return measuredSync(() => packMatrix(createModel(normalized)));
+}
+
+function packMatrix(model: QRCodeModel): QRCodeMatrix {
   const packed = new Uint8Array(
     Math.ceil((model.modules.size * model.modules.size) / 8),
   );
@@ -376,10 +377,13 @@ function preparePngCanvas(
     context.fillRect(0, 0, pixelSize, pixelSize);
   }
   if (plan.quietZoneFill !== undefined) {
-    const inset = Math.round(
+    const inset = Math.floor(
       (plan.quietZone * pixelSize) / plan.totalModules,
     );
-    const inner = pixelSize - inset * 2;
+    const inner =
+      Math.floor(
+        ((plan.quietZone + plan.matrixSize) * pixelSize) / plan.totalModules,
+      ) - inset;
     if (plan.background.type === "transparent") {
       context.clearRect(inset, inset, inner, inner);
     } else {
@@ -411,6 +415,7 @@ function finishPng(
       plan.totalModules,
       plan.pixelSize,
       options,
+      foregroundFill,
     );
   }
   clearLogoArea(context, plan, foregroundFill);
@@ -486,18 +491,28 @@ function resolvePlanFill(
   layer: "foreground" | "stroke" | "eye" | "eyeball" | "alignment" | "timing",
 ): CanvasFill {
   if (layer === "eyeball") {
-    return toSvgColor(options.eyeballColor);
+    return layerFill(options, foregroundFill, options.eyeballColor);
   }
   if (layer === "eye") {
-    return toSvgColor(options.eyeColor);
+    return layerFill(options, foregroundFill, options.eyeColor);
   }
   if (layer === "alignment") {
-    return toSvgColor(options.alignmentColor);
+    return layerFill(options, foregroundFill, options.alignmentColor);
   }
   if (layer === "timing") {
-    return toSvgColor(options.timingColor);
+    return layerFill(options, foregroundFill, options.timingColor);
   }
   return foregroundFill;
+}
+
+function layerFill(
+  options: NormalizedOptions,
+  foregroundFill: CanvasFill,
+  color: string,
+): CanvasFill {
+  return areRgbaColorsEqual(color, options.foregroundColor)
+    ? foregroundFill
+    : toSvgColor(color);
 }
 
 function yieldToMainThread(): Promise<void> {
@@ -595,14 +610,11 @@ function createForegroundFill(
 
 function hasCustomLayerColors(options: NormalizedOptions): boolean {
   return (
-    !areRgbaColorsEqual(options.strokeColor, DEFAULT_STROKE) ||
-    !areRgbaColorsEqual(options.eyeColor, DEFAULT_EYE) ||
-    !areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE) ||
-    !areRgbaColorsEqual(options.eyeballColor, DEFAULT_EYEBALL) ||
+    !areRgbaColorsEqual(options.strokeColor, options.foregroundColor) ||
+    hasCustomFinderColors(options) ||
     !areRgbaColorsEqual(options.alignmentColor, options.foregroundColor) ||
     !areRgbaColorsEqual(options.timingColor, options.foregroundColor) ||
-    !areRgbaColorsEqual(options.quietZoneColor, options.backgroundColor) ||
-    !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
+    !areRgbaColorsEqual(options.quietZoneColor, options.backgroundColor)
   );
 }
 
@@ -625,7 +637,7 @@ function modulePixel(
   pixelSize: number,
   totalModules: number,
 ): number {
-  return Math.round((moduleIndex * pixelSize) / totalModules);
+  return Math.floor((moduleIndex * pixelSize) / totalModules);
 }
 
 function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
@@ -680,26 +692,25 @@ function drawGroupedFinders(
   totalModules: number,
   pixelSize: number,
   options: NormalizedOptions,
+  foregroundFill: CanvasFill,
 ): void {
-  drawGroupedFinder(context, 0, 0, quietZone, totalModules, pixelSize, options);
-  drawGroupedFinder(
-    context,
-    matrixSize - 7,
-    0,
-    quietZone,
-    totalModules,
-    pixelSize,
-    options,
-  );
-  drawGroupedFinder(
-    context,
-    0,
-    matrixSize - 7,
-    quietZone,
-    totalModules,
-    pixelSize,
-    options,
-  );
+  const origins = [
+    [0, 0],
+    [matrixSize - 7, 0],
+    [0, matrixSize - 7],
+  ] as const;
+  for (const [moduleX, moduleY] of origins) {
+    drawGroupedFinder(
+      context,
+      moduleX,
+      moduleY,
+      quietZone,
+      totalModules,
+      pixelSize,
+      options,
+      foregroundFill,
+    );
+  }
 }
 
 function drawGroupedFinder(
@@ -710,6 +721,7 @@ function drawGroupedFinder(
   totalModules: number,
   pixelSize: number,
   options: NormalizedOptions,
+  foregroundFill: CanvasFill,
 ): void {
   const rect = (offset: number, span: number) => {
     const x = Math.round(
@@ -725,24 +737,27 @@ function drawGroupedFinder(
   };
   const frameShape = options.shapeOptions.eyeFrameShape;
   const strokeInset = frameShape === "square" ? 0.3 : 0.65;
-  const outerColor =
-    areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE)
-      ? toSvgColor(options.eyeColor)
-      : toSvgColor(options.eyeStrokeColor);
+  const hasEyeStroke = !areRgbaColorsEqual(
+    options.eyeStrokeColor,
+    options.eyeColor,
+  );
+  const eyeFill = layerFill(options, foregroundFill, options.eyeColor);
 
   drawFinderShape(
     context,
     rect(0, 7),
     frameShape,
-    outerColor,
+    hasEyeStroke
+      ? layerFill(options, foregroundFill, options.eyeStrokeColor)
+      : eyeFill,
     options.shapeOptions.eyePatternCornerRadius,
   );
-  if (!areRgbaColorsEqual(options.eyeStrokeColor, DEFAULT_EYE_STROKE)) {
+  if (hasEyeStroke) {
     drawFinderShape(
       context,
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
-      toSvgColor(options.eyeColor),
+      eyeFill,
       options.shapeOptions.eyePatternCornerRadius,
     );
   }
@@ -771,7 +786,7 @@ function drawGroupedFinder(
     context,
     rect(eyeballOffset, eyeballSpan),
     options.shapeOptions.eyeballShape,
-    toSvgColor(options.eyeballColor),
+    layerFill(options, foregroundFill, options.eyeballColor),
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -807,7 +822,7 @@ function drawFinderShape(
       rect.y,
       rect.size,
       rect.size,
-      Math.max(1, (rect.size * 9) / 20),
+      Math.max(1, Math.floor((rect.size * 9) / 20)),
     );
     return;
   }
@@ -818,7 +833,7 @@ function drawFinderShape(
       rect.y,
       rect.size,
       rect.size,
-      cornerRadius >= 0 ? cornerRadius : rect.size * 0.22,
+      cornerRadius >= 0 ? cornerRadius : Math.max(1, Math.floor(rect.size / 5)),
     );
     return;
   }
@@ -836,7 +851,7 @@ function drawModule(
   cornerRadius: number,
   neighbors: RenderNeighbors,
 ): void {
-  const maxGap = Math.max(0, (Math.min(x1 - x0, y1 - y0) - 1) / 2);
+  const maxGap = Math.max(0, Math.floor((Math.min(x1 - x0, y1 - y0) - 1) / 2));
   const inset = Math.min(gap, maxGap);
   const left = x0 + inset;
   const top = y0 + inset;
@@ -857,7 +872,7 @@ function drawModule(
       top,
       width,
       height,
-      Math.max(1, (Math.min(width, height) * 9) / 20),
+      Math.max(1, Math.floor((Math.min(width, height) * 9) / 20)),
     );
     return;
   }
@@ -868,7 +883,7 @@ function drawModule(
       top,
       width,
       height,
-      cornerRadius >= 0 ? cornerRadius : Math.min(width, height) / 3,
+      cornerRadius >= 0 ? cornerRadius : Math.floor(Math.min(width, height) / 3),
       neighbors,
     );
     return;
@@ -880,7 +895,7 @@ function drawModule(
       top,
       width,
       height,
-      cornerRadius >= 0 ? cornerRadius : Math.min(width, height) / 3,
+      cornerRadius >= 0 ? cornerRadius : Math.floor(Math.min(width, height) / 3),
     );
     return;
   }
@@ -897,11 +912,10 @@ function clearLogoArea(
     return;
   }
   const { size: areaSize, borderRadius } = plan.logoArea;
-  const left = (plan.pixelSize - areaSize) / 2;
-  const top = (plan.pixelSize - areaSize) / 2;
+  const origin = logoAreaOrigin(plan.pixelSize, areaSize);
   context.save();
   context.globalCompositeOperation = "destination-out";
-  drawRoundedRect(context, left, top, areaSize, areaSize, borderRadius);
+  drawRoundedRect(context, origin, origin, areaSize, areaSize, borderRadius);
   context.restore();
   context.fillStyle = foregroundFill;
 }
@@ -939,7 +953,14 @@ function drawClassy(
     context.fillRect(x, y, width, height);
     return;
   }
-  const corner = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const corner = Math.max(
+    0,
+    Math.min(
+      radius,
+      Math.floor((width - 1) / 2),
+      Math.floor((height - 1) / 2),
+    ),
+  );
   context.beginPath();
   if (roundTL) {
     context.moveTo(x + corner, y);
@@ -1007,7 +1028,14 @@ function drawRoundedRect(
   height: number,
   radius: number,
 ): void {
-  const corner = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const corner = Math.max(
+    0,
+    Math.min(
+      radius,
+      Math.floor((width - 1) / 2),
+      Math.floor((height - 1) / 2),
+    ),
+  );
   context.beginPath();
   context.moveTo(x + corner, y);
   context.lineTo(x + width - corner, y);

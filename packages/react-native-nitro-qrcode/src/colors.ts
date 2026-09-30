@@ -6,14 +6,6 @@ export const DEFAULT_FOREGROUND = "#000000";
 
 export const DEFAULT_BACKGROUND = "#FFFFFF";
 
-export const DEFAULT_STROKE = "#000000";
-
-export const DEFAULT_EYE = "#000000";
-
-export const DEFAULT_EYE_STROKE = "#000000";
-
-export const DEFAULT_EYEBALL = "#000000";
-
 export function sanitizeColor(value: string, name: string): QRCodeColor {
   return sanitizeHexColor(value, name);
 }

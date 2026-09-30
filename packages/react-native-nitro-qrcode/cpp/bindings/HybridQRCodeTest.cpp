@@ -123,8 +123,38 @@ void testHybridQRCodeMethods() {
   assert(qrCode->getCacheBytes() == 0);
   assert(qrCode->getExternalMemorySize() == 0);
 }
+void testPositionalAbiMatchesObjectAbi() {
+  auto qrCode = std::make_shared<HybridQRCode>();
+  GenerateOptions options = makeOptions();
+  options.foregroundColor = "#FF0000";
+  options.backgroundColor = "#000000";
+  options.strokeColor = "#FF0000";
+  options.eyeColor = "#FF0000";
+  options.eyeStrokeColor = "#FF0000";
+  options.eyeballColor = "#FF0000";
+  options.moduleShape = "rounded";
+  for (const double logoAreaSize : {0.0, 24.0}) {
+    options.logoAreaSize = logoAreaSize;
+    const std::string objectBase64 = qrCode->generatePngBase64Object(options);
+    const std::string positionalBase64 = qrCode->generatePngBase64(
+        options.value, options.size, options.quietZone,
+        options.errorCorrectionLevel, options.foregroundColor,
+        options.backgroundColor, options.strokeColor, options.eyeColor,
+        options.eyeStrokeColor, options.eyeballColor, options.minVersion,
+        options.maxVersion, options.mask, options.boostEcl,
+        options.moduleShape, options.eyePatternShape, options.eyeballShape,
+        options.gap, options.eyePatternGap, options.bodyDensity,
+        options.cornerRadius, options.eyePatternCornerRadius, options.layout,
+        options.logoAreaSize, options.logoAreaBorderRadius,
+        options.gradientType, options.gradientColors,
+        options.gradientLocations, options.gradientStartX,
+        options.gradientStartY, options.gradientEndX, options.gradientEndY);
+    assert(positionalBase64 == objectBase64);
+  }
+}
 }
 void runHybridQRCodeTests() {
   testHybridQRCodeMethods();
+  testPositionalAbiMatchesObjectAbi();
   std::cout << "HybridQRCode tests passed" << std::endl;
 }

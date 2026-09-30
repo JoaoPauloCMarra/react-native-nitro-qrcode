@@ -237,10 +237,10 @@ describe("native QRCode API", () => {
       errorCorrectionLevel: "H",
       foregroundColor: "#111111",
       backgroundColor: "#EEEEEE",
-      strokeColor: "#000000",
-      eyeColor: "#000000",
-      eyeStrokeColor: "#000000",
-      eyeballColor: "#000000",
+      strokeColor: "#111111",
+      eyeColor: "#111111",
+      eyeStrokeColor: "#111111",
+      eyeballColor: "#111111",
       alignmentColor: "#111111",
       timingColor: "#111111",
       quietZoneColor: "#EEEEEE",
@@ -672,7 +672,9 @@ describe("native QRCode API", () => {
 
   it("keeps the absolute and relative logo radius bounds aligned", () => {
     expect(() => validateLogoDimensions(0, 2048, 4096)).not.toThrow();
-    expect(() => validateLogoDimensions(0, 2049, 4096)).toThrow(
+    expect(() =>
+      toPngBase64({ value: "radius", size: 4096, logoAreaBorderRadius: 2049 }),
+    ).toThrow(
       "logoAreaBorderRadius must be an integer between 0 and 2048",
     );
     expect(() => validateLogoDimensions(0, 65, 128)).toThrow(
@@ -1652,6 +1654,62 @@ describe("native QRCode API", () => {
     );
   });
 
+  it("honors the deprecated eyePatternShape alias in the component", async () => {
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "alias",
+          shapeOptions: { eyePatternShape: "circle" },
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(
+      mockHybridObject.generatePngDataUriAsyncObject,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({ eyePatternShape: "circle" }),
+    );
+  });
+
+  it("describes the displayed image while a regeneration is pending or failed", async () => {
+    const second = createDeferred<string>();
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockImplementationOnce(async () => "data:image/png;base64,ONE")
+      .mockImplementationOnce(() => second.promise);
+    const onError = jest.fn();
+    let tree: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, { value: "one", onError }),
+      );
+      await Promise.resolve();
+    });
+    if (tree === undefined) {
+      throw new Error("Expected QRCode test renderer to be created.");
+    }
+    const currentTree = tree;
+    const container = () =>
+      currentTree.root.findAll(
+        (node) => node.props.accessible === true && node.props.accessibilityRole === "image",
+      )[0]!;
+    expect(container().props.accessibilityLabel).toBe("QR code for one");
+
+    await act(async () => {
+      currentTree.update(React.createElement(QRCode, { value: "two", onError }));
+      await Promise.resolve();
+    });
+    expect(container().props.accessibilityLabel).toBe("QR code for one");
+    expect(container().props.accessibilityState).toEqual({ busy: true });
+
+    await act(async () => {
+      second.reject(new Error("regen failed"));
+      await Promise.resolve();
+    });
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(container().props.accessibilityLabel).toBe("QR code for one");
+    expect(container().props.accessibilityState).toEqual({ busy: false });
+  });
+
   it("uses the default component size", async () => {
     let tree: TestRenderer.ReactTestRenderer | undefined;
     await act(async () => {
@@ -2039,12 +2097,20 @@ describe("web QRCode API", () => {
     const first = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#0B8E79",
+      strokeColor: "#000000",
+      eyeColor: "#000000",
+      eyeStrokeColor: "#000000",
+      eyeballColor: "#000000",
       alignmentColor: "#000000",
       timingColor: "#000000",
     });
     const second = Web.toSvgString({
       value: "option-collision-new",
       foregroundColor: "#D9F104",
+      strokeColor: "#000000",
+      eyeColor: "#000000",
+      eyeStrokeColor: "#000000",
+      eyeballColor: "#000000",
       alignmentColor: "#000000",
       timingColor: "#000000",
     });
@@ -3063,7 +3129,11 @@ describe("preset shape options", () => {
   ] as const)("applies a defined %s override", (key, value) => {
     expect(
       mergePresetShapeOptions({ [key]: value }, "rounded"),
-    ).toMatchObject({ ...PRESET_SHAPE_OPTIONS.rounded, [key]: value });
+    ).toMatchObject({
+      ...PRESET_SHAPE_OPTIONS.rounded,
+      ...(key === "eyePatternShape" ? { eyeFrameShape: value } : {}),
+      [key]: value,
+    });
   });
 });
 

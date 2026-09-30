@@ -65,6 +65,15 @@ const explicitOpaqueOptions = {
   eyeballColor: "#000000FF",
 } satisfies Web.QRCodeOptions;
 
+function decodeOperations(output: string): string[] {
+  return Buffer.from(
+    output.slice("data:image/png;base64,".length),
+    "base64",
+  )
+    .toString("utf8")
+    .split("|");
+}
+
 afterEach(() => {
   Web.clearQRCodeCache();
 });
@@ -107,7 +116,9 @@ describe("web color-equivalent PNG rendering", () => {
       quietZoneColor: "#E2E8F0",
     });
 
-    expect(output.startsWith("data:image/png;base64,")).toBe(true);
+    const operations = decodeOperations(output);
+    expect(operations[0]).toBe("fillRect:0,0,64,64:fill=#E2E8F0");
+    expect(operations[1]).toBe("fillRect:7,7,49,49:fill=#FFFFFF");
     expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 
@@ -119,7 +130,9 @@ describe("web color-equivalent PNG rendering", () => {
       quietZoneColor: "#E2E8F0",
     });
 
-    expect(output.startsWith("data:image/png;base64,")).toBe(true);
+    const operations = decodeOperations(output);
+    expect(operations[0]).toBe("fillRect:0,0,64,64:fill=#E2E8F0");
+    expect(operations[1]).toBe("clearRect:7,7,49,49:fill=#E2E8F0");
     expect(Web.getQRCodeCacheSize()).toBe(1);
   });
 });
