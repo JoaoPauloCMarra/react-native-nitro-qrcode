@@ -180,6 +180,12 @@ std::string legacyCacheRequest(const std::string &value,
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  appendLegacyCacheNumber(request, (options.strokeSet ? 1 : 0) |
+                                       (options.eyeSet ? 2 : 0) |
+                                       (options.eyeStrokeSet ? 4 : 0) |
+                                       (options.eyeballSet ? 8 : 0) |
+                                       (options.alignmentSet ? 16 : 0) |
+                                       (options.timingSet ? 32 : 0));
   return request;
 }
 
@@ -637,6 +643,7 @@ void testStyledPngGeneration() {
   options.eyeballShape = "circle";
   options.eyeStrokeColor = "#222222";
   options.eyeStroke = parseColor(options.eyeStrokeColor);
+  options.eyeStrokeSet = true;
   assertPngHeader(generator.renderPngBase64(
       "https://example.com/circle-body-square-frame-circle-eye", options));
 
@@ -706,6 +713,10 @@ void testStyledPngGeneration() {
   options.eye = parseColor(options.eyeColor);
   options.eyeStroke = parseColor(options.eyeStrokeColor);
   options.eyeball = parseColor(options.eyeballColor);
+  options.strokeSet = true;
+  options.eyeSet = true;
+  options.eyeStrokeSet = true;
+  options.eyeballSet = true;
   assertPngHeader(
       generator.renderPngBase64("https://example.com/layer-colors", options));
 
@@ -879,25 +890,32 @@ int moduleCenterPixel(int module, int quietZone, int imageSize,
   return (start + end) / 2;
 }
 
-void setLayerColors(GenerateOptions &options, const std::string &eye,
-                    const std::string &eyeStroke, const std::string &eyeball) {
-  options.eyeColor = eye;
-  options.eye = parseColor(eye);
-  options.eyeStrokeColor = eyeStroke;
-  options.eyeStroke = parseColor(eyeStroke);
-  options.eyeballColor = eyeball;
-  options.eyeball = parseColor(eyeball);
+void setColor(std::string &name, Color &color, const std::string &value) {
+  name = value;
+  color = parseColor(value);
 }
 
 void setForeground(GenerateOptions &options, const std::string &foreground) {
-  options.foregroundColor = foreground;
-  options.foreground = parseColor(foreground);
-  options.alignmentColor = foreground;
-  options.alignment = options.foreground;
-  options.timingColor = foreground;
-  options.timing = options.foreground;
-  options.strokeColor = foreground;
-  options.stroke = options.foreground;
+  setColor(options.foregroundColor, options.foreground, foreground);
+  setColor(options.alignmentColor, options.alignment, foreground);
+  setColor(options.timingColor, options.timing, foreground);
+}
+
+void setExplicitFinderColors(GenerateOptions &options, const std::string &eye,
+                             const std::string &eyeball) {
+  setColor(options.eyeColor, options.eye, eye);
+  setColor(options.eyeballColor, options.eyeball, eyeball);
+  options.eyeSet = true;
+  options.eyeballSet = true;
+}
+
+uint64_t fnv1a(const std::vector<uint8_t> &bytes) {
+  uint64_t hash = 14695981039346656037ULL;
+  for (uint8_t byte : bytes) {
+    hash ^= byte;
+    hash *= 1099511628211ULL;
+  }
+  return hash;
 }
 
 void testFinderColorIsEncoderIndependent() {
@@ -910,7 +928,6 @@ void testFinderColorIsEncoderIndependent() {
     options.size = 200;
     options.logoAreaSize = logoAreaSize;
     setForeground(options, "#FF0000");
-    setLayerColors(options, "#FF0000", "#FF0000", "#FF0000");
     const std::string encoded = generator.renderPngBase64(value, options);
     if (logoAreaSize == 0) {
       const PngHeader header = readPngHeader(encoded);
@@ -927,7 +944,7 @@ void testFinderColorIsEncoderIndependent() {
     assert(rgbaAt(rgba, width, frame, frame) == red);
     assert(rgbaAt(rgba, width, eyeball, eyeball) == red);
 
-    setLayerColors(options, "#000000", "#000000", "#000000");
+    setExplicitFinderColors(options, "#000000", "#000000");
     const auto explicitBlack =
         decodeRgbaPng(generator.renderPngBase64(value, options), width, height);
     assert(rgbaAt(explicitBlack, width, frame, frame) == black);
@@ -935,7 +952,7 @@ void testFinderColorIsEncoderIndependent() {
   }
 }
 
-void testGradientFillsForegroundLayers() {
+void testGradientFillsInheritedLayers() {
   QRCodeGenerator generator;
   const std::string value = "https://example.com/gradient-finder";
   const Color from = parseColor("#0000FF");
@@ -955,8 +972,6 @@ void testGradientFillsForegroundLayers() {
     options.size = 200;
     options.minVersion = 2;
     options.logoAreaSize = logoAreaSize;
-    setForeground(options, "#000000");
-    setLayerColors(options, "#000000", "#000000", "#000000");
     options.gradient.type = "linear";
     options.gradient.colors = {from, to};
     options.gradient.locations = {0.0, 1.0};
@@ -976,11 +991,76 @@ void testGradientFillsForegroundLayers() {
     assert(rgbaAt(rgba, width, timingX, timingY) ==
            expectedAt(timingX, timingY, width));
 
-    setLayerColors(options, "#FF0000", "#FF0000", "#FF0000");
-    const auto custom =
+    setExplicitFinderColors(options, "#000000", "#000000");
+    options.timingSet = true;
+    const auto explicitBlack =
         decodeRgbaPng(generator.renderPngBase64(value, options), width, height);
-    assert((rgbaAt(custom, width, frame, frame) == Rgba{255, 0, 0, 255}));
+    assert((rgbaAt(explicitBlack, width, frame, frame) == Rgba{0, 0, 0, 255}));
+    assert((rgbaAt(explicitBlack, width, eyeball, eyeball) ==
+            Rgba{0, 0, 0, 255}));
+    assert((rgbaAt(explicitBlack, width, timingX, timingY) ==
+            Rgba{0, 0, 0, 255}));
   }
+}
+
+void testExplicitBlackStrokeMeansNoStroke() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/black-stroke";
+  GenerateOptions options;
+  options.size = 200;
+  options.moduleShape = "rounded";
+  setForeground(options, "#DC2626");
+  const std::string unset = generator.renderPngBase64(value, options);
+  setColor(options.strokeColor, options.stroke, "#000000");
+  setColor(options.eyeStrokeColor, options.eyeStroke, "#000000");
+  options.strokeSet = true;
+  options.eyeStrokeSet = true;
+  assert(generator.renderPngBase64(value, options) == unset);
+  setColor(options.strokeColor, options.stroke, "#0000FF");
+  assert(generator.renderPngBase64(value, options) != unset);
+}
+
+void testOutputMatchesPreviousRelease() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/nitro";
+  const auto pixelHash = [&](const GenerateOptions &options) {
+    int width = 0;
+    int height = 0;
+    return fnv1a(decodeRgbaPng(generator.renderPngBase64(value, options),
+                               width, height));
+  };
+
+  GenerateOptions plain;
+  plain.size = 360;
+  assert(fnv1a(generator.renderPngBytes(value, plain)) ==
+         9506524200599952492ULL);
+  assert(pixelHash(plain) == 4388331751467048253ULL);
+
+  GenerateOptions layered;
+  layered.size = 203;
+  layered.logoAreaSize = 41;
+  layered.logoAreaBorderRadius = 7;
+  setColor(layered.foregroundColor, layered.foreground, "#DC2626");
+  setColor(layered.backgroundColor, layered.background, "#FFFFFF80");
+  setExplicitFinderColors(layered, "#1E40AF", "#0F172A");
+  setColor(layered.alignmentColor, layered.alignment, "#00AA00");
+  setColor(layered.timingColor, layered.timing, "#AA00AA");
+  layered.alignmentSet = true;
+  layered.timingSet = true;
+  setColor(layered.quietZoneColor, layered.quietZoneFill, "#EEEEEE");
+  setColor(layered.finderInnerColor, layered.finderInner, "#FFFF00");
+  assert(readPngHeader(generator.renderPngBase64(value, layered)).colorType == 3);
+  assert(pixelHash(layered) == 17958135356535734173ULL);
+
+  GenerateOptions stroked;
+  stroked.size = 257;
+  stroked.logoAreaSize = 50;
+  stroked.moduleShape = "circle";
+  setForeground(stroked, "#DC2626");
+  setColor(stroked.strokeColor, stroked.stroke, "#0000FF");
+  stroked.strokeSet = true;
+  setExplicitFinderColors(stroked, "#DC2626", "#DC2626");
+  assert(pixelHash(stroked) == 10899789426982616000ULL);
 }
 
 void testTransparentBackgroundPng() {
@@ -1585,7 +1665,9 @@ int main() {
   testCircleGeometryTolerance();
   testLogoAreaIsTransparent();
   testFinderColorIsEncoderIndependent();
-  testGradientFillsForegroundLayers();
+  testGradientFillsInheritedLayers();
+  testExplicitBlackStrokeMeansNoStroke();
+  testOutputMatchesPreviousRelease();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

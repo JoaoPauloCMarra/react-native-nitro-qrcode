@@ -1,6 +1,7 @@
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_FOREGROUND,
+  NO_STROKE_COLOR,
   sanitizeBackgroundColor,
   sanitizeColor,
   type QRCodeBackgroundColor,
@@ -214,6 +215,15 @@ export type NormalizedGradient = {
   endY: number;
 };
 
+export type NormalizedExplicitColors = {
+  stroke: boolean;
+  eye: boolean;
+  eyeStroke: boolean;
+  eyeball: boolean;
+  alignment: boolean;
+  timing: boolean;
+};
+
 export type NormalizedOptions = Required<
   Omit<
     QRCodeOptions,
@@ -224,6 +234,7 @@ export type NormalizedOptions = Required<
   scanSafe: false | "standard" | "strict";
   shapeOptions: Required<QRCodeShapeOptions>;
   gradient: NormalizedGradient;
+  explicitColors: NormalizedExplicitColors;
 };
 
 export type NitroQRCodeApi = Readonly<{
@@ -335,7 +346,6 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
     options.foregroundColor ?? DEFAULT_FOREGROUND,
     "foregroundColor",
   );
-  const eyeColor = sanitizeColor(options.eyeColor ?? foregroundColor, "eyeColor");
 
   return {
     value: options.value,
@@ -349,12 +359,12 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
       "backgroundColor",
     ),
     strokeColor: sanitizeColor(
-      options.strokeColor ?? foregroundColor,
+      options.strokeColor ?? NO_STROKE_COLOR,
       "strokeColor",
     ),
-    eyeColor,
+    eyeColor: sanitizeColor(options.eyeColor ?? foregroundColor, "eyeColor"),
     eyeStrokeColor: sanitizeColor(
-      options.eyeStrokeColor ?? eyeColor,
+      options.eyeStrokeColor ?? NO_STROKE_COLOR,
       "eyeStrokeColor",
     ),
     eyeballColor: sanitizeColor(
@@ -362,13 +372,21 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
       "eyeballColor",
     ),
     alignmentColor: sanitizeColor(
-      options.alignmentColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      options.alignmentColor ?? foregroundColor,
       "alignmentColor",
     ),
     timingColor: sanitizeColor(
-      options.timingColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      options.timingColor ?? foregroundColor,
       "timingColor",
     ),
+    explicitColors: {
+      stroke: options.strokeColor !== undefined,
+      eye: options.eyeColor !== undefined,
+      eyeStroke: options.eyeStrokeColor !== undefined,
+      eyeball: options.eyeballColor !== undefined,
+      alignment: options.alignmentColor !== undefined,
+      timing: options.timingColor !== undefined,
+    },
     quietZoneColor: sanitizeBackgroundColor(
       options.quietZoneColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
       "quietZoneColor",

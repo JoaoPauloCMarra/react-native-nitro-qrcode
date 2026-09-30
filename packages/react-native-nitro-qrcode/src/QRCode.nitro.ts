@@ -7,10 +7,10 @@ export interface GenerateOptions {
   errorCorrectionLevel: string;
   foregroundColor: string;
   backgroundColor: string;
-  strokeColor: string;
-  eyeColor: string;
-  eyeStrokeColor: string;
-  eyeballColor: string;
+  strokeColor?: string;
+  eyeColor?: string;
+  eyeStrokeColor?: string;
+  eyeballColor?: string;
   minVersion: number;
   maxVersion: number;
   mask: number;

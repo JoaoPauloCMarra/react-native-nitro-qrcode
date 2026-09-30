@@ -178,18 +178,36 @@ double gradientProgressAt(const GradientOptions &gradient, int imageSize, int x,
          denominator;
 }
 
+constexpr Color NoStrokeColor = {0, 0, 0, 255};
+
+bool drawsBodyStroke(const GenerateOptions &options) {
+  return options.strokeSet && options.stroke != NoStrokeColor;
+}
+
+bool drawsEyeStroke(const GenerateOptions &options) {
+  return options.eyeStrokeSet && options.eyeStroke != NoStrokeColor;
+}
+
 bool hasCustomFinderColors(const GenerateOptions &options) {
-  return options.eye != options.foreground ||
-         options.eyeStroke != options.eye ||
-         options.eyeball != options.foreground ||
+  return (options.eyeSet && options.eye != NoStrokeColor) ||
+         drawsEyeStroke(options) ||
+         (options.eyeballSet && options.eyeball != NoStrokeColor) ||
          options.finderInner != options.background;
 }
 
+bool paintsSolidLayer(bool isSet, const Color &color,
+                      const GenerateOptions &options) {
+  return isSet && color != options.foreground;
+}
+
 bool hasCustomLayerColors(const GenerateOptions &options) {
-  return options.stroke != options.foreground || hasCustomFinderColors(options) ||
-         options.alignment != options.foreground ||
-         options.timing != options.foreground ||
-         options.quietZoneFill != options.background;
+  return drawsBodyStroke(options) || drawsEyeStroke(options) ||
+         paintsSolidLayer(options.eyeSet, options.eye, options) ||
+         paintsSolidLayer(options.eyeballSet, options.eyeball, options) ||
+         paintsSolidLayer(options.alignmentSet, options.alignment, options) ||
+         paintsSolidLayer(options.timingSet, options.timing, options) ||
+         options.quietZoneFill != options.background ||
+         options.finderInner != options.background;
 }
 
 Color foregroundFillAt(const GenerateOptions &options, int imageSize, int x,
@@ -201,11 +219,9 @@ Color foregroundFillAt(const GenerateOptions &options, int imageSize, int x,
              : options.foreground;
 }
 
-Color layerFillAt(const Color &color, const GenerateOptions &options,
-                  int imageSize, int x, int y) {
-  return color == options.foreground
-             ? foregroundFillAt(options, imageSize, x, y)
-             : color;
+Color layerFillAt(bool isSet, const Color &color,
+                  const GenerateOptions &options, int imageSize, int x, int y) {
+  return isSet ? color : foregroundFillAt(options, imageSize, x, y);
 }
 
 Color colorForLayer(uint8_t layer, const GenerateOptions &options,
@@ -214,15 +230,18 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
   case 2:
     return options.stroke;
   case 3:
-    return layerFillAt(options.eye, options, imageSize, x, y);
+    return layerFillAt(options.eyeSet, options.eye, options, imageSize, x, y);
   case 4:
-    return layerFillAt(options.eyeStroke, options, imageSize, x, y);
+    return options.eyeStroke;
   case 5:
-    return layerFillAt(options.eyeball, options, imageSize, x, y);
+    return layerFillAt(options.eyeballSet, options.eyeball, options, imageSize,
+                       x, y);
   case AlignmentLayer:
-    return layerFillAt(options.alignment, options, imageSize, x, y);
+    return layerFillAt(options.alignmentSet, options.alignment, options,
+                       imageSize, x, y);
   case TimingLayer:
-    return layerFillAt(options.timing, options, imageSize, x, y);
+    return layerFillAt(options.timingSet, options.timing, options, imageSize,
+                       x, y);
   case FinderInnerLayer:
     return options.finderInner;
   case QuietZoneLayer:
@@ -1173,7 +1192,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
       const ModuleNeighbors neighbors{
           isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
           isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
-      if (layer == 1 && options.stroke != options.foreground) {
+      if (layer == 1 && drawsBodyStroke(options)) {
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2,
                    neighbors);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
@@ -1189,7 +1208,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
     drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
                        totalModules, eyePatternShape, eyeballShape,
                        options.eyePatternCornerRadius,
-                       options.eyeStroke != options.eye,
+                       drawsEyeStroke(options),
                        options.finderInner == options.background
                            ? 0
                            : FinderInnerLayer);
@@ -1395,6 +1414,12 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendCachePart(request, cacheDouble(options.gradient.startY));
   appendCachePart(request, cacheDouble(options.gradient.endX));
   appendCachePart(request, cacheDouble(options.gradient.endY));
+  appendCacheNumber(request, (options.strokeSet ? 1 : 0) |
+                                 (options.eyeSet ? 2 : 0) |
+                                 (options.eyeStrokeSet ? 4 : 0) |
+                                 (options.eyeballSet ? 8 : 0) |
+                                 (options.alignmentSet ? 16 : 0) |
+                                 (options.timingSet ? 32 : 0));
   return request;
 }
 

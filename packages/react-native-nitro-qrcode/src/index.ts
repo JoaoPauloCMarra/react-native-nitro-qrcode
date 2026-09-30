@@ -68,9 +68,14 @@ const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 type NativeSvgArgs = Parameters<HybridQRCode["generateSvgString"]>;
 type NativeMatrixArgs = Parameters<HybridQRCode["getMatrixObject"]>;
 
+function explicitColor(explicit: boolean, color: string): string | undefined {
+  return explicit ? color : undefined;
+}
+
 function toNativeGenerateOptions(
   normalized: NormalizedOptions,
 ): NativeGenerateOptions {
+  const explicit = normalized.explicitColors;
   return {
     value: normalized.value,
     size: normalized.size,
@@ -78,12 +83,12 @@ function toNativeGenerateOptions(
     errorCorrectionLevel: normalized.errorCorrectionLevel,
     foregroundColor: normalized.foregroundColor,
     backgroundColor: normalized.backgroundColor,
-    strokeColor: normalized.strokeColor,
-    eyeColor: normalized.eyeColor,
-    eyeStrokeColor: normalized.eyeStrokeColor,
-    eyeballColor: normalized.eyeballColor,
-    alignmentColor: normalized.alignmentColor,
-    timingColor: normalized.timingColor,
+    strokeColor: explicitColor(explicit.stroke, normalized.strokeColor),
+    eyeColor: explicitColor(explicit.eye, normalized.eyeColor),
+    eyeStrokeColor: explicitColor(explicit.eyeStroke, normalized.eyeStrokeColor),
+    eyeballColor: explicitColor(explicit.eyeball, normalized.eyeballColor),
+    alignmentColor: explicitColor(explicit.alignment, normalized.alignmentColor),
+    timingColor: explicitColor(explicit.timing, normalized.timingColor),
     quietZoneColor: normalized.quietZoneColor,
     finderInnerColor: normalized.finderInnerColor,
     minVersion: normalized.minVersion,

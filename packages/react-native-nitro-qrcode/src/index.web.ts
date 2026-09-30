@@ -14,7 +14,10 @@ import {
 } from "./colors";
 import {
   createRenderPlan,
+  drawsBodyStroke,
+  drawsEyeStroke,
   hasCustomFinderColors,
+  paintsSolidLayer,
   logoAreaOrigin,
   type RenderNeighbors,
   type RenderPlan,
@@ -490,29 +493,28 @@ function resolvePlanFill(
   foregroundFill: CanvasFill,
   layer: "foreground" | "stroke" | "eye" | "eyeball" | "alignment" | "timing",
 ): CanvasFill {
+  const explicit = options.explicitColors;
   if (layer === "eyeball") {
-    return layerFill(options, foregroundFill, options.eyeballColor);
+    return layerFill(foregroundFill, explicit.eyeball, options.eyeballColor);
   }
   if (layer === "eye") {
-    return layerFill(options, foregroundFill, options.eyeColor);
+    return layerFill(foregroundFill, explicit.eye, options.eyeColor);
   }
   if (layer === "alignment") {
-    return layerFill(options, foregroundFill, options.alignmentColor);
+    return layerFill(foregroundFill, explicit.alignment, options.alignmentColor);
   }
   if (layer === "timing") {
-    return layerFill(options, foregroundFill, options.timingColor);
+    return layerFill(foregroundFill, explicit.timing, options.timingColor);
   }
   return foregroundFill;
 }
 
 function layerFill(
-  options: NormalizedOptions,
   foregroundFill: CanvasFill,
+  explicit: boolean,
   color: string,
 ): CanvasFill {
-  return areRgbaColorsEqual(color, options.foregroundColor)
-    ? foregroundFill
-    : toSvgColor(color);
+  return explicit ? toSvgColor(color) : foregroundFill;
 }
 
 function yieldToMainThread(): Promise<void> {
@@ -610,10 +612,20 @@ function createForegroundFill(
 
 function hasCustomLayerColors(options: NormalizedOptions): boolean {
   return (
-    !areRgbaColorsEqual(options.strokeColor, options.foregroundColor) ||
+    drawsBodyStroke(options) ||
     hasCustomFinderColors(options) ||
-    !areRgbaColorsEqual(options.alignmentColor, options.foregroundColor) ||
-    !areRgbaColorsEqual(options.timingColor, options.foregroundColor) ||
+    paintsSolidLayer(options, options.explicitColors.eye, options.eyeColor) ||
+    paintsSolidLayer(
+      options,
+      options.explicitColors.eyeball,
+      options.eyeballColor,
+    ) ||
+    paintsSolidLayer(
+      options,
+      options.explicitColors.alignment,
+      options.alignmentColor,
+    ) ||
+    paintsSolidLayer(options, options.explicitColors.timing, options.timingColor) ||
     !areRgbaColorsEqual(options.quietZoneColor, options.backgroundColor)
   );
 }
@@ -737,19 +749,18 @@ function drawGroupedFinder(
   };
   const frameShape = options.shapeOptions.eyeFrameShape;
   const strokeInset = frameShape === "square" ? 0.3 : 0.65;
-  const hasEyeStroke = !areRgbaColorsEqual(
-    options.eyeStrokeColor,
+  const hasEyeStroke = drawsEyeStroke(options);
+  const eyeFill = layerFill(
+    foregroundFill,
+    options.explicitColors.eye,
     options.eyeColor,
   );
-  const eyeFill = layerFill(options, foregroundFill, options.eyeColor);
 
   drawFinderShape(
     context,
     rect(0, 7),
     frameShape,
-    hasEyeStroke
-      ? layerFill(options, foregroundFill, options.eyeStrokeColor)
-      : eyeFill,
+    hasEyeStroke ? toSvgColor(options.eyeStrokeColor) : eyeFill,
     options.shapeOptions.eyePatternCornerRadius,
   );
   if (hasEyeStroke) {
@@ -786,7 +797,11 @@ function drawGroupedFinder(
     context,
     rect(eyeballOffset, eyeballSpan),
     options.shapeOptions.eyeballShape,
-    layerFill(options, foregroundFill, options.eyeballColor),
+    layerFill(
+      foregroundFill,
+      options.explicitColors.eyeball,
+      options.eyeballColor,
+    ),
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -1193,6 +1208,7 @@ function cacheRequest(
     options.gradient.startY,
     options.gradient.endX,
     options.gradient.endY,
+    options.explicitColors,
   ]);
 }
 

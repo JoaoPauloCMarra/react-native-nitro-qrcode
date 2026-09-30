@@ -46,6 +46,12 @@ struct GenerateOptions {
   Color eye = {0, 0, 0, 255};
   Color eyeStroke = {0, 0, 0, 255};
   Color eyeball = {0, 0, 0, 255};
+  bool strokeSet = false;
+  bool eyeSet = false;
+  bool eyeStrokeSet = false;
+  bool eyeballSet = false;
+  bool alignmentSet = false;
+  bool timingSet = false;
   std::string alignmentColor = "#000000";
   std::string timingColor = "#000000";
   std::string quietZoneColor = "#FFFFFF";

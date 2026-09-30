@@ -6,6 +6,8 @@ export const DEFAULT_FOREGROUND = "#000000";
 
 export const DEFAULT_BACKGROUND = "#FFFFFF";
 
+export const NO_STROKE_COLOR = "#000000";
+
 export function sanitizeColor(value: string, name: string): QRCodeColor {
   return sanitizeHexColor(value, name);
 }

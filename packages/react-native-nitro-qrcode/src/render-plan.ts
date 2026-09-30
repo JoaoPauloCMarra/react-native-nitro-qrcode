@@ -1,4 +1,5 @@
 import {
+  NO_STROKE_COLOR,
   areRgbaColorsEqual,
   isFullyTransparent,
   toSvgColor,
@@ -180,12 +181,40 @@ function shouldDrawGroupedFinderEyes(
   );
 }
 
+export function drawsBodyStroke(options: NormalizedOptions): boolean {
+  return (
+    options.explicitColors.stroke &&
+    !areRgbaColorsEqual(options.strokeColor, NO_STROKE_COLOR)
+  );
+}
+
+export function drawsEyeStroke(options: NormalizedOptions): boolean {
+  return (
+    options.explicitColors.eyeStroke &&
+    !areRgbaColorsEqual(options.eyeStrokeColor, NO_STROKE_COLOR)
+  );
+}
+
 export function hasCustomFinderColors(options: NormalizedOptions): boolean {
   return (
-    !areRgbaColorsEqual(options.eyeColor, options.foregroundColor) ||
-    !areRgbaColorsEqual(options.eyeStrokeColor, options.eyeColor) ||
-    !areRgbaColorsEqual(options.eyeballColor, options.foregroundColor) ||
+    (options.explicitColors.eye &&
+      !areRgbaColorsEqual(options.eyeColor, NO_STROKE_COLOR)) ||
+    drawsEyeStroke(options) ||
+    (options.explicitColors.eyeball &&
+      !areRgbaColorsEqual(options.eyeballColor, NO_STROKE_COLOR)) ||
     !areRgbaColorsEqual(options.finderInnerColor, options.backgroundColor)
+  );
+}
+
+export function paintsSolidLayer(
+  options: NormalizedOptions,
+  explicit: boolean,
+  color: string,
+): boolean {
+  return (
+    explicit &&
+    (options.gradient.type !== "none" ||
+      !areRgbaColorsEqual(color, options.foregroundColor))
   );
 }
 
@@ -277,10 +306,7 @@ function buildModuleRows(
           west: isDark(model, moduleX - 1, moduleY),
         },
       };
-      if (
-        layer === "foreground" &&
-        !areRgbaColorsEqual(options.strokeColor, options.foregroundColor)
-      ) {
+      if (layer === "foreground" && drawsBodyStroke(options)) {
         plan.stroke = "stroke";
         plan.strokeGap = gap + Math.max(1, Math.floor((x1 - x0) / 5));
       }

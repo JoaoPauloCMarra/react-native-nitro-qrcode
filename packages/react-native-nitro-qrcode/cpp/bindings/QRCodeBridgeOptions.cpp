@@ -37,6 +37,11 @@ namespace margelo::nitro::NitroQRCode {
   options.eye = ::NitroQRCode::parseColor(eyeColor);
   options.eyeStroke = ::NitroQRCode::parseColor(eyeStrokeColor);
   options.eyeball = ::NitroQRCode::parseColor(eyeballColor);
+  constexpr ::NitroQRCode::Color legacyUnset = {0, 0, 0, 255};
+  options.strokeSet = options.stroke != legacyUnset;
+  options.eyeSet = options.eye != legacyUnset;
+  options.eyeStrokeSet = options.eyeStroke != legacyUnset;
+  options.eyeballSet = options.eyeball != legacyUnset;
   options.alignmentColor = foregroundColor;
   options.timingColor = foregroundColor;
   options.quietZoneColor = backgroundColor;

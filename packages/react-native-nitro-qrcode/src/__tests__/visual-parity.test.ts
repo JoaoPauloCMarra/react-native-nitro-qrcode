@@ -53,24 +53,34 @@ afterEach(() => {
 });
 
 describe("layer color defaults", () => {
-  it("resolves unset finder and stroke colors to the foreground", () => {
+  it("inherits unset finder colors from the foreground and keeps strokes off", () => {
     const normalized = normalizeOptions({
       value: "red",
       foregroundColor: "#FF0000",
     });
     expect(normalized.eyeColor).toBe("#FF0000");
     expect(normalized.eyeballColor).toBe("#FF0000");
-    expect(normalized.eyeStrokeColor).toBe("#FF0000");
-    expect(normalized.strokeColor).toBe("#FF0000");
+    expect(normalized.strokeColor).toBe("#000000");
+    expect(normalized.eyeStrokeColor).toBe("#000000");
+    expect(normalized.explicitColors).toEqual({
+      stroke: false,
+      eye: false,
+      eyeStroke: false,
+      eyeball: false,
+      alignment: false,
+      timing: false,
+    });
   });
 
-  it("resolves an unset eye stroke to the finder frame color", () => {
+  it("marks explicitly set layer colors", () => {
     const normalized = normalizeOptions({
-      value: "blue-eye",
-      eyeColor: "#1E40AF",
+      value: "explicit",
+      eyeColor: "#000000",
+      alignmentColor: "#000000",
     });
-    expect(normalized.eyeStrokeColor).toBe("#1E40AF");
-    expect(normalized.eyeballColor).toBe("#000000");
+    expect(normalized.explicitColors.eye).toBe(true);
+    expect(normalized.explicitColors.alignment).toBe(true);
+    expect(normalized.explicitColors.eyeball).toBe(false);
   });
 
   it("keeps foreground-colored finders on the plain module path", () => {
@@ -117,6 +127,90 @@ describe("layer color defaults", () => {
       .map((call) => call.fill);
     expect(moduleFills.length).toBeGreaterThan(0);
     expect(moduleFills).not.toContain("#000000");
+  });
+});
+
+describe("reviewer probes on web", () => {
+  function fills(calls: FillCall[]): unknown[] {
+    return calls
+      .filter((call) => call.op === "fill" || call.op === "fillRect")
+      .map((call) => call.fill);
+  }
+
+  it.each([
+    ["unset", {}],
+    [
+      "explicit black strokes",
+      { strokeColor: "#000000", eyeStrokeColor: "#000000" },
+    ],
+  ] as const)(
+    "draws no black rings for the example defaults with %s",
+    (_label, strokes) => {
+      const calls = installRecordingCanvas();
+      Web.toPngDataUri({
+        value: "https://example.com/nitro",
+        size: 128,
+        foregroundColor: "#09090B",
+        eyeColor: "#1E40AF",
+        eyeballColor: "#0F172A",
+        gradient: { type: "linear", colors: ["#09090B", "#1E3A8A"] },
+        ...strokes,
+      });
+      const painted = fills(calls);
+      expect(painted).toContain("#1E40AF");
+      expect(painted).toContain("#0F172A");
+      expect(painted).not.toContain("#000000");
+    },
+  );
+
+  it("paints explicit black finders solid under a gradient", () => {
+    const calls = installRecordingCanvas();
+    Web.toPngDataUri({
+      value: "https://example.com/nitro",
+      size: 128,
+      eyeColor: "#000000",
+      eyeballColor: "#000000",
+      gradient: { type: "linear", colors: ["#FF0000", "#0000FF"] },
+    });
+    expect(fills(calls)).toContain("#000000");
+  });
+
+  it("keeps grouped finder drawing when an explicit eye color equals the foreground", () => {
+    const explicitPlan = createRenderPlan(
+      normalizeOptions({
+        value: "probe-e",
+        foregroundColor: "#DC2626",
+        eyeColor: "#DC2626",
+        eyeballColor: "#DC2626",
+      }),
+      allDarkModel(),
+      257,
+    );
+    const inheritedPlan = createRenderPlan(
+      normalizeOptions({ value: "probe-e", foregroundColor: "#DC2626" }),
+      allDarkModel(),
+      257,
+    );
+    expect(explicitPlan.drawGroupedFinders).toBe(true);
+    expect(inheritedPlan.drawGroupedFinders).toBe(false);
+  });
+
+  it("treats an explicit black stroke as no stroke on a red foreground", () => {
+    const plan = createRenderPlan(
+      normalizeOptions({
+        value: "black-stroke",
+        foregroundColor: "#DC2626",
+        strokeColor: "#000000",
+        eyeStrokeColor: "#000000",
+        shapeOptions: { shape: "rounded" },
+      }),
+      allDarkModel(),
+      128,
+    );
+    expect(
+      plan.rows.flatMap((row) => row.modules).some((module) => module.stroke),
+    ).toBe(false);
+    expect(plan.drawGroupedFinders).toBe(false);
   });
 });
 

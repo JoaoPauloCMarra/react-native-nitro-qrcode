@@ -1,5 +1,4 @@
 import {
-  areRgbaColorsEqual,
   contrastRatio,
   isFullyTransparent,
   parseHexColor,
@@ -80,17 +79,17 @@ export function scanabilityWarnings(
 
   if (!isFullyTransparent(options.backgroundColor)) {
     const background = parseHexColor(options.backgroundColor);
-    const layerPairs: [string, string][] = [
-      [options.alignmentColor, "alignmentColor"],
-      [options.timingColor, "timingColor"],
-      [options.eyeColor, "eyeColor"],
-      [options.eyeballColor, "eyeballColor"],
+    const layerPairs: [string, string, boolean][] = [
+      [options.alignmentColor, "alignmentColor", options.explicitColors.alignment],
+      [options.timingColor, "timingColor", options.explicitColors.timing],
+      [options.eyeColor, "eyeColor", options.explicitColors.eye],
+      [options.eyeballColor, "eyeballColor", options.explicitColors.eyeball],
     ];
     const contrastPairs: [string, string][] = [
       [options.foregroundColor, "foregroundColor"],
-      ...layerPairs.filter(
-        ([color]) => !areRgbaColorsEqual(color, options.foregroundColor),
-      ),
+      ...layerPairs
+        .filter(([, , explicit]) => explicit)
+        .map(([color, name]): [string, string] => [color, name]),
     ];
     for (const [color, name] of contrastPairs) {
       const contrast = contrastRatio(parseHexColor(color), background);
