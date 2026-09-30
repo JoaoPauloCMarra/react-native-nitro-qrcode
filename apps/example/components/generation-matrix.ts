@@ -17,8 +17,8 @@ import {
   type QRCodeBodyShape,
   type QRCodeOptions,
   type QRCodePreset,
-  type QRCodeShapeOptions,
 } from "react-native-nitro-qrcode";
+import { PRESET_SHAPE_OPTIONS } from "../../../packages/react-native-nitro-qrcode/src/defaults";
 
 const SHAPES: readonly QRCodeBodyShape[] = [
   "square",
@@ -44,56 +44,6 @@ export const DENSITIES = ["sparse", "balanced", "dense"] as const;
 export const COLOR_MODES = ["solid", "linear", "radial"] as const;
 export const CACHE_MAX_ENTRIES = 128;
 export const CACHE_MAX_BYTES = 4 * 1024 * 1024;
-
-const PRESET_SHAPES: Record<QRCodePreset, QRCodeShapeOptions> = {
-  default: { shape: "square", eyeFrameShape: "square", eyeballShape: "square" },
-  rounded: {
-    shape: "rounded",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    cornerRadius: 8,
-    eyePatternCornerRadius: 8,
-  },
-  dots: {
-    shape: "circle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    gap: 1,
-    eyePatternGap: 1,
-  },
-  branded: {
-    shape: "rounded",
-    eyeFrameShape: "square",
-    eyeballShape: "rounded",
-    gap: 1,
-    eyePatternGap: 1,
-    cornerRadius: 6,
-    eyePatternCornerRadius: 6,
-  },
-  classy: {
-    shape: "classy",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    cornerRadius: 8,
-    eyePatternCornerRadius: 10,
-  },
-  mosaic: {
-    shape: "diamond",
-    eyeFrameShape: "rounded",
-    eyeballShape: "circle",
-    gap: 1,
-    bodyDensity: "balanced",
-    eyePatternCornerRadius: 8,
-  },
-  fluid: {
-    shape: "squircle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    gap: 1,
-    eyePatternGap: 1,
-    bodyDensity: "sparse",
-  },
-};
 
 export type ComboGroup = "shapes" | "core" | "errors";
 
@@ -241,7 +191,7 @@ export function buildGenerationCases(): ComboCase[] {
                 errorCorrectionLevel: ecl,
                 logoAreaSize: logo ? 36 : 0,
                 logoAreaBorderRadius: logo ? 8 : 0,
-                shapeOptions: PRESET_SHAPES[preset],
+                shapeOptions: PRESET_SHAPE_OPTIONS[preset],
               },
               colorMode,
             ),
@@ -388,7 +338,6 @@ export function buildVisualSpecimens(): VisualSpecimen[] {
         options: {
           value: `visual-${preset}`,
           size: 112,
-          shapeOptions: PRESET_SHAPES[preset],
         },
         preset,
       },
@@ -401,7 +350,6 @@ export function buildVisualSpecimens(): VisualSpecimen[] {
           errorCorrectionLevel: "H",
           logoAreaSize: 28,
           logoAreaBorderRadius: 6,
-          shapeOptions: PRESET_SHAPES[preset],
         },
         preset,
         logo: true,

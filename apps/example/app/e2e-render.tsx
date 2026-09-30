@@ -28,7 +28,7 @@ const SPECIMENS: readonly Specimen[] = [
   { id: "small", label: "64px", value: "small-qr", size: 64 },
   { id: "large", label: "128px", value: "large-qr", size: 128 },
   { id: "numeric", label: "Numeric", value: "123456789012345", size: 88 },
-  { id: "empty-safe", label: "Whitespace trimmed", value: "trim-me", size: 88 },
+  { id: "padded", label: "Padded whitespace", value: "  padded payload  ", size: 88 },
 ];
 
 export default function QrcodeE2eRenderScreen() {

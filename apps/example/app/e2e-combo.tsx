@@ -104,11 +104,11 @@ export default function ComboScreen() {
       if (ticks >= 12) {
         clearInterval(timer);
         const snapshot = getQRCodeMetrics();
-        const extra = snapshot.cacheMisses > 2;
+        const extra = snapshot.requests > 1;
         setRerenderResult(
           extra
-            ? `fail:misses=${snapshot.cacheMisses}:requests=${snapshot.requests}`
-            : `ok:misses=${snapshot.cacheMisses}:requests=${snapshot.requests}:ticks=12`,
+            ? `fail:requests=${snapshot.requests}`
+            : `ok:requests=${snapshot.requests}:ticks=12`,
         );
         setShowVisuals(true);
       }

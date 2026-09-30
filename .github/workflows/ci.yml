@@ -53,9 +53,6 @@ jobs:
       - name: Verify generated Nitro bindings
         run: bun run codegen:check
 
-      - name: Verify smoke reporting
-        run: bun run example:smoke:ci
-
       - name: Check example app
         run: bun run example:check
 

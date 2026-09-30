@@ -74,7 +74,7 @@ function createPackageDocLifecycle({
     }
   }
 
-  function assertDirectoryChain(absolutePath, label, allowMissingFinal) {
+  function assertDirectoryChain(absolutePath, label) {
     const resolved = path.resolve(absolutePath);
     const parsed = path.parse(resolved);
     let current = parsed.root;
@@ -85,10 +85,7 @@ function createPackageDocLifecycle({
     for (const segment of segments) {
       current = path.join(current, segment);
       const stat = tryLstat(current);
-      if (!stat) {
-        if (current === resolved && allowMissingFinal) return;
-        return;
-      }
+      if (!stat) return;
       if (stat.isSymbolicLink()) {
         throw new LifecycleError(`${label} ancestor is a symlink: ${current}`);
       }
@@ -101,7 +98,7 @@ function createPackageDocLifecycle({
   }
 
   function assertInitialDirectory(absolutePath, label) {
-    assertDirectoryChain(absolutePath, label, false);
+    assertDirectoryChain(absolutePath, label);
     const stat = tryLstat(absolutePath);
     if (!stat || !stat.isDirectory() || stat.isSymbolicLink()) {
       throw new LifecycleError(
@@ -116,7 +113,7 @@ function createPackageDocLifecycle({
   }
 
   function assertInitialPackageRoot(absolutePath, expectedIdentity) {
-    assertDirectoryChain(absolutePath, "Package root", true);
+    assertDirectoryChain(absolutePath, "Package root");
     const stat = tryLstat(absolutePath);
     if (!stat) return;
     if (!stat.isDirectory() || stat.isSymbolicLink()) {
@@ -132,7 +129,7 @@ function createPackageDocLifecycle({
   }
 
   function assertAnchoredRoots() {
-    assertDirectoryChain(repoPath, "Repository root", false);
+    assertDirectoryChain(repoPath, "Repository root");
     const currentRepo = tryLstat(repoPath);
     if (
       !currentRepo ||
@@ -142,7 +139,7 @@ function createPackageDocLifecycle({
     ) {
       throw new LifecycleError(`Repository root identity changed: ${repoPath}`);
     }
-    assertDirectoryChain(packagePath, "Package root", true);
+    assertDirectoryChain(packagePath, "Package root");
     const currentPackage = tryLstat(packagePath);
     if (currentPackage) {
       if (

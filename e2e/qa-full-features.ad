@@ -14,6 +14,8 @@ press id="e2e-run-metrics"
 wait text "ok:requests=1:reset=0"
 press id="e2e-run-validation"
 wait text "ok:valid=true"
+press id="e2e-run-audit"
+wait text "ok:bounds:boost:metrics:nul-image-ready"
 press id="e2e-export-uri"
 scroll bottom
 wait text "ok:uri="

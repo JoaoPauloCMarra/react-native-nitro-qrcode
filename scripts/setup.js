@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
 const { execSync } = require("child_process");
-const fs = require("fs");
 const path = require("path");
-const https = require("https");
 
 const colors = {
   green: (text) => `\x1b[32m${text}\x1b[0m`,
@@ -27,7 +25,7 @@ function execCommand(command, options = {}) {
       ...options,
     });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -42,12 +40,6 @@ function commandExists(command) {
     return true;
   } catch {
     return false;
-  }
-}
-
-function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
@@ -75,10 +67,16 @@ async function main() {
     projectRoot,
     "packages/react-native-nitro-qrcode"
   );
-  execCommand("bun run codegen", { cwd: packageDir });
+  if (!execCommand("bun run codegen", { cwd: packageDir })) {
+    log("Failed to generate Nitro bindings", "red");
+    process.exit(1);
+  }
 
   log("🔨 Building library...");
-  execCommand("bun run build", { cwd: packageDir });
+  if (!execCommand("bun run build", { cwd: packageDir })) {
+    log("Failed to build the library", "red");
+    process.exit(1);
+  }
 
   console.log("");
   log("✅ Setup complete!");
