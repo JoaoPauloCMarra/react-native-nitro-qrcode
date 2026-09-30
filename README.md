@@ -51,7 +51,7 @@ bare React Native app.
 | Package          | Supported range                                                     |
 | ---------------- | ------------------------------------------------------------------- |
 | React            | `>=18.2.0 <20.0.0`                                                  |
-| React Native     | `>=0.76` supported (declared peer `>=0.75.0 <1.0.0`); tested on `0.86.3` |
+| React Native     | `>=0.76.0 <1.0.0`; tested on `0.86.3`                              |
 | Nitro Modules    | `>=0.37.0 <0.38.0`                                                  |
 | Expo             | SDK 52 and newer development builds; tested on SDK 57; Expo Go is not supported |
 | iOS              | React Native's `min_ios_version_supported` (15.1 on RN 0.76–0.86)   |
@@ -72,12 +72,28 @@ not override that version in the example. The baseline uses React `19.2.3` and
 Nitro Modules `0.37.1`. Versions below the tested baseline follow the declared
 peer ranges but have no automated coverage in this repository.
 
-### Upgrade from 0.8.1
+### Upgrade from 0.8.x
 
-Version 0.8.2 has no API changes. Unset finder, eyeball, and stroke colors now
-follow `foregroundColor` (and its gradient). Pass `eyeColor` and
-`eyeballColor` explicitly to keep a different finder color. Non-React-Native
-resolvers (`node`, `import`, `require`, `default`) now load the web entry.
+Version 0.9.0 changes default output. Check these points:
+
+- **React Native 0.76 or newer.** The `react-native` peer range is now
+  `>=0.76.0`. React Native 0.76 and Expo SDK 52 apps must also set Android
+  `ndkVersion` to 27 or newer.
+- **Gradients cover finders, timing, and alignment patterns.** Unset
+  `eyeColor`, `eyeballColor`, `alignmentColor`, and `timingColor` now follow
+  the foreground fill, including a gradient. To keep solid patterns, set those
+  colors explicitly, for example `eyeColor="#000000"` and
+  `eyeballColor="#000000"`. Explicit colors always paint solid.
+- **Web edge rounding.** Web PNG module and quiet-zone edges use floor rounding
+  like native, so web PNG bytes change by up to one pixel per module edge.
+  Regenerate stored web snapshots.
+- **Package resolution.** Resolvers without the `react-native` condition
+  (`node`, `import`, `require`, `default`) now load the web entry. That entry
+  imports `react-native`, so those environments must alias `react-native` to
+  `react-native-web`, as Expo web and Next.js setups do.
+- **Strokes are unchanged.** `strokeColor` and `eyeStrokeColor` draw a stroke
+  only when set to a color other than `#000000`; `#000000` still means no
+  stroke.
 
 ### Upgrade from 0.7.x
 
@@ -346,12 +362,12 @@ Option loss and platform differences:
   diamonds, squircles) are antialiased by the web canvas and rasterized per
   pixel natively, so their edge pixels can differ by at most one pixel per
   module.
-- **Layer colors** default to the foreground: unset `strokeColor`, `eyeColor`,
-  and `eyeballColor` use `foregroundColor`, and an unset `eyeStrokeColor`
-  uses the resolved `eyeColor`. A finder, eyeball, alignment, or timing color
-  that equals `foregroundColor` is painted with the foreground fill, so a
-  gradient covers those patterns too. Set the color explicitly to paint it as
-  a solid color.
+- **Layer colors**: an unset `eyeColor`, `eyeballColor`, `alignmentColor`,
+  or `timingColor` follows the foreground fill, including a gradient. An
+  explicitly set layer color always paints solid, even when it equals
+  `foregroundColor`. `strokeColor` and `eyeStrokeColor` draw a stroke only
+  when set to a color other than `#000000`; unset or `#000000` means no
+  stroke.
 - **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
   shorthand expand to full hex before the native bridge). The native ABI
   itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the
@@ -514,12 +530,12 @@ Main exports:
 | `scanSafe`             | Raises unsafe defaults; `"strict"` turns scanability warnings into errors.                                                           |
 | `foregroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` foreground color.                                                                         |
 | `backgroundColor`      | `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`, or `"transparent"`.                                                                         |
-| `strokeColor`          | Body-module stroke color; defaults to `foregroundColor` (no visible stroke).                                                         |
-| `eyeColor`             | Finder frame fill color; defaults to `foregroundColor`.                                                                              |
-| `eyeStrokeColor`       | Finder frame stroke color; defaults to `eyeColor` (no visible stroke).                                                               |
-| `eyeballColor`         | Finder center color; defaults to `foregroundColor`.                                                                                  |
-| `alignmentColor`       | Alignment-pattern color; defaults to `foregroundColor`.                                                                              |
-| `timingColor`          | Timing-pattern color; defaults to `foregroundColor`.                                                                                 |
+| `strokeColor`          | Body-module stroke color. Unset or `#000000` draws no stroke.                                                                        |
+| `eyeColor`             | Finder frame fill color. Unset follows the foreground fill (including a gradient); a set value paints solid.                         |
+| `eyeStrokeColor`       | Finder frame stroke color. Unset or `#000000` draws no stroke.                                                                       |
+| `eyeballColor`         | Finder center color. Unset follows the foreground fill (including a gradient); a set value paints solid.                             |
+| `alignmentColor`       | Alignment-pattern color. Unset follows the foreground fill (including a gradient); a set value paints solid.                         |
+| `timingColor`          | Timing-pattern color. Unset follows the foreground fill (including a gradient); a set value paints solid.                            |
 | `quietZoneColor`       | Quiet-zone color; defaults to `backgroundColor`.                                                                                     |
 | `finderInnerColor`     | Finder inner-ring color; defaults to `backgroundColor`.                                                                              |
 | `gradient`             | Linear or radial foreground gradient with 2 through 8 colors.                                                                        |
@@ -567,8 +583,11 @@ option-by-option rules.
 The `qrcode` npm package powers only the web entry
 (`src/index.web.ts`, built as `lib/*/index.web.js`). The package `exports` map
 sends `react-native` resolvers to the native entry and `browser`, `node`,
-`import`, `require`, and `default` resolvers to the web entry, so server
-rendering and non-React-Native tooling never load the Nitro module. Native iOS and Android builds resolve the
+`import`, `require`, and `default` resolvers to the web entry, so those
+resolvers never load the Nitro module. The web entry imports `react-native`
+for `Image` and `View`, so it runs only where `react-native` is aliased to
+`react-native-web` (Expo web and server rendering, Next.js with
+react-native-web). Plain Node without that alias cannot load it. Native iOS and Android builds resolve the
 platform-specific entry and never bundle it; web bundlers include it only for
 web targets. Consumers do not need `react-native-svg`, Skia, canvas packages,
 or another QR package.
