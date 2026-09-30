@@ -59,7 +59,7 @@ Scope: bugs, performance, memory/CPU/GPU, bundle weight, API simplicity, docs dr
 ## P1: Misleading
 
 - [x] 12. **The iOS 16.4 floor is undocumented and has no code need; the peer range is untested below RN 0.86.** `react-native-nitro-qrcode.podspec:13` sets iOS 16.4; the only availability-sensitive C++ API is integer `std::to_chars`. RN's `min_ios_version_supported` is 15.1 (0.76–0.86) and Expo SDK 52–55 default to 15.1, so a default bare RN app or an SDK 52–55 app fails `pod install`. README.md:40-58 lists `react-native >=0.75.0` and Expo SDK 57 only, with no iOS row. Nitro 0.37 also needs NDK 27 (RN 0.76 defaults to 26.1). **Needs a decision**: use `min_ios_version_supported`, or document the floors and narrow the peer range.
-  - Receipt: Fixed in `8ff7440`: podspec uses `min_ios_version_supported` (fallback 15.1); README lists iOS, NDK 27 and RN/Expo floors. 0.9.0 raises the `react-native` peer to `>=0.76.0`.
+  - Receipt: Fixed in `8ff7440`: podspec uses `min_ios_version_supported` (fallback 15.1); README lists iOS, NDK 27 and RN/Expo floors. 0.9.0 raises the `react-native` peer to `>=0.77.0` (Nitro 0.37 does not compile on RN 0.76, verified by the lead); README states RN >= 0.77 / Expo SDK >= 53, tested on RN 0.86.3 / Expo SDK 57.
 
 ## P2: Inconsistencies and change costs
 

@@ -51,18 +51,16 @@ bare React Native app.
 | Package          | Supported range                                                     |
 | ---------------- | ------------------------------------------------------------------- |
 | React            | `>=18.2.0 <20.0.0`                                                  |
-| React Native     | `>=0.76.0 <1.0.0`; tested on `0.86.3`                              |
+| React Native     | `>=0.77.0 <1.0.0` (Nitro 0.37 minimum); tested on `0.86.3`          |
 | Nitro Modules    | `>=0.37.0 <0.38.0`                                                  |
-| Expo             | SDK 52 and newer development builds; tested on SDK 57; Expo Go is not supported |
-| iOS              | React Native's `min_ios_version_supported` (15.1 on RN 0.76–0.86)   |
-| Android NDK      | 27 or newer (Nitro Modules 0.37 requirement)                        |
+| Expo             | SDK 53 and newer development builds; tested on SDK 57; Expo Go is not supported |
+| iOS              | React Native's `min_ios_version_supported` (15.1 on RN 0.77–0.86)   |
 | React Native Web | `>=0.19.0 <1.0.0`                                                   |
 | Node             | `>=18.0.0`                                                          |
 
-React Native 0.76 and Expo SDK 52 default to NDK 26. Those apps must raise
-Android `ndkVersion` to 27 or newer: set `ndkVersion` in
-`android/build.gradle` for bare apps, or `android.ndkVersion` through
-`expo-build-properties` for Expo SDK 52.
+Supports React Native 0.77 or newer and Expo SDK 53 or newer (the
+`react-native-nitro-modules` 0.37 minimum); tested on React Native 0.86.3 and
+Expo SDK 57.
 
 The current example and package gate use React Native `0.86.3` and Expo SDK 57
 (`expo@~57.0.26`).
@@ -76,9 +74,9 @@ peer ranges but have no automated coverage in this repository.
 
 Version 0.9.0 changes default output. Check these points:
 
-- **React Native 0.76 or newer.** The `react-native` peer range is now
-  `>=0.76.0`. React Native 0.76 and Expo SDK 52 apps must also set Android
-  `ndkVersion` to 27 or newer.
+- **React Native 0.77 or newer.** The `react-native` peer range is now
+  `>=0.77.0` (Expo SDK 53 or newer), because `react-native-nitro-modules` 0.37
+  does not compile on React Native 0.76.
 - **Gradients cover finders, timing, and alignment patterns.** Unset
   `eyeColor`, `eyeballColor`, `alignmentColor`, and `timingColor` now follow
   the foreground fill, including a gradient. To keep solid patterns, set those

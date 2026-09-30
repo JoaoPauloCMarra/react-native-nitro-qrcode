@@ -10,7 +10,7 @@ Breaking changes are always listed first in each release section.
 
 ### Breaking changes
 
-- **React Native 0.76 or newer is required.** The `react-native` peer range is now `>=0.76.0 <1.0.0`. Nitro Modules 0.37 needs Android NDK 27, and React Native 0.76 and Expo SDK 52 default to NDK 26. Migration: upgrade React Native 0.75 apps, and set Android `ndkVersion` to 27 or newer (`android/build.gradle` for bare apps, `expo-build-properties` `android.ndkVersion` for Expo SDK 52).
+- **React Native 0.77 or newer is required.** The `react-native` peer range is now `>=0.77.0 <1.0.0` (Expo SDK 53 or newer). `react-native-nitro-modules` 0.37 does not compile on React Native 0.76. Migration: upgrade React Native 0.75 and 0.76 apps to 0.77 or newer, or Expo SDK 52 apps to SDK 53 or newer.
 - **Gradients now cover finders, eyeballs, timing, and alignment patterns by default.** An unset `eyeColor`, `eyeballColor`, `alignmentColor`, or `timingColor` follows the foreground fill, including a gradient, on iOS, Android, and web. In 0.8.1 these patterns were solid black on native gradient output. Migration: set `eyeColor`, `eyeballColor`, `alignmentColor`, and `timingColor` explicitly to keep solid patterns. An explicitly set layer color always paints solid, even when it equals `foregroundColor`.
 - **Web PNG edges use floor rounding.** Web module, quiet-zone, stroke-inset, and logo-hole edges now use the same integer floor rules as native, so web PNG pixels move by up to one pixel at module edges. Migration: regenerate stored web PNG snapshots or golden images.
 - **Resolvers without the `react-native` condition load the web entry.** `node`, `import`, `require`, and `default` now resolve to `lib/*/index.web.js` instead of the native entry. The web entry imports `react-native`, so it needs `react-native` aliased to `react-native-web` (Expo web and server rendering, Next.js). Migration: alias `react-native` to `react-native-web` in those environments; Jest setups that use the React Native preset keep the native entry.
@@ -29,7 +29,7 @@ Strokes are unchanged from 0.8.1: `strokeColor` and `eyeStrokeColor` draw a stro
 - The component accessibility label and busy state describe the image on screen while a regeneration is pending or after it fails.
 - Web `getMatrix` is counted in generation metrics like native.
 - The package `exports` map lists `browser` before `react-native`, so React Native Web on bare Metro loads the web entry.
-- The iOS podspec uses React Native's `min_ios_version_supported` (15.1 on React Native 0.76–0.86) instead of iOS 16.4, so default bare React Native and Expo SDK 52–55 apps install.
+- The iOS podspec uses React Native's `min_ios_version_supported` (15.1 on React Native 0.77–0.86) instead of iOS 16.4, so default bare React Native and Expo SDK 53–55 apps install.
 
 ### Changed
 
