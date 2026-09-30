@@ -5,8 +5,8 @@ wait text "e2e-ready"
 wait text "ok:ready=15/15:ms="
 wait id="e2e-render-qr-default"
 scroll bottom
-wait id="e2e-render-qr-empty-safe"
-wait text "Whitespace trimmed"
+wait id="e2e-render-qr-padded"
+wait text "Padded whitespace"
 scroll top
 press id="e2e-render-remount"
 wait text "ok:ready=15/15:ms="

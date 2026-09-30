@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.9.0] - 2026-09-30
+
+### Breaking changes
+
+- **React Native 0.77 or newer is required.** The `react-native` peer range is now `>=0.77.0 <1.0.0` (Expo SDK 53 or newer). `react-native-nitro-modules` 0.37 does not compile on React Native 0.76. Migration: upgrade React Native 0.75 and 0.76 apps to 0.77 or newer, or Expo SDK 52 apps to SDK 53 or newer.
+- **Gradients now cover finders, eyeballs, timing, and alignment patterns by default.** An unset `eyeColor`, `eyeballColor`, `alignmentColor`, or `timingColor` follows the foreground fill, including a gradient, on iOS, Android, and web. In 0.8.1 these patterns were solid black on native gradient output. Migration: set `eyeColor`, `eyeballColor`, `alignmentColor`, and `timingColor` explicitly to keep solid patterns. An explicitly set layer color always paints solid, even when it equals `foregroundColor`.
+- **Web PNG edges use floor rounding.** Web module, quiet-zone, stroke-inset, and logo-hole edges now use the same integer floor rules as native, so web PNG pixels move by up to one pixel at module edges. Migration: regenerate stored web PNG snapshots or golden images.
+- **Resolvers without the `react-native` condition load the web entry.** `node`, `import`, `require`, and `default` now resolve to `lib/*/index.web.js` instead of the native entry. The web entry imports `react-native`, so it needs `react-native` aliased to `react-native-web` (Expo web and server rendering, Next.js). Migration: alias `react-native` to `react-native-web` in those environments; Jest setups that use the React Native preset keep the native entry.
+- **Direct `HybridQRCode` callers:** `strokeColor`, `eyeColor`, `eyeStrokeColor`, and `eyeballColor` in the object-shaped `GenerateOptions` are now optional. Omitting a color means "inherit"; passing it means "paint solid". Migration: omit the field instead of passing `#000000` when the pattern should follow the foreground.
+
+Strokes are unchanged from 0.8.1: `strokeColor` and `eyeStrokeColor` draw a stroke only when set to a color other than `#000000`. Plain black-on-white native PNGs are byte-identical to 0.8.1.
+
+### Fixed
+
+- Native finder colors no longer depend on which PNG encoder runs. A non-black `foregroundColor` previously turned unset finders black when a logo area, gradient, or custom layer color was added.
+- Inverted codes (light foreground on a dark background) no longer report `low-contrast` for finders that follow the foreground, and a low-contrast foreground produces one warning instead of one per inherited pattern.
+- The deprecated positional native PNG methods derive alignment, timing, quiet-zone, and finder-inner colors and shapes like the object methods, so both return identical bytes.
+- `<QRCode>` honors the deprecated `shapeOptions.eyePatternShape` alias instead of letting the preset finder shape win.
+- Web clears the logo hole at the center of the rendered canvas when `size` is smaller than the module count, so it no longer removes finder modules outside the hole.
+- Native `toSvgString` keeps the full radial-gradient radius (for example `r="141.42%"`) to match web SVG and native PNG output.
+- The component accessibility label and busy state describe the image on screen while a regeneration is pending or after it fails.
+- Web `getMatrix` is counted in generation metrics like native.
+- The package `exports` map lists `browser` before `react-native`, so React Native Web on bare Metro loads the web entry.
+- The iOS podspec uses React Native's `min_ios_version_supported` (15.1 on React Native 0.77–0.86) instead of iOS 16.4, so default bare React Native and Expo SDK 53–55 apps install.
+
+### Changed
+
+- Native PNGs with layered colors or a logo area and no gradient use a 4-bit palette encoder with the same pixels as 0.8.1. A 4096 px logo-area PNG peaked at about 36 MB instead of about 355 MB in host measurements, and the files are smaller. Gradient PNGs keep the `fpng` RGBA encoder and still peak at about 355 MB at 4096 px.
+- The Android library no longer pins `kotlin-stdlib`; the app's Kotlin version applies.
+- `orbit` is marked `@deprecated` in the TypeScript types. It remains a no-op.
+- The README documents component defaults, layer-color rules, validation codes, metrics availability, compatibility floors, and pixel-geometry rules.
+
 ## [0.8.1] - 2026-09-27
 
 ### Breaking changes

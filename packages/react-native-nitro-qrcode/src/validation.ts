@@ -1,10 +1,7 @@
 import {
   DEFAULT_BACKGROUND,
-  DEFAULT_EYE,
-  DEFAULT_EYE_STROKE,
-  DEFAULT_EYEBALL,
   DEFAULT_FOREGROUND,
-  DEFAULT_STROKE,
+  NO_STROKE_COLOR,
   sanitizeBackgroundColor,
   sanitizeColor,
   type QRCodeBackgroundColor,
@@ -179,6 +176,7 @@ export type QRCodeOptions = {
   maxVersion?: QRCodeVersion;
   mask?: QRCodeMaskPattern;
   boostEcl?: boolean;
+  /** @deprecated No-op; the value is ignored. */
   orbit?: boolean;
   shapeOptions?: QRCodeShapeOptions;
   logoAreaSize?: number;
@@ -217,6 +215,15 @@ export type NormalizedGradient = {
   endY: number;
 };
 
+export type NormalizedExplicitColors = {
+  stroke: boolean;
+  eye: boolean;
+  eyeStroke: boolean;
+  eyeball: boolean;
+  alignment: boolean;
+  timing: boolean;
+};
+
 export type NormalizedOptions = Required<
   Omit<
     QRCodeOptions,
@@ -227,6 +234,7 @@ export type NormalizedOptions = Required<
   scanSafe: false | "standard" | "strict";
   shapeOptions: Required<QRCodeShapeOptions>;
   gradient: NormalizedGradient;
+  explicitColors: NormalizedExplicitColors;
 };
 
 export type NitroQRCodeApi = Readonly<{
@@ -334,6 +342,10 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
       : Math.max(requestedQuietZone, SCAN_SAFE_QUIET_ZONE_MINIMUM);
   const errorCorrectionLevel =
     scanSafe !== false && logoAreaSize > 0 ? "H" : requestedEcl;
+  const foregroundColor = sanitizeColor(
+    options.foregroundColor ?? DEFAULT_FOREGROUND,
+    "foregroundColor",
+  );
 
   return {
     value: options.value,
@@ -341,35 +353,40 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
     quietZone,
     errorCorrectionLevel,
     scanSafe,
-    foregroundColor: sanitizeColor(
-      options.foregroundColor ?? DEFAULT_FOREGROUND,
-      "foregroundColor",
-    ),
+    foregroundColor,
     backgroundColor: sanitizeBackgroundColor(
       options.backgroundColor ?? DEFAULT_BACKGROUND,
       "backgroundColor",
     ),
     strokeColor: sanitizeColor(
-      options.strokeColor ?? DEFAULT_STROKE,
+      options.strokeColor ?? NO_STROKE_COLOR,
       "strokeColor",
     ),
-    eyeColor: sanitizeColor(options.eyeColor ?? DEFAULT_EYE, "eyeColor"),
+    eyeColor: sanitizeColor(options.eyeColor ?? foregroundColor, "eyeColor"),
     eyeStrokeColor: sanitizeColor(
-      options.eyeStrokeColor ?? DEFAULT_EYE_STROKE,
+      options.eyeStrokeColor ?? NO_STROKE_COLOR,
       "eyeStrokeColor",
     ),
     eyeballColor: sanitizeColor(
-      options.eyeballColor ?? DEFAULT_EYEBALL,
+      options.eyeballColor ?? foregroundColor,
       "eyeballColor",
     ),
     alignmentColor: sanitizeColor(
-      options.alignmentColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      options.alignmentColor ?? foregroundColor,
       "alignmentColor",
     ),
     timingColor: sanitizeColor(
-      options.timingColor ?? options.foregroundColor ?? DEFAULT_FOREGROUND,
+      options.timingColor ?? foregroundColor,
       "timingColor",
     ),
+    explicitColors: {
+      stroke: options.strokeColor !== undefined,
+      eye: options.eyeColor !== undefined,
+      eyeStroke: options.eyeStrokeColor !== undefined,
+      eyeball: options.eyeballColor !== undefined,
+      alignment: options.alignmentColor !== undefined,
+      timing: options.timingColor !== undefined,
+    },
     quietZoneColor: sanitizeBackgroundColor(
       options.quietZoneColor ?? options.backgroundColor ?? DEFAULT_BACKGROUND,
       "quietZoneColor",
@@ -623,11 +640,6 @@ export function validateLogoDimensions(
 ): void {
   if (logoAreaSize > size) {
     throw new Error("logoAreaSize must be between 0 and size.");
-  }
-  if (logoAreaBorderRadius > 2048) {
-    throw new Error(
-      "logoAreaBorderRadius must be an integer between 0 and 2048.",
-    );
   }
   if (logoAreaBorderRadius > size / 2) {
     throw new Error(

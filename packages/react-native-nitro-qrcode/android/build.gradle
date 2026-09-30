@@ -90,6 +90,5 @@ repositories {
 dependencies {
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
-  implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
   implementation project(":react-native-nitro-modules")
 }

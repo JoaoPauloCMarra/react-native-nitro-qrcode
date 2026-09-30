@@ -38,6 +38,7 @@ module.exports = defineConfig([
       sourceType: "script",
       globals: {
         Buffer: "readonly",
+        Bun: "readonly",
         __dirname: "readonly",
         console: "readonly",
         module: "readonly",

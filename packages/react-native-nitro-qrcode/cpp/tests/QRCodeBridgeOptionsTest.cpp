@@ -60,6 +60,22 @@ void testBridgeOptionMapping() {
   assert(options.gradient.endY == 0.8);
 }
 
+void testBridgeDerivedLayerDefaults() {
+  const auto options = margelo::nitro::NitroQRCode::makeGenerateOptions(
+      256, 3, "M", "#FF0000", "#000000", "#FF0000", "#FF0000", "#FF0000",
+      "#FF0000", 1, 40, -1, true, "circle");
+  assert(options.alignmentColor == "#FF0000");
+  assert(options.timingColor == "#FF0000");
+  assert(options.quietZoneColor == "#000000");
+  assert(options.finderInnerColor == "#000000");
+  assert(options.alignment == options.foreground);
+  assert(options.timing == options.foreground);
+  assert(options.quietZoneFill == options.background);
+  assert(options.finderInner == options.background);
+  assert(options.alignmentShape == "circle");
+  assert(options.timingShape == "circle");
+}
+
 void testBridgeMatrixDefaults() {
   const auto options =
       margelo::nitro::NitroQRCode::makeMatrixOptions("Q", 3, 12, -1, true);
@@ -99,6 +115,7 @@ void testBridgeIntegerValidation() {
 
 void runQRCodeBridgeOptionsTests() {
   testBridgeOptionMapping();
+  testBridgeDerivedLayerDefaults();
   testBridgeMatrixDefaults();
   testBridgeIntegerValidation();
 }

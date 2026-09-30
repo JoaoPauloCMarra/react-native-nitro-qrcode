@@ -31,8 +31,8 @@
 
 
 #include <string>
-#include <vector>
 #include <optional>
+#include <vector>
 
 namespace margelo::nitro::NitroQRCode {
 
@@ -47,10 +47,10 @@ namespace margelo::nitro::NitroQRCode {
     std::string errorCorrectionLevel     SWIFT_PRIVATE;
     std::string foregroundColor     SWIFT_PRIVATE;
     std::string backgroundColor     SWIFT_PRIVATE;
-    std::string strokeColor     SWIFT_PRIVATE;
-    std::string eyeColor     SWIFT_PRIVATE;
-    std::string eyeStrokeColor     SWIFT_PRIVATE;
-    std::string eyeballColor     SWIFT_PRIVATE;
+    std::optional<std::string> strokeColor     SWIFT_PRIVATE;
+    std::optional<std::string> eyeColor     SWIFT_PRIVATE;
+    std::optional<std::string> eyeStrokeColor     SWIFT_PRIVATE;
+    std::optional<std::string> eyeballColor     SWIFT_PRIVATE;
     double minVersion     SWIFT_PRIVATE;
     double maxVersion     SWIFT_PRIVATE;
     double mask     SWIFT_PRIVATE;
@@ -82,7 +82,7 @@ namespace margelo::nitro::NitroQRCode {
 
   public:
     GenerateOptions() = default;
-    explicit GenerateOptions(std::string value, double size, double quietZone, std::string errorCorrectionLevel, std::string foregroundColor, std::string backgroundColor, std::string strokeColor, std::string eyeColor, std::string eyeStrokeColor, std::string eyeballColor, double minVersion, double maxVersion, double mask, bool boostEcl, std::string moduleShape, std::string eyePatternShape, std::string eyeballShape, double gap, double eyePatternGap, std::string bodyDensity, double cornerRadius, double eyePatternCornerRadius, std::string layout, double logoAreaSize, double logoAreaBorderRadius, std::string gradientType, std::vector<std::string> gradientColors, std::vector<double> gradientLocations, double gradientStartX, double gradientStartY, double gradientEndX, double gradientEndY, std::optional<std::string> alignmentColor, std::optional<std::string> timingColor, std::optional<std::string> quietZoneColor, std::optional<std::string> finderInnerColor, std::optional<std::string> alignmentShape, std::optional<std::string> timingShape): value(value), size(size), quietZone(quietZone), errorCorrectionLevel(errorCorrectionLevel), foregroundColor(foregroundColor), backgroundColor(backgroundColor), strokeColor(strokeColor), eyeColor(eyeColor), eyeStrokeColor(eyeStrokeColor), eyeballColor(eyeballColor), minVersion(minVersion), maxVersion(maxVersion), mask(mask), boostEcl(boostEcl), moduleShape(moduleShape), eyePatternShape(eyePatternShape), eyeballShape(eyeballShape), gap(gap), eyePatternGap(eyePatternGap), bodyDensity(bodyDensity), cornerRadius(cornerRadius), eyePatternCornerRadius(eyePatternCornerRadius), layout(layout), logoAreaSize(logoAreaSize), logoAreaBorderRadius(logoAreaBorderRadius), gradientType(gradientType), gradientColors(gradientColors), gradientLocations(gradientLocations), gradientStartX(gradientStartX), gradientStartY(gradientStartY), gradientEndX(gradientEndX), gradientEndY(gradientEndY), alignmentColor(alignmentColor), timingColor(timingColor), quietZoneColor(quietZoneColor), finderInnerColor(finderInnerColor), alignmentShape(alignmentShape), timingShape(timingShape) {}
+    explicit GenerateOptions(std::string value, double size, double quietZone, std::string errorCorrectionLevel, std::string foregroundColor, std::string backgroundColor, std::optional<std::string> strokeColor, std::optional<std::string> eyeColor, std::optional<std::string> eyeStrokeColor, std::optional<std::string> eyeballColor, double minVersion, double maxVersion, double mask, bool boostEcl, std::string moduleShape, std::string eyePatternShape, std::string eyeballShape, double gap, double eyePatternGap, std::string bodyDensity, double cornerRadius, double eyePatternCornerRadius, std::string layout, double logoAreaSize, double logoAreaBorderRadius, std::string gradientType, std::vector<std::string> gradientColors, std::vector<double> gradientLocations, double gradientStartX, double gradientStartY, double gradientEndX, double gradientEndY, std::optional<std::string> alignmentColor, std::optional<std::string> timingColor, std::optional<std::string> quietZoneColor, std::optional<std::string> finderInnerColor, std::optional<std::string> alignmentShape, std::optional<std::string> timingShape): value(value), size(size), quietZone(quietZone), errorCorrectionLevel(errorCorrectionLevel), foregroundColor(foregroundColor), backgroundColor(backgroundColor), strokeColor(strokeColor), eyeColor(eyeColor), eyeStrokeColor(eyeStrokeColor), eyeballColor(eyeballColor), minVersion(minVersion), maxVersion(maxVersion), mask(mask), boostEcl(boostEcl), moduleShape(moduleShape), eyePatternShape(eyePatternShape), eyeballShape(eyeballShape), gap(gap), eyePatternGap(eyePatternGap), bodyDensity(bodyDensity), cornerRadius(cornerRadius), eyePatternCornerRadius(eyePatternCornerRadius), layout(layout), logoAreaSize(logoAreaSize), logoAreaBorderRadius(logoAreaBorderRadius), gradientType(gradientType), gradientColors(gradientColors), gradientLocations(gradientLocations), gradientStartX(gradientStartX), gradientStartY(gradientStartY), gradientEndX(gradientEndX), gradientEndY(gradientEndY), alignmentColor(alignmentColor), timingColor(timingColor), quietZoneColor(quietZoneColor), finderInnerColor(finderInnerColor), alignmentShape(alignmentShape), timingShape(timingShape) {}
 
   public:
     friend bool operator==(const GenerateOptions& lhs, const GenerateOptions& rhs) = default;
@@ -104,10 +104,10 @@ namespace margelo::nitro {
         JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "errorCorrectionLevel"))),
         JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "foregroundColor"))),
         JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "backgroundColor"))),
-        JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "strokeColor"))),
-        JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeColor"))),
-        JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor"))),
-        JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "strokeColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "minVersion"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxVersion"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "mask"))),
@@ -146,10 +146,10 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "errorCorrectionLevel"), JSIConverter<std::string>::toJSI(runtime, arg.errorCorrectionLevel));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "foregroundColor"), JSIConverter<std::string>::toJSI(runtime, arg.foregroundColor));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "backgroundColor"), JSIConverter<std::string>::toJSI(runtime, arg.backgroundColor));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "strokeColor"), JSIConverter<std::string>::toJSI(runtime, arg.strokeColor));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeColor"), JSIConverter<std::string>::toJSI(runtime, arg.eyeColor));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor"), JSIConverter<std::string>::toJSI(runtime, arg.eyeStrokeColor));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor"), JSIConverter<std::string>::toJSI(runtime, arg.eyeballColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "strokeColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.strokeColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.eyeColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.eyeStrokeColor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.eyeballColor));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "minVersion"), JSIConverter<double>::toJSI(runtime, arg.minVersion));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "maxVersion"), JSIConverter<double>::toJSI(runtime, arg.maxVersion));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "mask"), JSIConverter<double>::toJSI(runtime, arg.mask));
@@ -194,10 +194,10 @@ namespace margelo::nitro {
       if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "errorCorrectionLevel")))) return false;
       if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "foregroundColor")))) return false;
       if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "backgroundColor")))) return false;
-      if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "strokeColor")))) return false;
-      if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeColor")))) return false;
-      if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor")))) return false;
-      if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "strokeColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeStrokeColor")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "eyeballColor")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "minVersion")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxVersion")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "mask")))) return false;

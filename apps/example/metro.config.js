@@ -24,25 +24,4 @@ config.resolver.blockList = exclusionList([
   /apps\/example\/android\/build\/.*/,
 ]);
 
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (platform === "web") {
-    if (moduleName === "react-native-nitro-modules") {
-      return { type: "empty" };
-    }
-
-    if (moduleName === "react-native-nitro-qrcode") {
-      return context.resolveRequest(
-        context,
-        path.resolve(
-          monorepoRoot,
-          "packages/react-native-nitro-qrcode/src/index.web.ts"
-        ),
-        platform
-      );
-    }
-  }
-
-  return context.resolveRequest(context, moduleName, platform);
-};
-
 module.exports = config;

@@ -3,12 +3,19 @@
 
 namespace margelo::nitro::NitroQRCode {
 
+namespace {
+constexpr const char *LegacyUnsetColor = "#000000";
+}
+
 ::NitroQRCode::GenerateOptions makeGenerateOptions(
     const GenerateOptions &options) {
   auto resolved = makeGenerateOptions(
       options.size, options.quietZone, options.errorCorrectionLevel,
-      options.foregroundColor, options.backgroundColor, options.strokeColor,
-      options.eyeColor, options.eyeStrokeColor, options.eyeballColor,
+      options.foregroundColor, options.backgroundColor,
+      options.strokeColor.value_or(LegacyUnsetColor),
+      options.eyeColor.value_or(LegacyUnsetColor),
+      options.eyeStrokeColor.value_or(LegacyUnsetColor),
+      options.eyeballColor.value_or(LegacyUnsetColor),
       options.minVersion, options.maxVersion, options.mask, options.boostEcl,
       options.moduleShape, options.eyePatternShape, options.eyeballShape,
       options.gap, options.eyePatternGap, options.bodyDensity,
@@ -17,20 +24,34 @@ namespace margelo::nitro::NitroQRCode {
       options.gradientType, options.gradientColors, options.gradientLocations,
       options.gradientStartX, options.gradientStartY, options.gradientEndX,
       options.gradientEndY);
-  resolved.alignmentColor =
-      options.alignmentColor.value_or(options.foregroundColor);
-  resolved.timingColor = options.timingColor.value_or(options.foregroundColor);
-  resolved.quietZoneColor =
-      options.quietZoneColor.value_or(options.backgroundColor);
-  resolved.finderInnerColor =
-      options.finderInnerColor.value_or(options.backgroundColor);
-  resolved.alignment = ::NitroQRCode::parseColor(resolved.alignmentColor);
-  resolved.timing = ::NitroQRCode::parseColor(resolved.timingColor);
-  resolved.quietZoneFill = ::NitroQRCode::parseColor(resolved.quietZoneColor);
-  resolved.finderInner = ::NitroQRCode::parseColor(resolved.finderInnerColor);
-  resolved.alignmentShape =
-      options.alignmentShape.value_or(options.moduleShape);
-  resolved.timingShape = options.timingShape.value_or(options.moduleShape);
+  resolved.strokeSet = options.strokeColor.has_value();
+  resolved.eyeSet = options.eyeColor.has_value();
+  resolved.eyeStrokeSet = options.eyeStrokeColor.has_value();
+  resolved.eyeballSet = options.eyeballColor.has_value();
+  if (options.alignmentColor.has_value()) {
+    resolved.alignmentSet = true;
+    resolved.alignmentColor = *options.alignmentColor;
+    resolved.alignment = ::NitroQRCode::parseColor(resolved.alignmentColor);
+  }
+  if (options.timingColor.has_value()) {
+    resolved.timingSet = true;
+    resolved.timingColor = *options.timingColor;
+    resolved.timing = ::NitroQRCode::parseColor(resolved.timingColor);
+  }
+  if (options.quietZoneColor.has_value()) {
+    resolved.quietZoneColor = *options.quietZoneColor;
+    resolved.quietZoneFill = ::NitroQRCode::parseColor(resolved.quietZoneColor);
+  }
+  if (options.finderInnerColor.has_value()) {
+    resolved.finderInnerColor = *options.finderInnerColor;
+    resolved.finderInner = ::NitroQRCode::parseColor(resolved.finderInnerColor);
+  }
+  if (options.alignmentShape.has_value()) {
+    resolved.alignmentShape = *options.alignmentShape;
+  }
+  if (options.timingShape.has_value()) {
+    resolved.timingShape = *options.timingShape;
+  }
   return resolved;
 }
 

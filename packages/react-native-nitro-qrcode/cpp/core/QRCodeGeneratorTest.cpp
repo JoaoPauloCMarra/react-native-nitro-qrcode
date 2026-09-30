@@ -16,6 +16,7 @@
 #include <zlib.h>
 
 using NitroQRCode::base64Encode;
+using NitroQRCode::Color;
 using NitroQRCode::encodePngRgba;
 using NitroQRCode::GenerateOptions;
 using NitroQRCode::parityCorpus;
@@ -179,7 +180,28 @@ std::string legacyCacheRequest(const std::string &value,
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
   appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  appendLegacyCacheNumber(request, (options.strokeSet ? 1 : 0) |
+                                       (options.eyeSet ? 2 : 0) |
+                                       (options.eyeStrokeSet ? 4 : 0) |
+                                       (options.eyeballSet ? 8 : 0) |
+                                       (options.alignmentSet ? 16 : 0) |
+                                       (options.timingSet ? 32 : 0));
   return request;
+}
+
+struct PngHeader {
+  int width = 0;
+  int height = 0;
+  int bitDepth = 0;
+  int colorType = 0;
+};
+
+PngHeader readPngHeader(const std::string &encoded) {
+  const std::vector<uint8_t> png = base64Decode(encoded);
+  assert(png.size() > 33);
+  assert(std::string(reinterpret_cast<const char *>(&png[12]), 4) == "IHDR");
+  return {static_cast<int>(readU32(png, 16)), static_cast<int>(readU32(png, 20)),
+          png[24], png[25]};
 }
 
 std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
@@ -187,6 +209,10 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
   const std::vector<uint8_t> png = base64Decode(encoded);
   assert(png.size() > 8);
   std::vector<uint8_t> compressed;
+  std::vector<uint8_t> palette;
+  std::vector<uint8_t> trns;
+  int bitDepth = 8;
+  int colorType = 6;
   size_t offset = 8;
   while (offset + 12 <= png.size()) {
     const uint32_t chunkSize = readU32(png, offset);
@@ -197,8 +223,17 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
     if (type == "IHDR") {
       width = static_cast<int>(readU32(png, dataOffset));
       height = static_cast<int>(readU32(png, dataOffset + 4));
-      assert(png[dataOffset + 8] == 8);
-      assert(png[dataOffset + 9] == 6);
+      bitDepth = png[dataOffset + 8];
+      colorType = png[dataOffset + 9];
+      assert((colorType == 6 && bitDepth == 8) ||
+             (colorType == 3 && (bitDepth == 1 || bitDepth == 2 ||
+                                 bitDepth == 4 || bitDepth == 8)));
+    } else if (type == "PLTE") {
+      palette.assign(png.begin() + dataOffset,
+                     png.begin() + dataOffset + chunkSize);
+    } else if (type == "tRNS") {
+      trns.assign(png.begin() + dataOffset,
+                  png.begin() + dataOffset + chunkSize);
     } else if (type == "IDAT") {
       compressed.insert(compressed.end(), png.begin() + dataOffset,
                         png.begin() + dataOffset + chunkSize);
@@ -208,7 +243,12 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
     offset = dataOffset + chunkSize + 4;
   }
 
-  const size_t rowBytes = static_cast<size_t>(width) * 4;
+  const size_t bytesPerPixel = colorType == 6 ? 4 : 1;
+  const size_t rowBytes =
+      colorType == 6
+          ? static_cast<size_t>(width) * 4
+          : (static_cast<size_t>(width) * static_cast<size_t>(bitDepth) + 7) /
+                8;
   std::vector<uint8_t> raw((rowBytes + 1) * static_cast<size_t>(height));
   uLongf rawSize = static_cast<uLongf>(raw.size());
   const int result = uncompress(raw.data(), &rawSize, compressed.data(),
@@ -216,7 +256,8 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
   assert(result == Z_OK);
   assert(rawSize == raw.size());
 
-  std::vector<uint8_t> rgba(rowBytes * static_cast<size_t>(height));
+  std::vector<uint8_t> rgba(static_cast<size_t>(width) *
+                            static_cast<size_t>(height) * 4);
   std::vector<uint8_t> previous(rowBytes, 0);
   for (int y = 0; y < height; y++) {
     const size_t rawRow = static_cast<size_t>(y) * (rowBytes + 1);
@@ -224,9 +265,10 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
     std::vector<uint8_t> row(raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1),
                              raw.begin() + static_cast<std::ptrdiff_t>(rawRow + 1 + rowBytes));
     for (size_t index = 0; index < rowBytes; index++) {
-      const uint8_t left = index >= 4 ? row[index - 4] : 0;
+      const uint8_t left = index >= bytesPerPixel ? row[index - bytesPerPixel] : 0;
       const uint8_t up = previous[index];
-      const uint8_t upLeft = index >= 4 ? previous[index - 4] : 0;
+      const uint8_t upLeft =
+          index >= bytesPerPixel ? previous[index - bytesPerPixel] : 0;
       uint8_t predictor = 0;
       switch (filter) {
       case 1:
@@ -253,9 +295,28 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
       }
       row[index] = static_cast<uint8_t>(row[index] + predictor);
     }
-    const size_t rgbaRow = static_cast<size_t>(y) * rowBytes;
-    std::copy(row.begin(), row.end(),
-              rgba.begin() + static_cast<std::ptrdiff_t>(rgbaRow));
+    const size_t rgbaRow =
+        static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
+    if (colorType == 6) {
+      std::copy(row.begin(), row.end(),
+                rgba.begin() + static_cast<std::ptrdiff_t>(rgbaRow));
+    } else {
+      const unsigned pixelsPerByte = 8U / static_cast<unsigned>(bitDepth);
+      const unsigned mask = (1U << static_cast<unsigned>(bitDepth)) - 1U;
+      for (int x = 0; x < width; x++) {
+        const uint8_t byte = row[static_cast<size_t>(x) / pixelsPerByte];
+        const unsigned shift =
+            8U - static_cast<unsigned>(bitDepth) *
+                     (static_cast<unsigned>(x) % pixelsPerByte + 1U);
+        const size_t entry = (byte >> shift) & mask;
+        assert(entry * 3 + 2 < palette.size());
+        const size_t out = rgbaRow + static_cast<size_t>(x) * 4;
+        rgba[out] = palette[entry * 3];
+        rgba[out + 1] = palette[entry * 3 + 1];
+        rgba[out + 2] = palette[entry * 3 + 2];
+        rgba[out + 3] = entry < trns.size() ? trns[entry] : 255;
+      }
+    }
     previous = std::move(row);
   }
   return rgba;
@@ -582,6 +643,7 @@ void testStyledPngGeneration() {
   options.eyeballShape = "circle";
   options.eyeStrokeColor = "#222222";
   options.eyeStroke = parseColor(options.eyeStrokeColor);
+  options.eyeStrokeSet = true;
   assertPngHeader(generator.renderPngBase64(
       "https://example.com/circle-body-square-frame-circle-eye", options));
 
@@ -651,6 +713,10 @@ void testStyledPngGeneration() {
   options.eye = parseColor(options.eyeColor);
   options.eyeStroke = parseColor(options.eyeStrokeColor);
   options.eyeball = parseColor(options.eyeballColor);
+  options.strokeSet = true;
+  options.eyeSet = true;
+  options.eyeStrokeSet = true;
+  options.eyeballSet = true;
   assertPngHeader(
       generator.renderPngBase64("https://example.com/layer-colors", options));
 
@@ -778,6 +844,9 @@ void testLogoAreaIsTransparent() {
   options.logoAreaBorderRadius = 4;
   const std::string encoded =
       generator.renderPngBase64("https://example.com/logo-hole", options);
+  const PngHeader header = readPngHeader(encoded);
+  assert(header.colorType == 3);
+  assert(header.bitDepth == 4);
 
   int width = 0;
   int height = 0;
@@ -796,6 +865,202 @@ void testLogoAreaIsTransparent() {
   assert(alphaAt(width / 2 - 10, height / 2) == 0);
   assert(alphaAt(width / 2 + 10, height / 2) == 0);
   assert(alphaAt(0, 0) == 255);
+}
+
+struct Rgba {
+  uint8_t r = 0;
+  uint8_t g = 0;
+  uint8_t b = 0;
+  uint8_t a = 0;
+  bool operator==(const Rgba &) const = default;
+};
+
+Rgba rgbaAt(const std::vector<uint8_t> &rgba, int width, int x, int y) {
+  const size_t offset =
+      (static_cast<size_t>(y) * static_cast<size_t>(width) +
+       static_cast<size_t>(x)) *
+      4;
+  return {rgba[offset], rgba[offset + 1], rgba[offset + 2], rgba[offset + 3]};
+}
+
+int moduleCenterPixel(int module, int quietZone, int imageSize,
+                      int totalModules) {
+  const int start = ((module + quietZone) * imageSize) / totalModules;
+  const int end = ((module + quietZone + 1) * imageSize) / totalModules;
+  return (start + end) / 2;
+}
+
+void setColor(std::string &name, Color &color, const std::string &value) {
+  name = value;
+  color = parseColor(value);
+}
+
+void setForeground(GenerateOptions &options, const std::string &foreground) {
+  setColor(options.foregroundColor, options.foreground, foreground);
+  setColor(options.alignmentColor, options.alignment, foreground);
+  setColor(options.timingColor, options.timing, foreground);
+}
+
+void setExplicitFinderColors(GenerateOptions &options, const std::string &eye,
+                             const std::string &eyeball) {
+  setColor(options.eyeColor, options.eye, eye);
+  setColor(options.eyeballColor, options.eyeball, eyeball);
+  options.eyeSet = true;
+  options.eyeballSet = true;
+}
+
+uint64_t fnv1a(const std::vector<uint8_t> &bytes) {
+  uint64_t hash = 14695981039346656037ULL;
+  for (uint8_t byte : bytes) {
+    hash ^= byte;
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
+void testFinderColorIsEncoderIndependent() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/finder-color";
+  const Rgba red = {255, 0, 0, 255};
+  const Rgba black = {0, 0, 0, 255};
+  for (const int logoAreaSize : {0, 20}) {
+    GenerateOptions options;
+    options.size = 200;
+    options.logoAreaSize = logoAreaSize;
+    setForeground(options, "#FF0000");
+    const std::string encoded = generator.renderPngBase64(value, options);
+    if (logoAreaSize == 0) {
+      const PngHeader header = readPngHeader(encoded);
+      assert(header.colorType == 3);
+      assert(header.bitDepth == 1);
+    }
+    int width = 0;
+    int height = 0;
+    const auto rgba = decodeRgbaPng(encoded, width, height);
+    const int matrixSize = generator.getMatrixSize(value, options);
+    const int totalModules = matrixSize + options.quietZone * 2;
+    const int frame = moduleCenterPixel(0, options.quietZone, width, totalModules);
+    const int eyeball = moduleCenterPixel(3, options.quietZone, width, totalModules);
+    assert(rgbaAt(rgba, width, frame, frame) == red);
+    assert(rgbaAt(rgba, width, eyeball, eyeball) == red);
+
+    setExplicitFinderColors(options, "#000000", "#000000");
+    const auto explicitBlack =
+        decodeRgbaPng(generator.renderPngBase64(value, options), width, height);
+    assert(rgbaAt(explicitBlack, width, frame, frame) == black);
+    assert(rgbaAt(explicitBlack, width, eyeball, eyeball) == black);
+  }
+}
+
+void testGradientFillsInheritedLayers() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/gradient-finder";
+  const Color from = parseColor("#0000FF");
+  const Color to = parseColor("#00FF00");
+  const auto expectedAt = [&](int x, int y, int size) {
+    const double nx = static_cast<double>(x) / static_cast<double>(size - 1);
+    const double ny = static_cast<double>(y) / static_cast<double>(size - 1);
+    const double t = std::clamp((nx + ny) / 2.0, 0.0, 1.0);
+    const auto mix = [t](uint8_t a, uint8_t b) {
+      return static_cast<uint8_t>(std::lround(
+          static_cast<double>(a) + (static_cast<double>(b) - a) * t));
+    };
+    return Rgba{mix(from.r, to.r), mix(from.g, to.g), mix(from.b, to.b), 255};
+  };
+  for (const int logoAreaSize : {0, 20}) {
+    GenerateOptions options;
+    options.size = 200;
+    options.minVersion = 2;
+    options.logoAreaSize = logoAreaSize;
+    options.gradient.type = "linear";
+    options.gradient.colors = {from, to};
+    options.gradient.locations = {0.0, 1.0};
+    int width = 0;
+    int height = 0;
+    const auto rgba =
+        decodeRgbaPng(generator.renderPngBase64(value, options), width, height);
+    const int matrixSize = generator.getMatrixSize(value, options);
+    const int totalModules = matrixSize + options.quietZone * 2;
+    const int frame = moduleCenterPixel(0, options.quietZone, width, totalModules);
+    const int eyeball = moduleCenterPixel(3, options.quietZone, width, totalModules);
+    const int timingX = moduleCenterPixel(8, options.quietZone, width, totalModules);
+    const int timingY = moduleCenterPixel(6, options.quietZone, width, totalModules);
+    assert(rgbaAt(rgba, width, frame, frame) == expectedAt(frame, frame, width));
+    assert(rgbaAt(rgba, width, eyeball, eyeball) ==
+           expectedAt(eyeball, eyeball, width));
+    assert(rgbaAt(rgba, width, timingX, timingY) ==
+           expectedAt(timingX, timingY, width));
+
+    setExplicitFinderColors(options, "#000000", "#000000");
+    options.timingSet = true;
+    const auto explicitBlack =
+        decodeRgbaPng(generator.renderPngBase64(value, options), width, height);
+    assert((rgbaAt(explicitBlack, width, frame, frame) == Rgba{0, 0, 0, 255}));
+    assert((rgbaAt(explicitBlack, width, eyeball, eyeball) ==
+            Rgba{0, 0, 0, 255}));
+    assert((rgbaAt(explicitBlack, width, timingX, timingY) ==
+            Rgba{0, 0, 0, 255}));
+  }
+}
+
+void testExplicitBlackStrokeMeansNoStroke() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/black-stroke";
+  GenerateOptions options;
+  options.size = 200;
+  options.moduleShape = "rounded";
+  setForeground(options, "#DC2626");
+  const std::string unset = generator.renderPngBase64(value, options);
+  setColor(options.strokeColor, options.stroke, "#000000");
+  setColor(options.eyeStrokeColor, options.eyeStroke, "#000000");
+  options.strokeSet = true;
+  options.eyeStrokeSet = true;
+  assert(generator.renderPngBase64(value, options) == unset);
+  setColor(options.strokeColor, options.stroke, "#0000FF");
+  assert(generator.renderPngBase64(value, options) != unset);
+}
+
+void testOutputMatchesPreviousRelease() {
+  QRCodeGenerator generator;
+  const std::string value = "https://example.com/nitro";
+  const auto pixelHash = [&](const GenerateOptions &options) {
+    int width = 0;
+    int height = 0;
+    return fnv1a(decodeRgbaPng(generator.renderPngBase64(value, options),
+                               width, height));
+  };
+
+  GenerateOptions plain;
+  plain.size = 360;
+  assert(fnv1a(generator.renderPngBytes(value, plain)) ==
+         9506524200599952492ULL);
+  assert(pixelHash(plain) == 4388331751467048253ULL);
+
+  GenerateOptions layered;
+  layered.size = 203;
+  layered.logoAreaSize = 41;
+  layered.logoAreaBorderRadius = 7;
+  setColor(layered.foregroundColor, layered.foreground, "#DC2626");
+  setColor(layered.backgroundColor, layered.background, "#FFFFFF80");
+  setExplicitFinderColors(layered, "#1E40AF", "#0F172A");
+  setColor(layered.alignmentColor, layered.alignment, "#00AA00");
+  setColor(layered.timingColor, layered.timing, "#AA00AA");
+  layered.alignmentSet = true;
+  layered.timingSet = true;
+  setColor(layered.quietZoneColor, layered.quietZoneFill, "#EEEEEE");
+  setColor(layered.finderInnerColor, layered.finderInner, "#FFFF00");
+  assert(readPngHeader(generator.renderPngBase64(value, layered)).colorType == 3);
+  assert(pixelHash(layered) == 17958135356535734173ULL);
+
+  GenerateOptions stroked;
+  stroked.size = 257;
+  stroked.logoAreaSize = 50;
+  stroked.moduleShape = "circle";
+  setForeground(stroked, "#DC2626");
+  setColor(stroked.strokeColor, stroked.stroke, "#0000FF");
+  stroked.strokeSet = true;
+  setExplicitFinderColors(stroked, "#DC2626", "#DC2626");
+  assert(pixelHash(stroked) == 10899789426982616000ULL);
 }
 
 void testTransparentBackgroundPng() {
@@ -1043,6 +1308,7 @@ void testSvgGeneration() {
   const std::string gradientSvg =
       generator.generateSvgString("Hello-gradient", options);
   assert(gradientSvg.find("radialGradient") != std::string::npos);
+  assert(gradientSvg.find("r=\"141.42%\"") != std::string::npos);
   assert(gradientSvg.find("url(#nitro-qrcode-gradient)") != std::string::npos);
 
   options.gradient.type = "linear";
@@ -1398,6 +1664,10 @@ int main() {
   testStyledPngGeneration();
   testCircleGeometryTolerance();
   testLogoAreaIsTransparent();
+  testFinderColorIsEncoderIndependent();
+  testGradientFillsInheritedLayers();
+  testExplicitBlackStrokeMeansNoStroke();
+  testOutputMatchesPreviousRelease();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

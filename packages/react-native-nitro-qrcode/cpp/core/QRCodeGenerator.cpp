@@ -178,14 +178,50 @@ double gradientProgressAt(const GradientOptions &gradient, int imageSize, int x,
          denominator;
 }
 
+constexpr Color NoStrokeColor = {0, 0, 0, 255};
+
+bool drawsBodyStroke(const GenerateOptions &options) {
+  return options.strokeSet && options.stroke != NoStrokeColor;
+}
+
+bool drawsEyeStroke(const GenerateOptions &options) {
+  return options.eyeStrokeSet && options.eyeStroke != NoStrokeColor;
+}
+
+bool hasCustomFinderColors(const GenerateOptions &options) {
+  return (options.eyeSet && options.eye != NoStrokeColor) ||
+         drawsEyeStroke(options) ||
+         (options.eyeballSet && options.eyeball != NoStrokeColor) ||
+         options.finderInner != options.background;
+}
+
+bool paintsSolidLayer(bool isSet, const Color &color,
+                      const GenerateOptions &options) {
+  return isSet && color != options.foreground;
+}
+
 bool hasCustomLayerColors(const GenerateOptions &options) {
-  constexpr Color defaultColor = {0, 0, 0, 255};
-  return options.stroke != defaultColor || options.eye != defaultColor ||
-         options.eyeStroke != defaultColor || options.eyeball != defaultColor ||
-         options.alignment != options.foreground ||
-         options.timing != options.foreground ||
+  return drawsBodyStroke(options) || drawsEyeStroke(options) ||
+         paintsSolidLayer(options.eyeSet, options.eye, options) ||
+         paintsSolidLayer(options.eyeballSet, options.eyeball, options) ||
+         paintsSolidLayer(options.alignmentSet, options.alignment, options) ||
+         paintsSolidLayer(options.timingSet, options.timing, options) ||
          options.quietZoneFill != options.background ||
          options.finderInner != options.background;
+}
+
+Color foregroundFillAt(const GenerateOptions &options, int imageSize, int x,
+                       int y) {
+  return hasGradient(options)
+             ? interpolateColor(
+                   options.gradient,
+                   gradientProgressAt(options.gradient, imageSize, x, y))
+             : options.foreground;
+}
+
+Color layerFillAt(bool isSet, const Color &color,
+                  const GenerateOptions &options, int imageSize, int x, int y) {
+  return isSet ? color : foregroundFillAt(options, imageSize, x, y);
 }
 
 Color colorForLayer(uint8_t layer, const GenerateOptions &options,
@@ -194,25 +230,24 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
   case 2:
     return options.stroke;
   case 3:
-    return options.eye;
+    return layerFillAt(options.eyeSet, options.eye, options, imageSize, x, y);
   case 4:
     return options.eyeStroke;
   case 5:
-    return options.eyeball;
+    return layerFillAt(options.eyeballSet, options.eyeball, options, imageSize,
+                       x, y);
   case AlignmentLayer:
-    return options.alignment;
+    return layerFillAt(options.alignmentSet, options.alignment, options,
+                       imageSize, x, y);
   case TimingLayer:
-    return options.timing;
+    return layerFillAt(options.timingSet, options.timing, options, imageSize,
+                       x, y);
   case FinderInnerLayer:
     return options.finderInner;
   case QuietZoneLayer:
     return options.quietZoneFill;
   case 1:
-    return hasGradient(options)
-               ? interpolateColor(
-                     options.gradient,
-                     gradientProgressAt(options.gradient, imageSize, x, y))
-               : options.foreground;
+    return foregroundFillAt(options, imageSize, x, y);
   case TransparentLayer:
     return {0, 0, 0, 0};
   default:
@@ -250,11 +285,12 @@ std::string svgColor(const Color &color) {
   return output.str();
 }
 
-std::string formatPercent(double value) {
+std::string formatPercent(double value, bool clampToUnit = true) {
   std::ostringstream output;
   output.setf(std::ios::fixed);
   output.precision(2);
-  output << (std::clamp(value, 0.0, 1.0) * 100.0) << "%";
+  output << ((clampToUnit ? std::clamp(value, 0.0, 1.0) : value) * 100.0)
+         << "%";
   return output.str();
 }
 
@@ -273,7 +309,7 @@ std::string createSvgGradient(const GenerateOptions &options) {
     defs << "<radialGradient id=\"nitro-qrcode-gradient\" cx=\""
          << formatPercent(options.gradient.startX) << "\" cy=\""
          << formatPercent(options.gradient.startY) << "\" r=\""
-         << formatPercent(radius) << "\">";
+         << formatPercent(radius, false) << "\">";
   } else {
     defs << "<linearGradient id=\"nitro-qrcode-gradient\" x1=\""
          << formatPercent(options.gradient.startX) << "\" y1=\""
@@ -909,6 +945,62 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
   return png;
 }
 
+std::vector<uint8_t> encodePngPalette(int width, int height,
+                                      const std::vector<uint8_t> &indices,
+                                      const std::vector<Color> &palette) {
+  constexpr unsigned bitDepth = 4;
+  const size_t rowBytes =
+      (static_cast<size_t>(width) * bitDepth + 7) / 8;
+  std::vector<uint8_t> raw((rowBytes + 1) * static_cast<size_t>(height), 0);
+  for (int y = 0; y < height; y++) {
+    const size_t rowOutputStart =
+        static_cast<size_t>(y) * (rowBytes + 1) + 1;
+    const size_t rowStart = static_cast<size_t>(y) * static_cast<size_t>(width);
+    for (int x = 0; x < width; x++) {
+      const uint8_t entry = indices[rowStart + static_cast<size_t>(x)];
+      const size_t byteIndex = rowOutputStart + static_cast<size_t>(x) / 2;
+      raw[byteIndex] = static_cast<uint8_t>(
+          raw[byteIndex] | ((x % 2 == 0) ? (entry << 4) : entry));
+    }
+  }
+
+  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
+  std::vector<uint8_t> ihdr;
+  writeU32(ihdr, static_cast<uint32_t>(width));
+  writeU32(ihdr, static_cast<uint32_t>(height));
+  ihdr.push_back(static_cast<uint8_t>(bitDepth));
+  ihdr.push_back(3);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  appendChunk(png, "IHDR", ihdr);
+
+  std::vector<uint8_t> plte;
+  std::vector<uint8_t> trns;
+  plte.reserve(palette.size() * 3);
+  trns.reserve(palette.size());
+  for (const Color &color : palette) {
+    plte.push_back(color.r);
+    plte.push_back(color.g);
+    plte.push_back(color.b);
+    trns.push_back(color.a);
+  }
+  appendChunk(png, "PLTE", plte);
+  appendChunk(png, "tRNS", trns);
+  appendChunk(png, "IDAT", zlibCompress(raw));
+  appendChunk(png, "IEND", {});
+  return png;
+}
+
+std::vector<Color> layerPalette(const GenerateOptions &options) {
+  std::vector<Color> palette;
+  palette.reserve(QuietZoneLayer + 1);
+  for (uint8_t layer = 0; layer <= QuietZoneLayer; layer++) {
+    palette.push_back(colorForLayer(layer, options, 1, 0, 0));
+  }
+  return palette;
+}
+
 } // namespace
 
 QRCodeGenerator::QRCodeGenerator(CacheKeyHasher cacheKeyHasher,
@@ -1037,11 +1129,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
       parseShape(options.timingShape, "timingShape");
   const std::vector<int> alignmentPositions =
       alignmentPatternPositions(matrix.size);
-  constexpr Color defaultColor = {0, 0, 0, 255};
-  const bool useCustomFinderColors = options.eye != defaultColor ||
-                                     options.eyeStroke != defaultColor ||
-                                     options.eyeball != defaultColor ||
-                                     options.finderInner != options.background;
+  const bool useCustomFinderColors = hasCustomFinderColors(options);
   const bool drawGroupedFinderEyes =
       eyePatternShape != ModuleShape::Square ||
       eyeballShape != ModuleShape::Square || useCustomFinderColors;
@@ -1104,7 +1192,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
       const ModuleNeighbors neighbors{
           isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
           isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
-      if (layer == 1 && options.stroke != defaultColor) {
+      if (layer == 1 && drawsBodyStroke(options)) {
         drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2,
                    neighbors);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
@@ -1120,7 +1208,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
     drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
                        totalModules, eyePatternShape, eyeballShape,
                        options.eyePatternCornerRadius,
-                       options.eyeStroke != defaultColor,
+                       drawsEyeStroke(options),
                        options.finderInner == options.background
                            ? 0
                            : FinderInnerLayer);
@@ -1128,13 +1216,13 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   clearLogoArea(indices, imageSize, options.logoAreaSize,
                 options.logoAreaBorderRadius);
 
-  const bool useRgbaOutput =
-      hasGradient(options) || hasCustomLayerColors(options) ||
-      options.logoAreaSize > 0;
   const std::vector<uint8_t> png =
-      useRgbaOutput
+      hasGradient(options)
           ? encodePngRgba(imageSize, imageSize,
                           renderLayeredRgba(indices, imageSize, options))
+      : hasCustomLayerColors(options) || options.logoAreaSize > 0
+          ? encodePngPalette(imageSize, imageSize, indices,
+                             layerPalette(options))
           : encodePngIndexed1(imageSize, imageSize, indices, options.foreground,
                               options.background);
   storeCacheEntry(key, request,
@@ -1326,6 +1414,12 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendCachePart(request, cacheDouble(options.gradient.startY));
   appendCachePart(request, cacheDouble(options.gradient.endX));
   appendCachePart(request, cacheDouble(options.gradient.endY));
+  appendCacheNumber(request, (options.strokeSet ? 1 : 0) |
+                                 (options.eyeSet ? 2 : 0) |
+                                 (options.eyeStrokeSet ? 4 : 0) |
+                                 (options.eyeballSet ? 8 : 0) |
+                                 (options.alignmentSet ? 16 : 0) |
+                                 (options.timingSet ? 32 : 0));
   return request;
 }
 

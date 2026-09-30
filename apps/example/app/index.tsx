@@ -300,10 +300,18 @@ export default function DemoScreen() {
   );
   const foregroundColor = resolveForegroundColor(foregroundConfig);
   const backgroundColor = resolveBackgroundColor(backgroundConfig);
-  const strokeColor = resolveSolidColor(strokeConfig, "#000000");
-  const eyeColor = resolveSolidColor(eyeConfig, "#000000");
-  const eyeStrokeColor = resolveSolidColor(eyeStrokeConfig, "#000000");
-  const eyeballColor = resolveSolidColor(eyeballConfig, "#000000");
+  const strokeColor = strokeConfig.enabled
+    ? resolveSolidColor(strokeConfig, "#000000")
+    : undefined;
+  const eyeColor = eyeConfig.enabled
+    ? resolveSolidColor(eyeConfig, "#000000")
+    : undefined;
+  const eyeStrokeColor = eyeStrokeConfig.enabled
+    ? resolveSolidColor(eyeStrokeConfig, "#000000")
+    : undefined;
+  const eyeballColor = eyeballConfig.enabled
+    ? resolveSolidColor(eyeballConfig, "#000000")
+    : undefined;
   const alignmentColor = alignmentConfig.enabled
     ? resolveSolidColor(alignmentConfig, "#000000")
     : undefined;

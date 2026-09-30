@@ -3,6 +3,8 @@ import { toError, type QRCodeOptions } from "./validation";
 
 export type QRCodeGenerationResult = {
   uri: string | undefined;
+  displayedValue: string | undefined;
+  pending: boolean;
   error: Error | undefined;
   options: QRCodeOptions;
 };
@@ -23,6 +25,7 @@ export function useQRCodeGeneration(
     uri: string;
   }>();
   const [generationError, setGenerationError] = useState<Error>();
+  const [failedOptions, setFailedOptions] = useState<QRCodeOptions>();
   const generationId = useRef(0);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
@@ -49,6 +52,7 @@ export function useQRCodeGeneration(
           return;
         }
         const nextError = toError(error);
+        setFailedOptions(options);
         const onErrorCallback = onErrorRef.current;
         if (onErrorCallback === undefined) {
           setGenerationError(nextError);
@@ -63,10 +67,14 @@ export function useQRCodeGeneration(
     };
   }, [generators, options]);
 
-  const uri =
-    keepPreviousImage || result?.options === options
-      ? result?.uri
-      : undefined;
+  const isCurrent = result?.options === options;
+  const uri = keepPreviousImage || isCurrent ? result?.uri : undefined;
 
-  return { uri, error: generationError, options };
+  return {
+    uri,
+    displayedValue: uri === undefined ? undefined : result?.options.value,
+    pending: !isCurrent && failedOptions !== options,
+    error: generationError,
+    options,
+  };
 }

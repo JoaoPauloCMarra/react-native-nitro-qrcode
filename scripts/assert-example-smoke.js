@@ -20,9 +20,6 @@ const FAILURE_TEXT = [
 ];
 const strict =
   process.argv.includes("--strict") || process.env.QRCODE_SMOKE_STRICT === "1";
-const selfCheck =
-  process.argv.includes("--self-check") ||
-  process.env.QRCODE_SMOKE_SELF_CHECK === "1";
 
 const results = [];
 
@@ -384,67 +381,30 @@ function smokePhysicalIos(udid) {
   recordResult("ios", "passed");
 }
 
-function runSelfCheck() {
-  console.log("[smoke] self-check: verifying terminal-state reporting");
-  const started = results.length;
-  recordResult("self-executed", "passed", "verification");
-  recordResult("self-skipped", "skipped", "verification");
-  recordResult("self-failed", "failed", "verification");
-  if (results.length !== started + 3) {
-    throw new Error("self-check failed to record every terminal state.");
-  }
-  const states = new Set(results.slice(started).map((result) => result.state));
-  if (
-    !states.has("passed") ||
-    !states.has("skipped") ||
-    !states.has("failed")
-  ) {
-    throw new Error(
-      `self-check did not record every terminal state: ${[...states].join(", ")}`,
-    );
-  }
-  results.splice(started);
-  const failureDetection = [
-    { state: "passed" },
-    { state: "skipped" },
-    { state: "failed" },
-  ].filter((result) => result.state === "failed");
-  if (failureDetection.length !== 1) {
-    throw new Error("self-check could not detect a failed result.");
-  }
-  console.log(
-    "[smoke] self-check passed: executed, skipped, and failed states are recorded",
+try {
+  smokeAndroid();
+} catch (error) {
+  recordResult("android", "failed", errorMessage(error));
+}
+try {
+  smokeIos();
+} catch (error) {
+  recordResult("ios", "failed", errorMessage(error));
+}
+const executed = results.filter((result) => result.state === "passed").length;
+const skipped = results.filter((result) => result.state === "skipped").length;
+const failed = results.filter((result) => result.state === "failed").length;
+console.log(
+  `[smoke] summary: ${results.length} results (${executed} passed, ${skipped} skipped, ${failed} failed)`,
+);
+if (failed > 0) {
+  process.exit(1);
+}
+if (strict && executed === 0) {
+  throw new Error(
+    "Strict smoke requires at least one executed case; both platforms were skipped.",
   );
 }
-
-if (selfCheck) {
-  runSelfCheck();
-} else {
-  try {
-    smokeAndroid();
-  } catch (error) {
-    recordResult("android", "failed", errorMessage(error));
-  }
-  try {
-    smokeIos();
-  } catch (error) {
-    recordResult("ios", "failed", errorMessage(error));
-  }
-  const executed = results.filter((result) => result.state === "passed").length;
-  const skipped = results.filter((result) => result.state === "skipped").length;
-  const failed = results.filter((result) => result.state === "failed").length;
-  console.log(
-    `[smoke] summary: ${results.length} results (${executed} passed, ${skipped} skipped, ${failed} failed)`,
-  );
-  if (failed > 0) {
-    process.exit(1);
-  }
-  if (strict && executed === 0) {
-    throw new Error(
-      "Strict smoke requires at least one executed case; both platforms were skipped.",
-    );
-  }
-  if (results.length === 0) {
-    throw new Error("Smoke recorded no results; it cannot silently pass.");
-  }
+if (results.length === 0) {
+  throw new Error("Smoke recorded no results; it cannot silently pass.");
 }

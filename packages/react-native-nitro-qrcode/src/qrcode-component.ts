@@ -210,7 +210,6 @@ export function createQRCodeComponent(
       maxVersion,
       mask,
       boostEcl,
-      orbit,
       shapeOptions,
       logoAreaSize,
       logoAreaBorderRadius,
@@ -391,7 +390,6 @@ export function createQRCodeComponent(
         maxVersion,
         mask,
         boostEcl,
-        orbit,
         shapeOptions: scaleShapeOptions(
           mergePresetShapeOptions(stableShapeOptions, preset),
           rasterScale,
@@ -423,7 +421,6 @@ export function createQRCodeComponent(
         maxVersion,
         mask,
         boostEcl,
-        orbit,
         preset,
         stableShapeOptions,
         rasterScale,
@@ -432,7 +429,12 @@ export function createQRCodeComponent(
       ],
     );
 
-    const { uri, error: generationError } = useQRCodeGeneration(
+    const {
+      uri,
+      displayedValue,
+      pending,
+      error: generationError,
+    } = useQRCodeGeneration(
       options,
       generators,
       keepPreviousImage,
@@ -483,10 +485,10 @@ export function createQRCodeComponent(
         accessible: true,
         accessibilityRole: "image" as const,
         accessibilityLabel:
-          uri === undefined
+          displayedValue === undefined
             ? generatingAccessibilityLabel()
-            : qrCodeAccessibilityLabel(value),
-        accessibilityState: { busy: uri === undefined },
+            : qrCodeAccessibilityLabel(displayedValue),
+        accessibilityState: { busy: pending },
       },
       uri === undefined && placeholder,
       imageUris.map((imageUri) =>

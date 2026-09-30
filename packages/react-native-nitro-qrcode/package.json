@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-qrcode",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Fast QR code generator for React Native and Expo with Nitro, native C++, PNG export, gradients, and no react-native-svg or Skia.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
@@ -10,16 +10,27 @@
   "source": "src/index.ts",
   "exports": {
     ".": {
-      "react-native": "./src/index.ts",
       "browser": "./src/index.web.ts",
+      "react-native": "./src/index.ts",
+      "node": {
+        "import": {
+          "types": "./lib/typescript/module/index.d.ts",
+          "default": "./lib/module/index.web.js"
+        },
+        "require": {
+          "types": "./lib/typescript/commonjs/index.d.ts",
+          "default": "./lib/commonjs/index.web.js"
+        }
+      },
       "import": {
         "types": "./lib/typescript/module/index.d.ts",
-        "default": "./lib/module/index.js"
+        "default": "./lib/module/index.web.js"
       },
       "require": {
         "types": "./lib/typescript/commonjs/index.d.ts",
-        "default": "./lib/commonjs/index.js"
-      }
+        "default": "./lib/commonjs/index.web.js"
+      },
+      "default": "./lib/module/index.web.js"
     },
     "./app.plugin": "./app.plugin.js",
     "./app.plugin.js": "./app.plugin.js",
@@ -141,7 +152,7 @@
   "peerDependencies": {
     "react": ">=18.2.0 <20.0.0",
     "react-dom": ">=18.2.0 <20.0.0",
-    "react-native": ">=0.75.0 <1.0.0",
+    "react-native": ">=0.77.0 <1.0.0",
     "react-native-nitro-modules": ">=0.37.0 <0.38.0",
     "react-native-web": ">=0.19.0 <1.0.0"
   },
