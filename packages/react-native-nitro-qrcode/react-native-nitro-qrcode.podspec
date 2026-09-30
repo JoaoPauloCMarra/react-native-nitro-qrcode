@@ -1,6 +1,7 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+min_ios = defined?(min_ios_version_supported) ? min_ios_version_supported : "15.1"
 
 Pod::Spec.new do |s|
   s.name         = "react-native-nitro-qrcode"
@@ -10,7 +11,7 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => "16.4" }
+  s.platforms    = { :ios => min_ios }
   s.source       = { :git => "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode.git", :tag => "v#{s.version}" }
   s.module_name  = "NitroQRCode"
 
