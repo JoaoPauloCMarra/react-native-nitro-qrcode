@@ -3,6 +3,7 @@
 #include "QRCodeGenerator.hpp"
 #include "qrcodegen.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -17,6 +18,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <zlib.h>
 
 extern "C" {
 #include "quirc.h"
@@ -802,6 +804,159 @@ void testReturnedPngDoesNotRetainEncoderCapacity() {
   assert(direct.capacity() <= direct.size() * 2);
 }
 
+uint32_t readBigEndian32(const std::vector<uint8_t> &bytes, size_t offset) {
+  return (static_cast<uint32_t>(bytes[offset]) << 24) |
+         (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
+         (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
+         static_cast<uint32_t>(bytes[offset + 3]);
+}
+
+size_t assertStreamedRgbaPngStructure(const std::vector<uint8_t> &png,
+                                      int expectedSize) {
+  const std::vector<uint8_t> signature = {137, 80, 78, 71, 13, 10, 26, 10};
+  assert(png.size() > signature.size());
+  assert(std::equal(signature.begin(), signature.end(), png.begin()));
+  std::vector<std::string> types;
+  size_t idatBytes = 0;
+  size_t offset = signature.size();
+  while (offset < png.size()) {
+    assert(offset + 12 <= png.size());
+    const size_t length = readBigEndian32(png, offset);
+    assert(offset + 12 + length <= png.size());
+    const std::string type(reinterpret_cast<const char *>(&png[offset + 4]), 4);
+    const uint32_t expectedCrc = static_cast<uint32_t>(
+        crc32(crc32(0L, Z_NULL, 0), &png[offset + 4],
+              static_cast<uInt>(length + 4)));
+    assert(readBigEndian32(png, offset + 8 + length) == expectedCrc);
+    if (type == "IHDR") {
+      assert(length == 13);
+      assert(readBigEndian32(png, offset + 8) ==
+             static_cast<uint32_t>(expectedSize));
+      assert(readBigEndian32(png, offset + 12) ==
+             static_cast<uint32_t>(expectedSize));
+      assert(png[offset + 16] == 8 && png[offset + 17] == 6);
+      assert(png[offset + 18] == 0 && png[offset + 19] == 0 &&
+             png[offset + 20] == 0);
+    } else if (type == "IDAT") {
+      assert(length > 0 && length <= 64 * 1024);
+      idatBytes += length;
+    } else {
+      assert(type == "IEND" && length == 0);
+    }
+    types.push_back(type);
+    offset += 12 + length;
+  }
+  assert(offset == png.size());
+  assert(types.size() >= 3);
+  assert(types.front() == "IHDR" && types.back() == "IEND");
+  for (size_t index = 1; index + 1 < types.size(); index++) {
+    assert(types[index] == "IDAT");
+  }
+  return idatBytes;
+}
+
+std::vector<GenerateOptions> gradientVariants(int size) {
+  std::vector<GenerateOptions> variants;
+  GenerateOptions linear;
+  linear.size = size;
+  linear.gradient.type = "linear";
+  linear.gradient.colors = {parseColor("#111111"), parseColor("#F5A623")};
+  variants.push_back(linear);
+
+  GenerateOptions radialLogo = linear;
+  radialLogo.gradient.type = "radial";
+  radialLogo.gradient.startX = 0.5;
+  radialLogo.gradient.startY = 0.5;
+  radialLogo.errorCorrectionLevel = "H";
+  radialLogo.logoAreaSize = size * 3 / 10;
+  radialLogo.logoAreaBorderRadius = size / 20;
+  radialLogo.quietZone = 0;
+  variants.push_back(radialLogo);
+
+  GenerateOptions translucent = linear;
+  translucent.background = parseColor("transparent");
+  translucent.backgroundColor = "transparent";
+  translucent.quietZoneFill = translucent.background;
+  translucent.finderInner = translucent.background;
+  translucent.moduleShape = "circle";
+  translucent.eyePatternShape = "rounded";
+  translucent.eyeballShape = "diamond";
+  translucent.gradient.colors = {
+      parseColor("#FF000080"), parseColor("#00FF00"), parseColor("#0000FF40"),
+      parseColor("#000000"),   parseColor("#FFFFFF"), parseColor("#12345678"),
+      parseColor("#ABCDEF"),   parseColor("#00000000")};
+  translucent.gradient.locations = {0.0, 0.1, 0.2, 0.2, 0.5, 0.75, 0.9, 1.0};
+  variants.push_back(translucent);
+
+  GenerateOptions layered = linear;
+  layered.minVersion = 8;
+  layered.strokeSet = true;
+  layered.stroke = parseColor("#00AA00");
+  layered.eyeSet = true;
+  layered.eye = parseColor("#AA0000");
+  layered.eyeStrokeSet = true;
+  layered.eyeStroke = parseColor("#0000AA");
+  layered.alignmentSet = true;
+  layered.alignment = parseColor("#AA00AA");
+  layered.quietZoneFill = parseColor("#EEEEEE");
+  layered.finderInner = parseColor("#FFFFCC");
+  layered.quietZone = 32;
+  variants.push_back(layered);
+  return variants;
+}
+
+void testStreamedGradientPixelsMatchFpng() {
+  const int never = std::numeric_limits<int>::max();
+  const std::string value = "https://example.com/streamed-gradient";
+  for (const int size : {1, 64, 257, 1024, 1025, 1500}) {
+    for (const GenerateOptions &options : gradientVariants(size)) {
+      QRCodeGenerator streamed({}, QRCodeGenerator::DefaultMaxCacheBytes, 0);
+      QRCodeGenerator buffered({}, QRCodeGenerator::DefaultMaxCacheBytes,
+                               never);
+      QRCodeGenerator standard;
+      const auto streamedPng = streamed.renderPngBytes(value, options);
+      const auto bufferedPng = buffered.renderPngBytes(value, options);
+      const auto standardPng = standard.renderPngBytes(value, options);
+
+      int streamedWidth = 0;
+      int streamedHeight = 0;
+      int bufferedWidth = 0;
+      int bufferedHeight = 0;
+      const auto streamedPixels = decodePngBase64ToRgba(
+          NitroQRCode::base64Encode(streamedPng), streamedWidth,
+          streamedHeight);
+      const auto bufferedPixels = decodePngBase64ToRgba(
+          NitroQRCode::base64Encode(bufferedPng), bufferedWidth,
+          bufferedHeight);
+      assert(streamedWidth == bufferedWidth);
+      assert(streamedHeight == bufferedHeight);
+      assert(streamedPixels == bufferedPixels);
+      assertStreamedRgbaPngStructure(streamedPng, streamedWidth);
+      assert(streamedPng.capacity() <= streamedPng.size() * 2);
+
+      const bool large =
+          streamedWidth > QRCodeGenerator::DefaultStreamedRgbaMinSize;
+      assert(standardPng == (large ? streamedPng : bufferedPng));
+      assert(streamed.renderPngBytes(value, options) == streamedPng);
+      assert(streamed.getCacheSize() == 1);
+    }
+  }
+}
+
+void testStreamedGradientSpansManyIdatChunks() {
+  GenerateOptions options;
+  options.size = 1400;
+  options.minVersion = 40;
+  options.moduleShape = "circle";
+  options.gradient.type = "linear";
+  options.gradient.colors = {parseColor("#FF0000"), parseColor("#00FF00"),
+                             parseColor("#0000FF80")};
+  QRCodeGenerator generator;
+  const auto png = generator.renderPngBytes("idat-chunks", options);
+  const size_t idatBytes = assertStreamedRgbaPngStructure(png, 1400);
+  assert(idatBytes > 3 * 64 * 1024);
+}
+
 void testEncodePngRgbaDimensionGuards() {
   using NitroQRCode::encodePngRgba;
   const int intMax = std::numeric_limits<int>::max();
@@ -856,6 +1011,8 @@ void runQRCodeHardeningTests() {
   testOversizedValueIsRejectedLikeTheEncoder();
   testConcurrentLargeRendersMatchSerialOutput();
   testReturnedPngDoesNotRetainEncoderCapacity();
+  testStreamedGradientPixelsMatchFpng();
+  testStreamedGradientSpansManyIdatChunks();
   testEncodePngRgbaDimensionGuards();
   testBase64OutputLengthIsExact();
   testVersion40CapacityBoundaries();

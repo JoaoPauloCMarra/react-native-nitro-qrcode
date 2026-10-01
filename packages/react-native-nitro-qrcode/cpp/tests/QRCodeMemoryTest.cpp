@@ -15,6 +15,9 @@
 #include <thread>
 #include <vector>
 
+std::vector<uint8_t> decodePngBase64ToRgba(const std::string &encoded,
+                                           int &width, int &height);
+
 namespace {
 
 constexpr size_t HeaderBytes = alignof(std::max_align_t) > sizeof(size_t)
@@ -264,7 +267,7 @@ void testPeakMemoryForLargestImages() {
   const Case cases[] = {
       {"flat 1-bit", &flat, 22 * MiB},
       {"layered palette", &layered, 28 * MiB},
-      {"gradient RGBA", &gradient, 328 * MiB},
+      {"gradient RGBA", &gradient, 22 * MiB},
   };
   for (const Case &entry : cases) {
     QRCodeGenerator generator;
@@ -288,7 +291,7 @@ void testPeakMemoryForLargestImages() {
   }
 }
 
-void testConcurrentLargestGradientsDoNotMultiplyPeak() {
+void testConcurrentLargestGradientsStayBounded() {
   GenerateOptions options = largestOptions();
   options.gradient.type = "radial";
   options.gradient.colors = {parseColor("#000000"), parseColor("#1A237E")};
@@ -318,20 +321,79 @@ void testConcurrentLargestGradientsDoNotMultiplyPeak() {
   }
   const size_t concurrentPeak = scope.peak();
   std::cout << "peak heap, 4 concurrent 4096px gradients: "
-            << concurrentPeak / MiB << " MiB (single " << singlePeak / MiB
-            << " MiB)" << std::endl;
+            << concurrentPeak / 1024 << " KiB (single " << singlePeak / 1024
+            << " KiB)" << std::endl;
   assert(completed.load() == 4);
-  assert(concurrentPeak <= singlePeak + 16 * MiB);
+  assert(concurrentPeak <= 4 * singlePeak + 4 * MiB);
+  assert(concurrentPeak <= 96 * MiB);
 }
 
-void testGradientEncoderShareOfPeak() {
-  const std::vector<uint8_t> rgba(static_cast<size_t>(4096) * 4096 * 4, 0x40);
+void testBufferedGradientEncoderPeakAtStreamingThreshold() {
+  const int size = QRCodeGenerator::DefaultStreamedRgbaMinSize;
+  GenerateOptions options;
+  options.size = size;
+  options.gradient.type = "radial";
+  options.gradient.colors = {parseColor("#000000"), parseColor("#1A237E")};
+  QRCodeGenerator generator;
   PeakScope scope;
-  assert(!NitroQRCode::encodePngRgba(4096, 4096, rgba).empty());
-  std::cout << "peak heap, fpng encode of a 4096px RGBA plane (input "
-            << rgba.size() / MiB << " MiB excluded): " << scope.peak() / MiB
-            << " MiB" << std::endl;
-  assert(scope.peak() <= 264 * MiB);
+  assert(!generator.renderPngBytes("threshold-peak", options).empty());
+  std::cout << "peak heap, " << size << "px gradient on the fpng path: "
+            << scope.peak() / 1024 << " KiB" << std::endl;
+  assert(scope.peak() <= 24 * MiB);
+}
+
+void testStreamedGradientMatchesFpngPixelsAtLargestSize() {
+  GenerateOptions options = largestOptions();
+  options.gradient.type = "radial";
+  options.gradient.colors = {parseColor("#000000"), parseColor("#1A237E"),
+                             parseColor("#FF000080")};
+  QRCodeGenerator streamed;
+  QRCodeGenerator buffered({}, QRCodeGenerator::DefaultMaxCacheBytes,
+                           std::numeric_limits<int>::max());
+  int width = 0;
+  int height = 0;
+  const auto streamedPng = streamed.renderPngBase64("largest", options);
+  const auto streamedPixels = decodePngBase64ToRgba(streamedPng, width, height);
+  assert(width == 4096 && height == 4096);
+  PeakScope scope;
+  const auto bufferedPng = buffered.renderPngBase64("largest", options);
+  const size_t bufferedPeak = scope.peak();
+  const auto bufferedPixels = decodePngBase64ToRgba(bufferedPng, width, height);
+  assert(streamedPixels == bufferedPixels);
+  std::cout << "4096px gradient: streamed png " << streamedPng.size() * 3 / 4096
+            << " KiB, fpng png " << bufferedPng.size() * 3 / 4096
+            << " KiB, fpng path peak heap " << bufferedPeak / MiB << " MiB"
+            << std::endl;
+}
+
+void testStreamedRenderSurvivesAllocationFailure() {
+  GenerateOptions options;
+  options.size = 1100;
+  options.gradient.type = "linear";
+  options.gradient.colors = {parseColor("#000000"), parseColor("#1A237E")};
+  const std::string value = "streamed-allocation-failure";
+  const std::vector<uint8_t> reference =
+      QRCodeGenerator().renderPngBytes(value, options);
+  const size_t baseline = liveBytes.load();
+  long failures = 0;
+  for (long failAt = 0;; failAt++) {
+    QRCodeGenerator generator;
+    std::vector<uint8_t> output;
+    failAfterAllocations = failAt;
+    const bool failed = failsWithBadAlloc(
+        [&]() { output = generator.renderPngBytes(value, options); });
+    if (!failed) {
+      assert(output == reference);
+      break;
+    }
+    failures++;
+    assert(generator.getCacheSize() == 0);
+    assert(generator.memorySize() <= QRCodeGenerator::MaxCombinedCacheBytes);
+  }
+  std::cout << "streamed render: " << failures
+            << " injected allocation failures survived" << std::endl;
+  assert(failures > 50);
+  assert(liveBytes.load() == baseline);
 }
 
 void testOversizedPayloadIsRejectedWithLinearMemory() {
@@ -424,8 +486,10 @@ void runQRCodeMemoryTests() {
   testRenderSurvivesEveryAllocationFailure();
   testLargeAllocationFailureLeavesGeneratorUsable();
   testPeakMemoryForLargestImages();
-  testConcurrentLargestGradientsDoNotMultiplyPeak();
-  testGradientEncoderShareOfPeak();
+  testConcurrentLargestGradientsStayBounded();
+  testBufferedGradientEncoderPeakAtStreamingThreshold();
+  testStreamedGradientMatchesFpngPixelsAtLargestSize();
+  testStreamedRenderSurvivesAllocationFailure();
   testOversizedPayloadIsRejectedWithLinearMemory();
   testOutOfRangeOptionsAreRejectedBeforeImageAllocation();
   testCacheHeapStaysBounded();
