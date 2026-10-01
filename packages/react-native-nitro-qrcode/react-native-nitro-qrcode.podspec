@@ -24,6 +24,7 @@ Pod::Spec.new do |s|
     "cpp/vendor/fpng/fpng.h",
     "cpp/vendor/fpng/fpng_unity.cpp"
   ]
+  s.exclude_files = "cpp/**/*Test.cpp"
   s.preserve_paths = "cpp/vendor/fpng/fpng.cpp"
 
   s.pod_target_xcconfig = {

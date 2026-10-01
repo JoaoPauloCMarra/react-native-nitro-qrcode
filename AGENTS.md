@@ -5,7 +5,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 ## Workspace Map
 
 - Monorepo layout: `packages/react-native-nitro-qrcode` (library), `apps/example` (Expo Router example).
-- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored Nayuki encoder, `vendor/fpng/` RGBA PNG writer for gradients; flat and layered PNGs use the zlib indexed/palette writers). Host-only `cpp/tests/quirc` is for C++ scan-back tests.
+- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored Nayuki encoder, `vendor/fpng/` RGBA PNG writer for gradients of 1024 px or smaller, larger gradients use the streamed zlib RGBA writer in `core/`; flat and layered PNGs use the zlib indexed/palette writers). Host-only `cpp/tests/quirc` is for C++ scan-back tests.
 - Native shell: `packages/react-native-nitro-qrcode/android`; iOS is wired through the podspec plus generated Nitrogen files.
 - Expo config plugin: `packages/react-native-nitro-qrcode/app.plugin.js`.
 
@@ -13,6 +13,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 
 - Package manager: `bun` / `bunx`. Bun workspaces are the only orchestration layer; root scripts delegate with `bun run --cwd ...` (no Turborepo).
 - Root quality gate: `bun run check` (lint including root scripts, types, coverage, C++ tests, build, example checks, lifecycle tests). CI gate: `bun run check:ci` (adds C++ sanitizers). Device-free release gate: `bun run release:preflight:ci` (adds benchmark, package audit, and dry-run publish; used by the publish workflow). Local release gate: `bun run release:preflight` (runs `release:preflight:ci`, then `example:smoke -- --strict`).
+- Example React Compiler is on (`experiments.reactCompiler`). Never write try/finally without catch inside a React component or hook. The compiler cannot lower it ("Handle TryStatement without a catch clause") and skips the whole function. Use promise.finally() for async cleanup, or a real catch that handles or reports the error. try/catch/finally is not this bailout. Example lint fails that form (`TryStatement[handler=null]` via `compiler-bailout/no-try-without-catch`). A compiler bailout fails the check. It is not a type or lint warning to ignore.
 - Example checks: `bun run example:check`; native builds via `example:android:assemble` / `example:ios:build` after `example:prebuild`.
 - Example E2E scripts open labs by scheme (`qrcode://e2e`, `qrcode://e2e-render`, …). Do not route flows through the home `open-e2e-lab` gate. On a physical iPhone use `bun run example:e2e:ios-device -- <udid>` (`bash scripts/run-ios-device-e2e.sh`), which rejects suites with no steps, launches via CoreDevice `--payload-url` then attaches agent-device.
 - LLVM: CI pins LLVM 18; the C++ scripts prefer `clang++-18`/`llvm-profdata-18`/`llvm-cov-18` and fall back to unversioned tools.

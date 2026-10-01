@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.9.1] - 2026-10-01
+
+### Breaking changes
+
+None.
+
+### Changed
+
+- Native gradient PNGs larger than 1024 px are written by a streaming encoder. Peak native memory for a 4096 px gradient drops from about 320 MiB to about 18 MiB. These PNGs decode to the same pixels as in 0.9.0, but their bytes and file size differ (15 to 35% larger for opaque gradients in host measurements), and encoding took 35 to 45% longer in the same measurements. Gradients of 1024 px or smaller, and all two-color and palette PNGs, are byte-identical to 0.9.0.
+
+### Fixed
+
+- The native cache no longer becomes inconsistent, or crashes during eviction, when a memory allocation fails while it stores an entry.
+- PNG buffers returned by the `generatePngArrayBuffer*` methods are sized to the PNG instead of keeping the encoder's working capacity, which could be several megabytes for a gradient.
+- Native PNG generation releases an internal buffer before encoding, which lowers peak memory by 2 to 8 MiB at 4096 px for two-color and palette PNGs.
+- Values of 65,536 bytes or more are rejected immediately with the same `Segment too long` error, without first copying the value.
+- The podspec excludes C++ test sources, so path and git installs no longer compile them into the pod.
+- The native RGBA PNG size check is overflow-safe on 32-bit Android. The JavaScript API could not reach the overflow.
+- The README documents that the deprecated positional async native methods throw synchronously for invalid numeric and color options.
+
 ## [0.9.0] - 2026-09-30
 
 ### Breaking changes

@@ -25,8 +25,13 @@ using NitroQRCode::QRCodeGenerator;
 
 void runQRCodeBridgeOptionsTests();
 void runQRCodeScanTests();
+void runQRCodeHardeningTests();
 #ifdef NITRO_HYBRID_BINDING_TEST
 void runHybridQRCodeTests();
+void runHybridQRCodeHardeningTests();
+#endif
+#ifdef NITRO_QRCODE_MEMORY_TEST
+void runQRCodeMemoryTests();
 #endif
 
 namespace {
@@ -1652,6 +1657,11 @@ void testGradientStopBounds() {
   }
 }
 
+std::vector<uint8_t> decodePngBase64ToRgba(const std::string &encoded,
+                                           int &width, int &height) {
+  return decodeRgbaPng(encoded, width, height);
+}
+
 int main() {
   testGradientStopBounds();
   testPngGeneration();
@@ -1680,8 +1690,13 @@ int main() {
   testValidation();
   runQRCodeBridgeOptionsTests();
   runQRCodeScanTests();
+  runQRCodeHardeningTests();
 #ifdef NITRO_HYBRID_BINDING_TEST
   runHybridQRCodeTests();
+  runHybridQRCodeHardeningTests();
+#endif
+#ifdef NITRO_QRCODE_MEMORY_TEST
+  runQRCodeMemoryTests();
 #endif
   std::cout << "QRCodeGenerator tests passed" << std::endl;
   return 0;
