@@ -68,17 +68,6 @@ jobs:
       - name: JavaScript coverage
         run: bun run test:coverage -- --runInBand --watchman=false
 
-      - name: C++ tests
-        run: bun run test:cpp
-
-      - name: C++ sanitizers
-        run: |
-          sudo sysctl vm.mmap_rnd_bits=28
-          bun run test:cpp:sanitize
-
-      - name: C++ benchmark smoke
-        run: bun run benchmark:cpp:smoke
-
       - name: Test lifecycle and release contracts
         run: bun run test:lifecycle
 
@@ -90,3 +79,37 @@ jobs:
 
       - name: Validate auth-free publication
         run: bun run publish-package:dry-run
+
+  cpp:
+    name: C++ tests and sanitizers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Setup LLVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 llvm-18
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: C++ tests
+        run: bun run test:cpp
+
+      - name: C++ sanitizers
+        run: |
+          sudo sysctl vm.mmap_rnd_bits=28
+          bun run test:cpp:sanitize
+
+      - name: C++ benchmark smoke
+        run: bun run benchmark:cpp:smoke
