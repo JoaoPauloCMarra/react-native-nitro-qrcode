@@ -269,6 +269,12 @@ base64 and data-URI methods remain thin wrappers over that byte path. The four o
 positional PNG methods remain available only as deprecated compatibility
 wrappers; they are not used by the JavaScript entrypoints.
 
+The positional async methods (`generatePngBase64Async`,
+`generatePngDataUriAsync`) validate numeric and color options synchronously and
+throw before a promise is returned. The object-shaped `*AsyncObject` methods
+report every error through the returned promise. Wrap positional calls in
+`try`/`catch` and also handle the promise rejection.
+
 `getMatrix` returns the QR symbol size and a Base64-encoded, row-major bitset.
 Each module uses one bit, most-significant bit first; dark modules are `1`.
 Rendering-only options such as colors, size, shapes, gradients, and logo area do
@@ -383,8 +389,10 @@ Option loss and platform differences:
   the C++ renderer (macOS, `clang++ -O2`, one call) peaked at about 23 MB for
   a two-color 4096 px code, 36 MB for a 4096 px palette code with a logo area
   or custom layer colors, and 355 MB for a 4096 px gradient (about 90 MB at
-  2048 px). Keep gradient exports near the displayed size, and avoid running
-  many large gradient exports in parallel.
+  2048 px). Keep gradient exports near the displayed size. Native PNG renders
+  larger than 1024 px run one at a time, so parallel large exports queue
+  instead of multiplying peak memory; a synchronous large export waits for an
+  asynchronous one that is already running.
 - **Styled modules** stay on the standard QR matrix. `classy` connects
   neighbors, `diamond` draws rhombi, and `squircle` uses extra-rounded cells.
   Rust crates such as `qr-code-styling` and `modo-rs` were not vendored; the
