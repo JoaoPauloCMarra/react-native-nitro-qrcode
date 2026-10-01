@@ -91,6 +91,7 @@ public:
   using CacheKeyHasher = std::function<std::string(const std::string &)>;
 
   static constexpr size_t DefaultMaxCacheBytes = 4 * 1024 * 1024;
+  static constexpr int DefaultStreamedRgbaMinSize = 1024;
   static constexpr size_t MaxMatrixCacheBytes = 512 * 1024;
   static constexpr size_t MaxCombinedCacheBytes =
       DefaultMaxCacheBytes + MaxMatrixCacheBytes;
@@ -101,7 +102,8 @@ public:
   };
 
   explicit QRCodeGenerator(CacheKeyHasher cacheKeyHasher = {},
-                           size_t maxCacheBytes = DefaultMaxCacheBytes);
+                           size_t maxCacheBytes = DefaultMaxCacheBytes,
+                           int streamedRgbaMinSize = DefaultStreamedRgbaMinSize);
   std::vector<uint8_t> renderPngBytes(const std::string &value,
                                       const GenerateOptions &options);
   std::string renderPngBase64(const std::string &value,
@@ -125,6 +127,7 @@ private:
   static constexpr size_t MaxMatrixCacheEntries = 32;
 
   CacheKeyHasher cacheKeyHasher_;
+  int streamedRgbaMinSize_;
   BoundedCache<std::string> outputCache_;
   BoundedCache<MatrixObject> matrixCache_;
 

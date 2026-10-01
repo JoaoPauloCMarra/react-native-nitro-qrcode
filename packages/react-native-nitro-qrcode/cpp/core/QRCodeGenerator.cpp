@@ -26,12 +26,7 @@ constexpr uint8_t TimingLayer = 8;
 constexpr uint8_t FinderInnerLayer = 9;
 constexpr uint8_t QuietZoneLayer = 10;
 constexpr size_t SegmentTooLongChars = 65536;
-constexpr int SerializedRenderMinSize = 1024;
-
-std::mutex &largeRenderMutex() {
-  static std::mutex mutex;
-  return mutex;
-}
+constexpr size_t IdatChunkBytes = 64 * 1024;
 
 enum class ModuleShape {
   Square,
@@ -263,24 +258,29 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
   }
 }
 
+void writeLayeredRow(const std::vector<uint8_t> &indices, int imageSize, int y,
+                     const GenerateOptions &options, uint8_t *row) {
+  const size_t rowStart =
+      static_cast<size_t>(y) * static_cast<size_t>(imageSize);
+  for (int x = 0; x < imageSize; x++) {
+    const Color color = colorForLayer(indices[rowStart + static_cast<size_t>(x)],
+                                      options, imageSize, x, y);
+    const size_t offset = static_cast<size_t>(x) * 4;
+    row[offset] = color.r;
+    row[offset + 1] = color.g;
+    row[offset + 2] = color.b;
+    row[offset + 3] = color.a;
+  }
+}
+
 std::vector<uint8_t> renderLayeredRgba(const std::vector<uint8_t> &indices,
                                        int imageSize,
                                        const GenerateOptions &options) {
-  std::vector<uint8_t> rgba(static_cast<size_t>(imageSize) *
-                            static_cast<size_t>(imageSize) * 4);
+  const size_t rowBytes = static_cast<size_t>(imageSize) * 4;
+  std::vector<uint8_t> rgba(static_cast<size_t>(imageSize) * rowBytes);
   for (int y = 0; y < imageSize; y++) {
-    for (int x = 0; x < imageSize; x++) {
-      const size_t pixelIndex =
-          static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
-          static_cast<size_t>(x);
-      const size_t offset = pixelIndex * 4;
-      const Color color =
-          colorForLayer(indices[pixelIndex], options, imageSize, x, y);
-      rgba[offset] = color.r;
-      rgba[offset + 1] = color.g;
-      rgba[offset + 2] = color.b;
-      rgba[offset + 3] = color.a;
-    }
+    writeLayeredRow(indices, imageSize, y, options,
+                    rgba.data() + static_cast<size_t>(y) * rowBytes);
   }
   return rgba;
 }
@@ -901,12 +901,91 @@ std::string cacheDouble(double value) {
 }
 
 void appendChunk(std::vector<uint8_t> &png, const char *type,
-                 const std::vector<uint8_t> &data) {
-  writeU32(png, static_cast<uint32_t>(data.size()));
+                 const uint8_t *data, size_t size) {
+  writeU32(png, static_cast<uint32_t>(size));
   const size_t crcStart = png.size();
   png.insert(png.end(), type, type + 4);
-  png.insert(png.end(), data.begin(), data.end());
+  png.insert(png.end(), data, data + size);
   writeU32(png, crc32Value(png.data() + crcStart, png.size() - crcStart));
+}
+
+void appendChunk(std::vector<uint8_t> &png, const char *type,
+                 const std::vector<uint8_t> &data) {
+  appendChunk(png, type, data.data(), data.size());
+}
+
+class DeflateStream {
+public:
+  DeflateStream() {
+    if (deflateInit(&stream_, Z_BEST_SPEED) != Z_OK) throw std::runtime_error("PNG compression failed.");
+  }
+  ~DeflateStream() { deflateEnd(&stream_); }
+  DeflateStream(const DeflateStream &) = delete;
+  DeflateStream &operator=(const DeflateStream &) = delete;
+  z_stream &stream() { return stream_; }
+
+private:
+  z_stream stream_{};
+};
+
+std::vector<uint8_t> encodePngRgbaStreamed(const std::vector<uint8_t> &indices,
+                                           int imageSize,
+                                           const GenerateOptions &options) {
+  const size_t rowBytes = static_cast<size_t>(imageSize) * 4;
+  std::vector<uint8_t> current(rowBytes);
+  std::vector<uint8_t> previous(rowBytes, 0);
+  std::vector<uint8_t> filtered(rowBytes + 1);
+  std::vector<uint8_t> chunk(IdatChunkBytes);
+
+  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
+  std::vector<uint8_t> ihdr;
+  writeU32(ihdr, static_cast<uint32_t>(imageSize));
+  writeU32(ihdr, static_cast<uint32_t>(imageSize));
+  ihdr.push_back(8);
+  ihdr.push_back(6);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  appendChunk(png, "IHDR", ihdr);
+
+  DeflateStream deflater;
+  z_stream &stream = deflater.stream();
+  stream.next_out = chunk.data();
+  stream.avail_out = static_cast<uInt>(chunk.size());
+  const auto pump = [&](int flush) {
+    bool done = false;
+    while (!done) {
+      const int result = deflate(&stream, flush);
+      if (result == Z_STREAM_ERROR) throw std::runtime_error("PNG compression failed.");
+      done = flush == Z_FINISH
+                 ? result == Z_STREAM_END
+                 : stream.avail_in == 0 && stream.avail_out != 0;
+      if (stream.avail_out == 0 ||
+          (result == Z_STREAM_END && stream.avail_out != chunk.size())) {
+        appendChunk(png, "IDAT", chunk.data(), chunk.size() - stream.avail_out);
+        stream.next_out = chunk.data();
+        stream.avail_out = static_cast<uInt>(chunk.size());
+      }
+    }
+  };
+
+  filtered[0] = 2;
+  for (int y = 0; y < imageSize; y++) {
+    writeLayeredRow(indices, imageSize, y, options, current.data());
+    for (size_t index = 0; index < rowBytes; index++) {
+      filtered[index + 1] =
+          static_cast<uint8_t>(current[index] - previous[index]);
+    }
+    stream.next_in = filtered.data();
+    stream.avail_in = static_cast<uInt>(filtered.size());
+    pump(Z_NO_FLUSH);
+    current.swap(previous);
+  }
+  stream.next_in = filtered.data();
+  stream.avail_in = 0;
+  pump(Z_FINISH);
+  appendChunk(png, "IEND", {});
+  return std::vector<uint8_t>(png.begin(), png.end());
 }
 
 std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {
@@ -1025,8 +1104,9 @@ std::vector<Color> layerPalette(const GenerateOptions &options) {
 } // namespace
 
 QRCodeGenerator::QRCodeGenerator(CacheKeyHasher cacheKeyHasher,
-                                 size_t maxCacheBytes)
+                                 size_t maxCacheBytes, int streamedRgbaMinSize)
     : cacheKeyHasher_(std::move(cacheKeyHasher)),
+      streamedRgbaMinSize_(streamedRgbaMinSize),
       outputCache_(MaxCacheEntries, maxCacheBytes),
       matrixCache_(MaxMatrixCacheEntries, MaxMatrixCacheBytes) {}
 
@@ -1123,13 +1203,7 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   rejectOversizedValue(value, options);
   const std::string request = cacheRequest(value, options, "png-bytes");
   const std::string key = cacheKey(request);
-  auto cached = getCacheEntry(key, request);
-  std::unique_lock<std::mutex> largeRender;
-  if (!cached && options.size > SerializedRenderMinSize) {
-    largeRender = std::unique_lock<std::mutex>(largeRenderMutex());
-    cached = getCacheEntry(key, request);
-  }
-  if (cached) {
+  if (const auto cached = getCacheEntry(key, request)) {
     return std::vector<uint8_t>(cached->begin(), cached->end());
   }
 
@@ -1245,7 +1319,9 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
                 options.logoAreaBorderRadius);
 
   std::vector<uint8_t> png;
-  if (hasGradient(options)) {
+  if (hasGradient(options) && imageSize > streamedRgbaMinSize_) {
+    png = encodePngRgbaStreamed(indices, imageSize, options);
+  } else if (hasGradient(options)) {
     const std::vector<uint8_t> rgba =
         renderLayeredRgba(indices, imageSize, options);
     std::vector<uint8_t>().swap(indices);
