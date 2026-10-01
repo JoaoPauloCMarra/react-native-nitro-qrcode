@@ -14,13 +14,13 @@ None.
 
 ### Changed
 
-- Native PNG renders larger than 1024 px run one at a time. Concurrent large renders no longer multiply peak memory, and identical concurrent requests share one render. A synchronous large render waits for an asynchronous large render that is already running. Renders of 1024 px or smaller and cache hits are not affected.
+- Native gradient PNGs larger than 1024 px are written by a streaming encoder. Peak native memory for a 4096 px gradient drops from about 320 MiB to about 18 MiB. These PNGs decode to the same pixels as in 0.9.0, but their bytes and file size differ (15 to 35% larger for opaque gradients in host measurements), and encoding took 35 to 45% longer in the same measurements. Gradients of 1024 px or smaller, and all two-color and palette PNGs, are byte-identical to 0.9.0.
 
 ### Fixed
 
 - The native cache no longer becomes inconsistent, or crashes during eviction, when a memory allocation fails while it stores an entry.
-- PNG buffers returned by the `generatePngArrayBuffer*` methods are sized to the PNG instead of keeping the encoder's working capacity, which could be tens of megabytes for a large gradient.
-- Native PNG generation releases an internal buffer before encoding, which lowers peak memory by 2 to 16 MiB at 4096 px, depending on the output type.
+- PNG buffers returned by the `generatePngArrayBuffer*` methods are sized to the PNG instead of keeping the encoder's working capacity, which could be several megabytes for a gradient.
+- Native PNG generation releases an internal buffer before encoding, which lowers peak memory by 2 to 8 MiB at 4096 px for two-color and palette PNGs.
 - Values of 65,536 bytes or more are rejected immediately with the same `Segment too long` error, without first copying the value.
 - The podspec excludes C++ test sources, so path and git installs no longer compile them into the pod.
 - The native RGBA PNG size check is overflow-safe on 32-bit Android. The JavaScript API could not reach the overflow.

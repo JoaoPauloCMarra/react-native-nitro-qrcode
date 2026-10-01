@@ -383,16 +383,15 @@ Option loss and platform differences:
   for UI flows.
 - **Native PNG encoding** writes flat two-color codes as 1-bit indexed zlib
   PNGs and layered colors or logo-area clearing as 4-bit palette PNGs with a
-  `tRNS` alpha table. Only gradients use vendored `fpng` for RGBA. The QR
+  `tRNS` alpha table. Gradients of 1024 px or smaller use vendored `fpng` for RGBA; larger
+  gradients use a streaming zlib RGBA writer that keeps memory low. The QR
   matrix still comes from Project Nayuki. Web PNG stays on canvas `toDataURL`.
 - **Native memory** scales with the square of `size`. Host measurements of
-  the C++ renderer (macOS, `clang++ -O2`, one call) peaked at about 23 MB for
-  a two-color 4096 px code, 36 MB for a 4096 px palette code with a logo area
-  or custom layer colors, and 355 MB for a 4096 px gradient (about 90 MB at
-  2048 px). Keep gradient exports near the displayed size. Native PNG renders
-  larger than 1024 px run one at a time, so parallel large exports queue
-  instead of multiplying peak memory; a synchronous large export waits for an
-  asynchronous one that is already running.
+  the C++ renderer (macOS, `clang++ -O2`, one call) peaked at about 18 MiB of
+  heap for a two-color 4096 px code, 24 MiB for a 4096 px palette code with a
+  logo area or custom layer colors, 18 MiB for a 4096 px gradient, and 20 MiB
+  for a 1024 px gradient. Four concurrent 4096 px gradient renders peaked at
+  about 70 MiB. Keep exports near the displayed size.
 - **Styled modules** stay on the standard QR matrix. `classy` connects
   neighbors, `diamond` draws rhombi, and `squircle` uses extra-rounded cells.
   Rust crates such as `qr-code-styling` and `modo-rs` were not vendored; the

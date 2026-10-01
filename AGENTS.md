@@ -5,7 +5,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 ## Workspace Map
 
 - Monorepo layout: `packages/react-native-nitro-qrcode` (library), `apps/example` (Expo Router example).
-- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored Nayuki encoder, `vendor/fpng/` RGBA PNG writer for gradients; flat and layered PNGs use the zlib indexed/palette writers). Host-only `cpp/tests/quirc` is for C++ scan-back tests.
+- C++ core: `packages/react-native-nitro-qrcode/cpp` (`core/` generator, `bindings/` Nitro bridge, `qrcodegen/` vendored Nayuki encoder, `vendor/fpng/` RGBA PNG writer for gradients of 1024 px or smaller, larger gradients use the streamed zlib RGBA writer in `core/`; flat and layered PNGs use the zlib indexed/palette writers). Host-only `cpp/tests/quirc` is for C++ scan-back tests.
 - Native shell: `packages/react-native-nitro-qrcode/android`; iOS is wired through the podspec plus generated Nitrogen files.
 - Expo config plugin: `packages/react-native-nitro-qrcode/app.plugin.js`.
 
