@@ -150,6 +150,7 @@ const quircObjects = [
   const objectFile = path.join(buildDir, `${file}.o`);
   runCommand(resolveLlvmTool("clang"), [
     "-std=c11",
+    "-DQUIRC_MAX_REGIONS=65534",
     "-O0",
     "-g",
     "-fprofile-instr-generate",
@@ -168,6 +169,9 @@ const sources = [
   path.join(cppDir, "core", "parity-corpus.cpp"),
   path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
   path.join(cppDir, "tests", "QRCodeScanTest.cpp"),
+  path.join(cppDir, "tests", "QRCodeHardeningTest.cpp"),
+  path.join(cppDir, "tests", "HybridQRCodeHardeningTest.cpp"),
+  path.join(cppDir, "tests", "QRCodeMemoryTest.cpp"),
   path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
   path.join(cppDir, "bindings", "HybridQRCodeTest.cpp"),
   path.join(cppDir, "bindings", "HybridQRCode.cpp"),
@@ -183,6 +187,7 @@ const compileArgs = [
   "-Wextra",
   "-Werror",
   "-DNITRO_HYBRID_BINDING_TEST",
+  "-DNITRO_QRCODE_MEMORY_TEST",
   "-O0",
   "-g",
   "-fprofile-instr-generate",
