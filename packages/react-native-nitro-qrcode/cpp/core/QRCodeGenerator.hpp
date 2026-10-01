@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -140,6 +141,21 @@ private:
   void storeCacheEntry(const std::string &key, const std::string &request,
                        const std::string &value);
 };
+
+template <typename Size>
+constexpr bool pixelBufferBytes(int width, int height, unsigned channels,
+                                Size &bytes) noexcept {
+  if (width <= 0 || height <= 0 || channels == 0 || channels > 4) {
+    return false;
+  }
+  const uint64_t total = static_cast<uint64_t>(width) *
+                         static_cast<uint64_t>(height) * channels;
+  if (total > static_cast<uint64_t>(std::numeric_limits<Size>::max())) {
+    return false;
+  }
+  bytes = static_cast<Size>(total);
+  return true;
+}
 
 Color parseColor(const std::string &value);
 std::string base64Encode(const std::vector<uint8_t> &bytes);

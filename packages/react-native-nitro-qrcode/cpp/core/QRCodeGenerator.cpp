@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -24,6 +25,13 @@ constexpr uint8_t AlignmentLayer = 7;
 constexpr uint8_t TimingLayer = 8;
 constexpr uint8_t FinderInnerLayer = 9;
 constexpr uint8_t QuietZoneLayer = 10;
+constexpr size_t SegmentTooLongChars = 65536;
+constexpr int SerializedRenderMinSize = 1024;
+
+std::mutex &largeRenderMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
 
 enum class ModuleShape {
   Square,
@@ -435,6 +443,17 @@ void validateOptions(const std::string &value, const GenerateOptions &options) {
         "logoAreaBorderRadius must be between 0 and half the size.");
   }
   validateGradient(options);
+}
+
+void rejectOversizedValue(const std::string &value,
+                          const GenerateOptions &options) {
+  if (value.size() < SegmentTooLongChars ||
+      value.size() > static_cast<size_t>(INT_MAX)) {
+    return;
+  }
+  validateOptions(value, options);
+  parseEcc(options.errorCorrectionLevel);
+  throw qrcodegen::data_too_long("Segment too long");
 }
 
 bool isEyeModule(int x, int y, int matrixSize) {
@@ -902,7 +921,7 @@ std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {
 }
 
 std::vector<uint8_t> encodePngIndexed1(int width, int height,
-                                       const std::vector<uint8_t> &indices,
+                                       std::vector<uint8_t> indices,
                                        const Color &foreground,
                                        const Color &background) {
   const size_t rowBytes = (static_cast<size_t>(width) + 7) / 8;
@@ -922,6 +941,7 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
       }
     }
   }
+  std::vector<uint8_t>().swap(indices);
 
   std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
   std::vector<uint8_t> ihdr;
@@ -946,7 +966,7 @@ std::vector<uint8_t> encodePngIndexed1(int width, int height,
 }
 
 std::vector<uint8_t> encodePngPalette(int width, int height,
-                                      const std::vector<uint8_t> &indices,
+                                      std::vector<uint8_t> indices,
                                       const std::vector<Color> &palette) {
   constexpr unsigned bitDepth = 4;
   const size_t rowBytes =
@@ -963,6 +983,7 @@ std::vector<uint8_t> encodePngPalette(int width, int height,
           raw[byteIndex] | ((x % 2 == 0) ? (entry << 4) : entry));
     }
   }
+  std::vector<uint8_t>().swap(indices);
 
   std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
   std::vector<uint8_t> ihdr;
@@ -1054,9 +1075,9 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
   if (width <= 0 || height <= 0) {
     throw std::invalid_argument("PNG dimensions must be positive.");
   }
-  const size_t expectedSize =
-      static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
-  if (rgba.size() != expectedSize) {
+  size_t expectedSize = 0;
+  if (!pixelBufferBytes(width, height, 4, expectedSize) ||
+      rgba.size() != expectedSize) {
     throw std::invalid_argument(
         "RGBA buffer size does not match PNG dimensions.");
   }
@@ -1068,7 +1089,7 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
   if (!fpng::fpng_encode_image_to_memory(
           rgba.data(), static_cast<uint32_t>(width),
           static_cast<uint32_t>(height), 4, png, fpng::FPNG_ENCODE_SLOWER)) throw std::runtime_error("PNG compression failed.");
-  return png;
+  return std::vector<uint8_t>(png.begin(), png.end());
 }
 
 Matrix QRCodeGenerator::createMatrix(const std::string &value,
@@ -1099,9 +1120,16 @@ Matrix QRCodeGenerator::createMatrix(const std::string &value,
 std::vector<uint8_t>
 QRCodeGenerator::renderPngBytes(const std::string &value,
                                 const GenerateOptions &options) {
+  rejectOversizedValue(value, options);
   const std::string request = cacheRequest(value, options, "png-bytes");
   const std::string key = cacheKey(request);
-  if (const auto cached = getCacheEntry(key, request)) {
+  auto cached = getCacheEntry(key, request);
+  std::unique_lock<std::mutex> largeRender;
+  if (!cached && options.size > SerializedRenderMinSize) {
+    largeRender = std::unique_lock<std::mutex>(largeRenderMutex());
+    cached = getCacheEntry(key, request);
+  }
+  if (cached) {
     return std::vector<uint8_t>(cached->begin(), cached->end());
   }
 
@@ -1216,15 +1244,19 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   clearLogoArea(indices, imageSize, options.logoAreaSize,
                 options.logoAreaBorderRadius);
 
-  const std::vector<uint8_t> png =
-      hasGradient(options)
-          ? encodePngRgba(imageSize, imageSize,
-                          renderLayeredRgba(indices, imageSize, options))
-      : hasCustomLayerColors(options) || options.logoAreaSize > 0
-          ? encodePngPalette(imageSize, imageSize, indices,
-                             layerPalette(options))
-          : encodePngIndexed1(imageSize, imageSize, indices, options.foreground,
-                              options.background);
+  std::vector<uint8_t> png;
+  if (hasGradient(options)) {
+    const std::vector<uint8_t> rgba =
+        renderLayeredRgba(indices, imageSize, options);
+    std::vector<uint8_t>().swap(indices);
+    png = encodePngRgba(imageSize, imageSize, rgba);
+  } else if (hasCustomLayerColors(options) || options.logoAreaSize > 0) {
+    png = encodePngPalette(imageSize, imageSize, std::move(indices),
+                           layerPalette(options));
+  } else {
+    png = encodePngIndexed1(imageSize, imageSize, std::move(indices),
+                            options.foreground, options.background);
+  }
   storeCacheEntry(key, request,
                   std::string(png.begin(), png.end()));
   return png;
@@ -1249,6 +1281,7 @@ QRCodeGenerator::renderPngDataUri(const std::string &value,
 
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
                                                const GenerateOptions &options) {
+  rejectOversizedValue(value, options);
   const std::string request = cacheRequest(value, options, "svg");
   const std::string key = cacheKey(request);
   if (const auto cached = getCacheEntry(key, request)) {
@@ -1289,6 +1322,7 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
 QRCodeGenerator::MatrixObject
 QRCodeGenerator::getMatrix(const std::string &value,
                            const GenerateOptions &options) {
+  rejectOversizedValue(value, options);
   const std::string request = cacheRequest(value, options, "matrix");
   if (const auto cached = matrixCache_.get(cacheKey(request), request)) {
     return *cached;

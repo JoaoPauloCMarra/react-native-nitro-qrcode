@@ -40,15 +40,25 @@ public:
     if (bytes > maxBytes_) {
       return;
     }
+    BoundedCacheEntry<Value> entry{request, value, bytes};
     std::lock_guard<std::mutex> lock(mutex_);
     const auto existing = entries_.find(key);
-    if (existing != entries_.end()) {
+    if (existing == entries_.end()) {
+      order_.push_back(key);
+      try {
+        entries_.emplace(key, std::move(entry));
+      } catch (...) {
+        order_.pop_back();
+        throw;
+      }
+    } else {
       bytes_ -= existing->second.bytes;
+      existing->second = std::move(entry);
+      touch(key);
     }
-    entries_[key] = {request, value, bytes};
     bytes_ += bytes;
-    touch(key);
-    while (order_.size() > maxEntries_ || bytes_ > maxBytes_) {
+    while (!order_.empty() &&
+           (order_.size() > maxEntries_ || bytes_ > maxBytes_)) {
       const auto oldest = entries_.find(order_.front());
       if (oldest != entries_.end()) {
         bytes_ -= oldest->second.bytes;
@@ -79,9 +89,8 @@ private:
   void touch(const std::string &key) {
     const auto order = std::find(order_.begin(), order_.end(), key);
     if (order != order_.end()) {
-      order_.erase(order);
+      std::rotate(order, order + 1, order_.end());
     }
-    order_.push_back(key);
   }
 
   size_t maxEntries_;
