@@ -227,8 +227,6 @@ function runExampleReplay({
       )
     : undefined;
   const targetArgs = [
-    "--platform",
-    options.platform,
     options.targetFlag,
     options.target,
   ];
