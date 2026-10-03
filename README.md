@@ -407,7 +407,11 @@ The component exposes accessible semantics: the generated image is
 announced as an image with the label `QR code for <value>`, where `<value>` is
 the payload of the image currently on screen. While `keepPreviousImage` shows
 an older image, the label keeps describing that image and the container
-reports a busy state until the new image is ready or generation fails. The
+reports a busy state until the new image loads or generation/decoding fails.
+Before any image loads, the default label is `Generating QR code`; a decoding
+failure without a prior image uses `QR code unavailable`. Set
+`accessibilityLabel="Código de pagamento"` for a localized description that
+does not announce the encoded payload. Label-only changes do not regenerate the PNG. The
 logo overlay is hidden from the accessibility tree. Screen readers announce the QR meaning
 and its generation state on iOS and Android.
 
@@ -424,7 +428,10 @@ With `scanSafe`, quiet zones smaller than four modules are raised to four. When
 `scanSafe: "strict"` additionally rejects generation when scanability warnings
 remain. Synchronous methods throw, asynchronous methods reject, and the component
 reports the error through `onError`. `validateOptions` returns the warnings as
-structured errors without throwing.
+structured errors without throwing. With an active gradient, contrast checks
+use every configured gradient stop instead of the unused solid foreground.
+Explicit layer colors are checked separately. These checks do not guarantee
+scanner success; test the actual output and backdrop.
 
 Generation starts when normalized render options change. `placeholder` is
 shown only while no image is available. `keepPreviousImage` defaults to `true`:
@@ -434,12 +441,13 @@ the placeholder appears on the first mount only. Pass
 every change. `hideLogoUntilReady` also defaults to `true` and delays the
 overlay until an image is ready. QR images do not use Android's default
 fade animation when the value or options change.
-`onReady` receives the successful PNG data URI. Stale or unmounted async
+`onReady` receives the successful PNG data URI when generation completes,
+before native image loading. It is not a presentation or decoding callback. Stale or unmounted async
 completions are ignored. Identical options on a later mount reuse the package
 cache, so `onReady` can fire with the cached URI without a second encode.
 
 Synchronous export helpers throw validation or generation errors. Async helpers
-reject with them. The component calls `onError` when supplied; otherwise it
+reject with them. The component calls `onError` for generation or image-decoding failures when supplied; otherwise it
 throws the error during render so the nearest React error boundary can handle
 it. Invalid component layout sizes throw before rendering or QR generation.
 
@@ -557,8 +565,9 @@ Main exports:
 | `logoBackgroundColor`  | Overlay background color; does not change the generated PNG.                                                                         |
 | `keepPreviousImage`    | Keeps the previous image visible while the next image generates; default `true`.                                                     |
 | `hideLogoUntilReady`   | Delays logo rendering until the QR image is ready; default `true`.                                                                   |
+| `accessibilityLabel`   | Optional localized image description; overrides the default payload-based label. |
 | `onReady`              | Called with the generated PNG data URI.                                                                                              |
-| `onError`              | Called when generation fails.                                                                                                        |
+| `onError`              | Called when generation or image decoding fails.                                                                                                        |
 
 ## Error Handling
 
@@ -637,11 +646,12 @@ For a physical iPhone, set `IOS_DEVICE_UDID` and install `agent-device` (or set
 assertions and closes its own session. Use `IOS_UDID` for a simulator; do not
 set both selectors. An unavailable explicitly selected target fails the smoke.
 
-With the example's Metro server running, `bun run example:e2e:image-swap
---device "RN Expo MidRange"` records 12 QR values at two-second intervals.
-Use the selected iOS simulator's name for the iOS regression check. Inspect
-the recording for blank or faded frames between values; generation callbacks
-alone do not prove that the image stayed visible.
+Use `bun run example:replay -- --platform android --serial <serial> --flow image-swap`
+with a current installed example to record twelve QR values at two-second intervals.
+For iOS, pass `--platform ios --udid <simulator-udid>`; physical iPhones use
+`bun run example:e2e:ios-device -- <udid> image-swap`. Inspect the recording for
+blank or faded frames. See the [maintained replay guide](docs/qa/agent-device-replay.md)
+for all flows, source freshness, prerequisites, cleanup and evidence limits.
 
 The `e2e/qa-scanability.ad` flow checks sizes, payloads, shapes, gradients, logos,
 transparent backgrounds, strict validation, and recovery. Decode the captured
