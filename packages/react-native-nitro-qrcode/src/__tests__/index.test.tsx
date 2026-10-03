@@ -1630,6 +1630,8 @@ describe("native QRCode API", () => {
         node.props.source?.uri === "data:image/png;base64,accessible",
     )[0];
     expect(image).toBeDefined();
+    expect(containerWhilePending.props.accessibilityState).toEqual({ busy: true });
+    await act(async () => { image.props.onLoad(); });
     expect(image.props.accessible).toBe(false);
     expect(image.props.accessibilityElementsHidden).toBe(true);
     expect(containerWhilePending.props.accessibilityLabel).toBe(
@@ -1692,6 +1694,9 @@ describe("native QRCode API", () => {
       currentTree.root.findAll(
         (node) => node.props.accessible === true && node.props.accessibilityRole === "image",
       )[0]!;
+    await act(async () => {
+      currentTree.root.findAll((node) => node.props.source?.uri === "data:image/png;base64,ONE")[0]!.props.onLoad();
+    });
     expect(container().props.accessibilityLabel).toBe("QR code for one");
 
     await act(async () => {
@@ -3456,4 +3461,209 @@ describe("web transparent and geometry rendering", () => {
     expect(context.quadraticCurveTo).toHaveBeenCalled();
   });
 });
+});
+
+describe("gradient policy and image presentation", () => {
+  let errorSpy: jest.SpyInstance;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockHybridObject.generatePngDataUriAsyncObject.mockResolvedValue(
+      "data:image/png;base64,fixture",
+    );
+    errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    Web.clearQRCodeCache();
+  });
+  afterEach(() => errorSpy.mockRestore());
+  const frame = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root.findAll(
+      (n) =>
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === "string",
+    )[0]!;
+  const png = (tree: TestRenderer.ReactTestRenderer, uri: string) =>
+    tree.root.findAll((n) => n.props.source?.uri === uri)[0]!;
+
+  it("strict policy rejects a fully white rendered gradient", () => {
+    const options = {
+      value: "fixture",
+      size: 256,
+      quietZone: 4,
+      scanSafe: "strict",
+      foregroundColor: "#000000",
+      backgroundColor: "#FFFFFF",
+      gradient: { type: "linear", colors: ["#FFFFFF", "#FFFFFF"] },
+    } as const;
+    const result = validateOptions(options);
+    expect(result.valid).toBe(false);
+    expect(() => Web.toSvgString(options)).toThrow();
+    expect(() => toPngDataUri(options)).toThrow();
+    expect(mockHybridObject.generatePngDataUriObject).not.toHaveBeenCalled();
+  });
+
+  it("strict policy accepts a dark gradient when the unused foreground is white", () => {
+    const options = {
+      value: "fixture",
+      size: 256,
+      quietZone: 4,
+      scanSafe: "strict",
+      foregroundColor: "#FFFFFF",
+      backgroundColor: "#FFFFFF",
+      gradient: { type: "linear", colors: ["#000000", "#111111"] },
+    } as const;
+    const result = validateOptions(options);
+    expect(result.valid).toBe(true);
+    expect(() => Web.toSvgString(options)).not.toThrow();
+  });
+
+  it("label and busy state follow the loaded image without delaying generation onReady", async () => {
+    const onReady = jest.fn();
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockResolvedValueOnce("data:image/png;base64,one")
+      .mockResolvedValueOnce("data:image/png;base64,two");
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, { value: "one", onReady }),
+      );
+    });
+    await act(async () => {
+      png(tree, "data:image/png;base64,one").props.onLoad();
+    });
+    expect(frame(tree).props.accessibilityLabel).toBe("QR code for one");
+    await act(async () => {
+      tree.update(React.createElement(QRCode, { value: "two", onReady }));
+    });
+    const label = frame(tree).props.accessibilityLabel;
+    const busy = frame(tree).props.accessibilityState.busy;
+    const second = png(tree, "data:image/png;base64,two");
+    const hidden = second.props.style.some(
+      (s: unknown) =>
+        s !== null &&
+        typeof s === "object" &&
+        "opacity" in s &&
+        s.opacity === 0,
+    );
+    await act(async () => {
+      second.props.onLoad();
+    });
+    const after = {
+      label: frame(tree).props.accessibilityLabel,
+      busy: frame(tree).props.accessibilityState.busy,
+    };
+    await act(async () => tree.unmount());
+    expect(hidden).toBe(true);
+    expect(label).toBe("QR code for one");
+    expect(busy).toBe(true);
+    expect(onReady).toHaveBeenCalledTimes(2);
+    expect(after).toEqual({ label: "QR code for two", busy: false });
+  });
+
+  it("native decode failure reaches the existing onError callback", async () => {
+    const onError = jest.fn();
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, { value: "fixture", onError }),
+      );
+    });
+    const image = png(tree, "data:image/png;base64,fixture");
+    await act(async () => {
+      image.props.onError?.({
+        nativeEvent: { error: "fixture decode failure" },
+      });
+    });
+    const busy = frame(tree).props.accessibilityState.busy;
+    await act(async () => tree.unmount());
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect(busy).toBe(false);
+  });
+
+  it("apps can supply a localized label without exposing the encoded payload", async () => {
+    const props = {
+      value: "fixture-opaque-payload",
+      accessibilityLabel: "Código de pagamento",
+    };
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(React.createElement(QRCode, props));
+    });
+    await act(async () => {
+      png(tree, "data:image/png;base64,fixture").props.onLoad();
+    });
+    const label = frame(tree).props.accessibilityLabel;
+    await act(async () => tree.unmount());
+    expect(label).toBe("Código de pagamento");
+  });
+
+  it("changing only the label never regenerates the PNG", async () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    const first = { value: "fixture", accessibilityLabel: "Payment code" };
+    await act(async () => {
+      tree = TestRenderer.create(React.createElement(QRCode, first));
+    });
+    const second = {
+      value: "fixture",
+      accessibilityLabel: "Código de pagamento",
+    };
+    await act(async () => {
+      tree.update(React.createElement(QRCode, second));
+    });
+    expect(frame(tree).props.accessibilityLabel).toBe(
+      second.accessibilityLabel,
+    );
+    expect(
+      mockHybridObject.generatePngDataUriAsyncObject,
+    ).toHaveBeenCalledTimes(1);
+    await act(async () => tree.unmount());
+  });
+
+  it("stale image errors do not affect the replacement", async () => {
+    const onError = jest.fn();
+    mockHybridObject.generatePngDataUriAsyncObject
+      .mockResolvedValueOnce("data:image/png;base64,old")
+      .mockResolvedValueOnce("data:image/png;base64,new");
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(QRCode, { value: "old", onError }),
+      );
+    });
+    const stale = png(tree, "data:image/png;base64,old").props.onError;
+    await act(async () => {
+      tree.update(React.createElement(QRCode, { value: "new", onError }));
+    });
+    await act(async () => {
+      stale({ nativeEvent: { error: "old fixture failure" } });
+    });
+    expect(onError).not.toHaveBeenCalled();
+    await act(async () => {
+      png(tree, "data:image/png;base64,new").props.onLoad();
+    });
+    expect(frame(tree).props.accessibilityLabel).toBe("QR code for new");
+    await act(async () => tree.unmount());
+  });
+
+  it("decode failures reach the existing error-boundary path when no handler is supplied", async () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      tree = TestRenderer.create(
+        React.createElement(
+          ErrorBoundary,
+          null,
+          React.createElement(QRCode, { value: "fixture" }),
+        ),
+      );
+    });
+    await act(async () => {
+      png(tree, "data:image/png;base64,fixture").props.onError({
+        nativeEvent: { error: "fixture decode failure" },
+      });
+    });
+    expect(
+      tree.root.findAll((n) => String(n.type) === "error-boundary")[0]?.props
+        .message,
+    ).toBe("QRCode image failed to load.");
+    await act(async () => tree.unmount());
+  });
 });

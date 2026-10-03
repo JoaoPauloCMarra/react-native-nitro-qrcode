@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "entry": "scripts/run-example-replay.js",
+  "sourceScope": [
+    "Library JS/native wiring/generated bindings/package and workspace metadata",
+    "All example source and assets excluding generated Android/iOS projects, tests, caches and secrets",
+    "Replay flows and assertions"
+  ],
+  "suites": [
+    {
+      "id": "full-features",
+      "path": "e2e/qa-full-features.ad",
+      "purpose": "Public PNG/SVG/matrix exports, cache, metrics, bounds, validation, component recovery and repeated exports"
+    },
+    {
+      "id": "render-stress",
+      "path": "e2e/qa-render-stress.ad",
+      "purpose": "Fifteen component specimens complete generation before and after remount"
+    },
+    {
+      "id": "image-swap",
+      "path": "e2e/qa-image-swap.ad",
+      "purpose": "Twelve successive values, loaded final label, custom localized label and error status"
+    },
+    {
+      "id": "scanability",
+      "path": "e2e/qa-scanability.ad",
+      "purpose": "Twenty-five visual cases including strict gradient rejection and recovery"
+    },
+    {
+      "id": "deeplink",
+      "path": "e2e/qa-deeplink.ad",
+      "purpose": "Direct lab route on the installed example"
+    }
+  ],
+  "features": [
+    {
+      "id": "exports.sync",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-helpers-result",
+      "expectedText": "ok:png=",
+      "assertion": "new Uint8Array(bytes)[0] === 137",
+      "controlId": "e2e-run-helpers"
+    },
+    {
+      "id": "exports.async",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-namespace-result",
+      "expectedText": "ok:nitro:",
+      "assertion": "NitroQRCode.toPngArrayBufferAsync(options)",
+      "controlId": "e2e-run-namespace"
+    },
+    {
+      "id": "cache.clear",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-cache-result",
+      "expectedText": "ok:cleared:",
+      "assertion": "before > 0 && after === 0 && bytes === 0",
+      "controlId": "e2e-run-cache"
+    },
+    {
+      "id": "metrics.reset",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-metrics-result",
+      "expectedText": "ok:requests=1:reset=0",
+      "assertion": "snapshot.requests === 1",
+      "controlId": "e2e-run-metrics"
+    },
+    {
+      "id": "validation.result",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-validation-result",
+      "expectedText": "ok:valid=true",
+      "assertion": "valid.valid && !invalid.valid && invalid.errors.length > 0",
+      "controlId": "e2e-run-validation"
+    },
+    {
+      "id": "encoder.bounds-ecl-nul",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-audit-result",
+      "expectedText": "ok:bounds:boost:metrics:nul-image-ready",
+      "assertion": "JSON.stringify(boosted) !== JSON.stringify(medium)",
+      "controlId": "e2e-run-audit"
+    },
+    {
+      "id": "component.ref",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-export-uri-result",
+      "expectedText": "ok:uri=",
+      "assertion": "qrRef.current?.toPngDataUri()",
+      "controlId": "e2e-export-uri"
+    },
+    {
+      "id": "component.validation-recovery",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-error-result",
+      "expectedText": "ok:error:empty",
+      "assertion": "error.message.includes(\"value must not be empty\")",
+      "controlId": "e2e-force-empty"
+    },
+    {
+      "id": "exports.repeated",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-stress-result",
+      "expectedText": "ok:count=40:ms=",
+      "assertion": "snapshot.requests === STRESS_COUNT && snapshot.failedRequests === 0",
+      "controlId": "e2e-run-stress"
+    },
+    {
+      "id": "component.generation-recovery",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-error-result",
+      "expectedText": "ok:ready",
+      "assertion": "error: \"ok:ready\"",
+      "controlId": "e2e-force-empty"
+    },
+    {
+      "id": "render.wall",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-render-stress.ad",
+      "source": "apps/example/app/e2e-render.tsx",
+      "statusId": "e2e-render-ready-count",
+      "expectedText": "ok:ready=15/15:ms=",
+      "assertion": "next.length === SPECIMENS.length",
+      "trigger": "screen-load",
+      "claimLimit": "Generation completion does not prove every native Image decoded or that its code is scannable."
+    },
+    {
+      "id": "render.remount",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-render-stress.ad",
+      "source": "apps/example/app/e2e-render.tsx",
+      "statusId": "e2e-render-generation",
+      "expectedText": "generation=1",
+      "assertion": "setGeneration((value) => value + 1)",
+      "controlId": "e2e-render-remount"
+    },
+    {
+      "id": "presentation.final-loaded-label",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-image-swap.ad",
+      "source": "apps/example/app/e2e-image-swap.tsx",
+      "statusId": "swap-qr",
+      "expectedText": "QR code for https://example.com/scan/12?",
+      "assertion": "keepPreviousImage",
+      "trigger": "screen-load",
+      "claimLimit": "The final label follows Image.onLoad. The recording must be reviewed separately for blank frames between all twelve values."
+    },
+    {
+      "id": "presentation.error-status",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-image-swap.ad",
+      "source": "apps/example/app/e2e-image-swap.tsx",
+      "statusId": "swap-error",
+      "expectedText": "errors=0",
+      "assertion": "onError={(failure) => setError(failure.message)}",
+      "trigger": "screen-load"
+    },
+    {
+      "id": "presentation.custom-label",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-image-swap.ad",
+      "source": "apps/example/app/e2e-image-swap.tsx",
+      "statusId": "custom-label-qr",
+      "expectedText": "Código de pagamento",
+      "assertion": "accessibilityLabel=\"Código de pagamento\"",
+      "trigger": "screen-load",
+      "claimLimit": "The tree exposes the override; real screen-reader speech and navigation remain pending."
+    },
+    {
+      "id": "gradient.reject-white",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-scanability.ad",
+      "source": "apps/example/app/e2e-scanability.tsx",
+      "statusId": "scan-result",
+      "expectedText": "rejected:strict-white-gradient",
+      "assertion": "id: \"strict-white-gradient\"",
+      "controlId": "scan-next"
+    },
+    {
+      "id": "gradient.accept-dark",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-scanability.ad",
+      "source": "apps/example/app/e2e-scanability.tsx",
+      "statusId": "scan-result",
+      "expectedText": "ready:strict-dark-gradient",
+      "assertion": "id: \"strict-dark-gradient\"",
+      "controlId": "scan-next"
+    },
+    {
+      "id": "scan.recover",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-scanability.ad",
+      "source": "apps/example/app/e2e-scanability.tsx",
+      "statusId": "scan-result",
+      "expectedText": "ready:final-recover",
+      "assertion": "validation.errors.some((issue) => error.message.includes(issue.message))",
+      "controlId": "scan-next"
+    },
+    {
+      "id": "scan.visual-cases",
+      "coverage": "replay-asserted",
+      "kind": "visual-only",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-scanability.ad",
+      "source": "apps/example/app/e2e-scanability.tsx",
+      "statusId": "scan-result",
+      "expectedText": "ready:default",
+      "assertion": "const SCAN_CASES: readonly ScanCase[]",
+      "trigger": "screen-load",
+      "claimLimit": "Generation and screenshots are not independent camera decoding. Compare exact payloads using the pending hardware procedure."
+    },
+    {
+      "id": "routing.deeplink",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-deeplink.ad",
+      "source": "apps/example/app/e2e.tsx",
+      "statusId": "e2e-deeplink",
+      "expectedText": "qrcode://e2e",
+      "assertion": "Deep link qrcode://e2e.",
+      "trigger": "screen-load"
+    }
+  ],
+  "pending": [
+    {
+      "id": "scanner.decode",
+      "state": "pending-prerequisites",
+      "reason": "Screenshots and generation callbacks do not measure camera decode success.",
+      "prerequisites": [
+        "Installed Android and iOS examples",
+        "Independent camera/scanner and declared distance, lighting and backdrop",
+        "Captured scanability screenshots"
+      ],
+      "acceptance": "Decode each valid case to its exact SCAN_CASES payload. Record device, case and scanner result; rejected cases must not be counted as decoded."
+    },
+    {
+      "id": "presentation.frames",
+      "state": "pending-prerequisites",
+      "reason": "A final loaded label does not prove that all frames stayed visible.",
+      "prerequisites": [
+        "Replay recording for image-swap on Android and iOS"
+      ],
+      "acceptance": "Inspect every replacement for blank/faded frames and correlate generation versus load status."
+    },
+    {
+      "id": "presentation.decode-error",
+      "state": "pending-prerequisites",
+      "reason": "The public component generates valid PNGs; no replay claims a manufactured native decode failure.",
+      "prerequisites": [
+        "Controlled native image-loader failure fixture without modifying the public library",
+        "Dedicated QA device"
+      ],
+      "acceptance": "Verify onError or the error boundary receives QRCode image failed to load.; the prior loaded label remains correct and stale events are ignored."
+    },
+    {
+      "id": "accessibility.reader",
+      "state": "pending-prerequisites",
+      "reason": "Tree text cannot prove spoken output or focus behavior.",
+      "prerequisites": [
+        "VoiceOver and TalkBack enabled on dedicated QA targets"
+      ],
+      "acceptance": "Verify localized labels, no encoded payment payload in speech, busy transitions and hidden image/logo children."
+    },
+    {
+      "id": "web.browser",
+      "state": "pending-prerequisites",
+      "reason": "The agent-device runner targets Android/iOS only.",
+      "prerequisites": [
+        "Browser canvas and an explicitly authorized example web session"
+      ],
+      "acceptance": "Run each public export and component route in the browser; record web image loading, errors, canvas results and parity separately."
+    },
+    {
+      "id": "performance.device",
+      "state": "pending-prerequisites",
+      "reason": "Elapsed times in the example are informational.",
+      "prerequisites": [
+        "Release example and declared workload on representative hardware"
+      ],
+      "acceptance": "Record responsiveness, memory and time with a fixed workload before making a performance claim."
+    }
+  ]
+}

@@ -1,4 +1,13 @@
 open "com.qrcode.example" "qrcode://e2e-image-swap" --relaunch
+wait id="image-swap-screen"
+wait id="swap-qr"
+wait id="custom-label-qr"
+wait text "Código de pagamento"
 
 wait text "QR code for https://example.com/scan/12?" 40000
+wait id="swap-ready"
+wait text "Generated 12"
+wait id="swap-error"
+wait text "errors=0"
+screenshot "${OUTPUT_DIR}/image-swap-final.png"
 close

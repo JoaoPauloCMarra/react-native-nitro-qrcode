@@ -56,7 +56,7 @@
     },
     "packages/react-native-nitro-qrcode": {
       "name": "react-native-nitro-qrcode",
-      "version": "0.9.1",
+      "version": "0.10.0",
       "dependencies": {
         "qrcode": "^1.5.4",
       },

@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-Security updates are provided for the latest release of the `0.9.x` line.
+Security updates are provided for the latest release of the `0.10.x` line.
 Older `0.x` lines are not supported; upgrade to the latest release to receive
 security fixes.
 
 | Version | Supported |
 | --- | --- |
-| `0.9.x` (latest) | Yes |
+| `0.10.x` (latest) | Yes |
 | `0.8.x` and earlier | No |
 
 ## Vendored And Runtime Dependencies

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.10.0] - 2026-10-03
+
+### Breaking changes
+
+No API changes. Two behavior changes can affect existing callers:
+
+- An image decoding failure without an `onError` handler now throws to the nearest error boundary, the same as a generation error. In 0.9.1 the component rendered blank. Migration: pass `onError` or wrap the component in an error boundary.
+- With `scanSafe: "strict"`, a gradient with a stop that has low contrast against the background is now rejected, and `scanSafe: true` warns and names the stop as `gradient.colors[i]`. In 0.9.1 only the unused solid foreground color was checked. Migration: raise the contrast of the named gradient stop, or use `scanSafe: true` to keep the gradient with a warning.
+
+### Added
+
+- The QRCode component accepts an optional `accessibilityLabel` for localized descriptions that do not expose the encoded payload.
+
+### Fixed
+
+- Scan-safe contrast validation checks the configured gradient stops instead of the unused solid foreground color when a gradient is active.
+- The default accessibility label describes the loaded image, and its busy state stays active while the next PNG loads. The existing `onReady` callback still reports generation completion.
+- Image decoding failures reach `onError`, or the nearest error boundary when no handler is supplied. Errors from a replaced image are ignored.
+
 ## [0.9.1] - 2026-10-01
 
 ### Breaking changes
