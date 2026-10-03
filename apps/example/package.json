@@ -39,6 +39,8 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
-    "@types/react": "~19.2.18"
+    "@types/react": "~19.2.18",
+    "fflate": "0.8.3",
+    "jsqr": "1.4.0"
   }
 }

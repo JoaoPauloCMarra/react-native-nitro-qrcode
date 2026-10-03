@@ -1,6 +1,6 @@
 # Maintained QR Code device replays
 
-The example has five maintained `agent-device test` flows. Source freshness and runner tests are device-free checks. They do not build, install, launch, or replay the app.
+The example has seven maintained `agent-device test` flows. Source freshness and runner tests are device-free checks. They do not build, install, launch, or replay the app.
 
 ## Run after runtime testing is authorized
 
@@ -14,7 +14,7 @@ bun run example:e2e:ios-device -- <physical-iphone-udid>
 bun run example:e2e:ios-device -- <physical-iphone-udid> scanability
 ```
 
-Repeat `--flow` to select several flow IDs. With no selection, all five run. The physical-iPhone wrapper accepts a manifest flow ID, not an arbitrary script or deep link. It delivers each validated QR lab URL through CoreDevice, waits 2 s for the route to settle, then attaches agent-device without relaunching the routed app. An empty or unsupported flow fails before launch.
+Repeat `--flow` to select several flow IDs. With no selection, all seven run. The physical-iPhone wrapper accepts a manifest flow ID, not an arbitrary script or deep link. It delivers each validated QR lab URL through CoreDevice, waits 2 s for the route to settle, then attaches agent-device without relaunching the routed app. An empty or unsupported flow fails before launch.
 
 Each invocation gets a unique session and OS temporary artifact directory. Videos and screenshots are retained there; physical-iPhone flows get separate subdirectories so reports do not overwrite each other. `OUTPUT_DIR` points at that flow's artifacts. Every flow ends with `close`, and `agent-device test` closes each attempt session itself, including after a failure. A failed launch stops before replay. No retries are used, so the first failure stays visible.
 
@@ -22,13 +22,15 @@ Each invocation gets a unique session and OS temporary artifact directory. Video
 
 | Flow | Assertions |
 | --- | --- |
-| `full-features` | PNG signatures, SVG and matrix shapes, sync and async exports, ref export, cache clear, metrics reset, version/ECL bounds, invalid-input recovery and forty successful requests. |
+| `full-features` | PNG signatures, SVG and matrix shapes, sync and async exports, ref data URI and base64 exports, cache clear, metrics reset, no recording while metrics are disabled, sorted scanability warning codes, version/ECL bounds, invalid-input recovery, forty successful requests, `keepPreviousImage` off, and error-boundary throws for an empty value and size 0 without `onError`. |
 | `render-stress` | Fifteen generation callbacks, explicit remount generation, and fifteen callbacks after remount. This is not image decoding or a performance benchmark. |
 | `image-swap` | Twelve generated values, final loaded-image label, zero reported errors, and a localized accessibility label. Inspect the recording for blank or faded frames. |
-| `scanability` | Twenty-five cases, snapshots, strict white-gradient rejection, dark-gradient acceptance with unused white foreground, and recovery. Expected failures must match public validation errors. |
+| `scanability` | Twenty-five cases, snapshots, strict white-gradient rejection, dark-gradient acceptance with unused white foreground, and recovery. Expected failures must match public validation errors. The `scan-decode` probe decodes each ref PNG in the app process with a local PNG decoder (`fflate` inflate) and `jsQR` against the stage backdrop. The flow asserts `decode:<id>=ok;` for plain-module cases only: default, large, long, logo, linear, radial, transparent-light, transparent-dark, quiet-zone, clear-previous, recover, strict-dark-gradient and final-recover. Shaped presets (rounded, dots, branded, classy, mosaic, fluid, classy-logo), small and unicode are reported but not asserted. Outcomes are `ok`, `miss` (no code found), `mismatch` (wrong payload) or `error` (PNG export or decoder threw). This is not camera evidence. |
+| `combo` | Generation sweep with `fail=0;`, overlapping async results equal to sync results, cache bounds after 600 unique values, one request across twelve parent rerenders, and every combo visual specimen ready without `onError`. |
+| `visuals` | Fifteen preset and logo specimens plus custom region colors and shapes complete generation, and complete again after an explicit remount (`generation=1;`). Looks are not compared to references. |
 | `deeplink` | Installed app routes directly to the QR lab. |
 
-[e2e/qrcode-replay-coverage.json](../../e2e/qrcode-replay-coverage.json) maps each assertion to source and replay text. Its pending rows require independent scanner decode, frame review, a controlled native image-loader failure fixture, VoiceOver/TalkBack, browser canvas checks, and device performance measurements. They are not passing replay results. PNG signatures and generation callbacks do not prove camera scanning. Unit tests exercise decode-error callbacks and stale-event guards with mocked Image events; that is not native decoder evidence.
+[e2e/qrcode-replay-coverage.json](../../e2e/qrcode-replay-coverage.json) maps each assertion to source and replay text. Its pending rows require independent camera scanner decode, frame review, a controlled native image-loader failure fixture, VoiceOver/TalkBack, browser canvas checks, and device performance measurements. They are not passing replay results. PNG signatures and generation callbacks do not prove camera scanning. Unit tests exercise decode-error callbacks and stale-event guards with mocked Image events; that is not native decoder evidence.
 
 For scanner checks, compare every valid scanability case against its exact payload in [e2e-scanability.tsx](../../apps/example/app/e2e-scanability.tsx), including Unicode, transparency/backdrop, gradients and recovery. Record target, OS, build, route, scanner, lighting, distance, observed payload, artifact location, and any pending item. A successful replay report covers only its declared assertions.
 

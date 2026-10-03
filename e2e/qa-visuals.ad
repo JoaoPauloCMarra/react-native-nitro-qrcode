@@ -1,0 +1,12 @@
+open "com.qrcode.example" "qrcode://e2e-visuals" --relaunch
+wait "stable"
+wait id="e2e-visuals-screen"
+wait text "e2e-visuals-ready"
+wait id="e2e-visuals-generation"
+wait text "generation=0;"
+wait id="e2e-visuals-ready-count"
+wait text "ok:ready=15/15:ms="
+press id="e2e-visuals-remount"
+wait text "generation=1;"
+wait text "ok:ready=15/15:ms="
+close

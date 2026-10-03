@@ -10,7 +10,7 @@
     {
       "id": "full-features",
       "path": "e2e/qa-full-features.ad",
-      "purpose": "Public PNG/SVG/matrix exports, cache, metrics, bounds, validation, component recovery and repeated exports"
+      "purpose": "Public PNG/SVG/matrix exports, cache, metrics on and off, bounds, validation and warning codes, ref exports, component recovery, error boundary and repeated exports"
     },
     {
       "id": "render-stress",
@@ -25,7 +25,17 @@
     {
       "id": "scanability",
       "path": "e2e/qa-scanability.ad",
-      "purpose": "Twenty-five visual cases including strict gradient rejection and recovery"
+      "purpose": "Twenty-five visual cases including strict gradient rejection and recovery, plus same-process decode of the generated PNG for plain-module cases"
+    },
+    {
+      "id": "combo",
+      "path": "e2e/qa-combo.ad",
+      "purpose": "Combo generation sweep with zero failures, async race, cache leak bound, parent rerender stability and visual specimens"
+    },
+    {
+      "id": "visuals",
+      "path": "e2e/qa-visuals.ad",
+      "purpose": "Fifteen visual specimens, including custom region colors and shapes, complete generation before and after remount"
     },
     {
       "id": "deeplink",
@@ -277,13 +287,176 @@
       "expectedText": "qrcode://e2e",
       "assertion": "Deep link qrcode://e2e.",
       "trigger": "screen-load"
+    },
+    {
+      "id": "validation.warning-codes",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-probe",
+      "expectedText": "warnings=bad-quiet-zone,logo-too-large,low-contrast,low-ecl-for-logo,too-small-size;",
+      "assertion": "[...new Set(result.warnings.map((warning) => warning.code))].sort()",
+      "controlId": "e2e-run-warnings"
+    },
+    {
+      "id": "component.ref-base64",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-probe",
+      "expectedText": "ok:b64=",
+      "assertion": "qrRef.current?.toPngBase64()",
+      "controlId": "e2e-export-b64"
+    },
+    {
+      "id": "metrics.disabled",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-probe",
+      "expectedText": "ok:metrics-off:requests=0",
+      "assertion": "disabled.requests === 0",
+      "controlId": "e2e-run-metrics-off"
+    },
+    {
+      "id": "component.keep-previous-off",
+      "coverage": "replay-asserted",
+      "kind": "visual-only",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-probe",
+      "expectedText": "keep=off:ready",
+      "assertion": "keepPreviousImage={keepPrevious}",
+      "controlId": "e2e-keep-previous",
+      "claimLimit": "Shows the prop toggled off while the lab code stays ready. It does not prove which image is shown during a value change; frame review stays pending."
+    },
+    {
+      "id": "component.throw-without-onerror",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-full-features.ad",
+      "source": "apps/example/components/e2e-lab.tsx",
+      "statusId": "e2e-probe",
+      "expectedText": "boundary:empty=ok:size=ok;",
+      "assertion": "error.message.includes(\"QRCode value must not be empty.\")",
+      "controlId": "e2e-run-boundary"
+    },
+    {
+      "id": "combo.sweep",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-combo.ad",
+      "source": "apps/example/app/e2e-combo.tsx",
+      "statusId": "e2e-combo-report",
+      "expectedText": "fail=0;",
+      "assertion": "`fail=${report.failed}`",
+      "trigger": "screen-load",
+      "claimLimit": "Every generation case returns a valid shape or its expected error in one sweep; output pixels are not decoded."
+    },
+    {
+      "id": "combo.race-leak",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-combo.ad",
+      "source": "apps/example/app/e2e-combo.tsx",
+      "statusId": "e2e-combo-report",
+      "expectedText": "race=ok;",
+      "assertion": "`race=${report.raceOk ? \"ok\" : \"fail\"}`",
+      "trigger": "screen-load"
+    },
+    {
+      "id": "combo.leak",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-combo.ad",
+      "source": "apps/example/app/e2e-combo.tsx",
+      "statusId": "e2e-combo-report",
+      "expectedText": "leak=ok;",
+      "assertion": "`leak=${report.leakOk ? \"ok\" : \"fail\"}`",
+      "trigger": "screen-load",
+      "claimLimit": "Cache entries and bytes stay within the documented bounds after 600 unique values; this is not a heap or native memory measurement."
+    },
+    {
+      "id": "component.rerender-stable",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-combo.ad",
+      "source": "apps/example/app/e2e-combo.tsx",
+      "statusId": "e2e-combo-rerender",
+      "expectedText": "ok:requests=1:ticks=12",
+      "assertion": "`ok:requests=${snapshot.requests}:ticks=12`",
+      "trigger": "screen-load"
+    },
+    {
+      "id": "combo.visuals",
+      "coverage": "replay-asserted",
+      "kind": "visual-only",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-combo.ad",
+      "source": "apps/example/app/e2e-combo.tsx",
+      "statusId": "e2e-combo-visuals",
+      "expectedText": "ok:ready=",
+      "assertion": "onError={() => markReady(specimen.id, true)}",
+      "trigger": "screen-load",
+      "claimLimit": "Every combo visual specimen completed generation without onError. Looks are not compared to references or decoded."
+    },
+    {
+      "id": "visuals.regions",
+      "coverage": "replay-asserted",
+      "kind": "visual-only",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-visuals.ad",
+      "source": "apps/example/app/e2e-visuals.tsx",
+      "statusId": "e2e-visuals-ready-count",
+      "expectedText": "ok:ready=15/15:ms=",
+      "assertion": "id: \"regions\"",
+      "trigger": "screen-load",
+      "claimLimit": "Fifteen specimens, including custom alignment, timing, quiet-zone and finder colors and shapes, complete generation before and after remount. Region colors and shapes are not compared to references or decoded."
+    },
+    {
+      "id": "visuals.remount",
+      "coverage": "replay-asserted",
+      "kind": "public-api",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-visuals.ad",
+      "source": "apps/example/app/e2e-visuals.tsx",
+      "statusId": "e2e-visuals-generation",
+      "expectedText": "generation=1;",
+      "assertion": "setGeneration((value) => value + 1)",
+      "controlId": "e2e-visuals-remount"
+    },
+    {
+      "id": "scan.decode-inprocess",
+      "coverage": "replay-asserted",
+      "kind": "test-adapter",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-scanability.ad",
+      "source": "apps/example/components/scan-decode.ts",
+      "statusSource": "apps/example/app/e2e-scanability.tsx",
+      "statusId": "scan-decode",
+      "expectedText": "decode:default=ok;",
+      "assertion": "jsQR(rgba, width, height, { inversionAttempts: \"attemptBoth\" })",
+      "trigger": "screen-load",
+      "claimLimit": "same-process decoder on the generated PNG; not camera, distance or lighting evidence"
     }
   ],
   "pending": [
     {
       "id": "scanner.decode",
       "state": "pending-prerequisites",
-      "reason": "Screenshots and generation callbacks do not measure camera decode success.",
+      "reason": "The in-process jsQR decode of the generated PNG (scan.decode-inprocess) does not measure camera decode success, distance, lighting or styled-module cases.",
       "prerequisites": [
         "Installed Android and iOS examples",
         "Independent camera/scanner and declared distance, lighting and backdrop",

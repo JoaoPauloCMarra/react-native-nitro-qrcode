@@ -39,7 +39,7 @@ function formatReport(report: ComboReport): string {
     `race=${report.raceOk ? "ok" : "fail"}`,
     `leak=${report.leakOk ? "ok" : "fail"}`,
     `failures=${failures}`,
-  ].join(" · ");
+  ].join("; ");
 }
 
 export default function ComboScreen() {
@@ -51,17 +51,24 @@ export default function ComboScreen() {
   const [rerenderTicks, setRerenderTicks] = useState(0);
   const [rerenderResult, setRerenderResult] = useState("(idle)");
   const readyIdsRef = useRef(new Set<string>());
+  const failedIdsRef = useRef(new Set<string>());
   const [visualStatus, setVisualStatus] = useState(
     `ready=0/${VISUALS.length}`,
   );
 
-  const markReady = useCallback((id: string) => {
+  const markReady = useCallback((id: string, failed = false) => {
     if (readyIdsRef.current.has(id)) {
       return;
     }
     readyIdsRef.current.add(id);
+    if (failed) {
+      failedIdsRef.current.add(id);
+    }
     const next = [...readyIdsRef.current];
-    if (next.length === VISUALS.length) {
+    const errors = failedIdsRef.current.size;
+    if (next.length === VISUALS.length && errors > 0) {
+      setVisualStatus(`fail:ready=${next.length}/${VISUALS.length}:errors=${errors}`);
+    } else if (next.length === VISUALS.length) {
       setVisualStatus(`ok:ready=${next.length}/${VISUALS.length}`);
     } else {
       setVisualStatus(`ready=${next.length}/${VISUALS.length}`);
@@ -169,7 +176,7 @@ export default function ComboScreen() {
                 ) : undefined
               }
               onReady={() => markReady(specimen.id)}
-              onError={() => markReady(specimen.id)}
+              onError={() => markReady(specimen.id, true)}
             />
             <Text style={styles.label}>{specimen.label}</Text>
           </View>

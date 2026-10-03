@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { QRCode, validateOptions, type QRCodeProps } from "react-native-nitro-qrcode";
+import { QRCode, validateOptions, type QRCodeProps, type QRCodeRef } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { decodePngBase64, type Backdrop, type DecodeOutcome } from "../components/scan-decode";
 
 type ScanCase = {
   id: string;
@@ -38,23 +39,63 @@ const SCAN_CASES: readonly ScanCase[] = [
   { id: "final-recover", props: { value: "https://nitro.dev/scan/final-recover", imageStyle: { opacity: 0.9 } } },
 ];
 
+const DECODABLE_CASES = SCAN_CASES.filter((scanCase) => scanCase.expectedError !== true);
+const LIGHT_BACKDROP: Backdrop = [255, 255, 255];
+const DARK_BACKDROP: Backdrop = [16, 17, 18];
+
+function decodeProbeLabel(decodes: ReadonlyMap<string, DecodeOutcome>): string {
+  const okCount = [...decodes.values()].filter((outcome) => outcome === "ok").length;
+  const tokens = [...decodes].map(([id, outcome]) => `decode:${id}=${outcome};`);
+  return [`decoded=${okCount}/${DECODABLE_CASES.length};`, ...tokens].join(" ");
+}
+
 export default function ScanabilityScreen() {
   const insets = useSafeAreaInsets();
+  const qrRef = useRef<QRCodeRef>(null);
   const [index, setIndex] = useState(0);
   const [result, setResult] = useState("pending");
+  const [decodes, setDecodes] = useState<ReadonlyMap<string, DecodeOutcome>>(() => new Map());
   const specimen = SCAN_CASES[index];
   const validation = validateOptions(specimen.props);
 
+  const decodeCurrent = (scanCase: ScanCase) => {
+    if (scanCase.expectedError === true) {
+      return;
+    }
+    let base64: string | undefined;
+    try {
+      base64 = qrRef.current?.toPngBase64();
+    } catch {
+      base64 = undefined;
+    }
+    setTimeout(() => {
+      let outcome: DecodeOutcome = "error";
+      if (base64 !== undefined) {
+        try {
+          outcome = decodePngBase64(base64, scanCase.props.value, scanCase.darkBackdrop === true ? DARK_BACKDROP : LIGHT_BACKDROP);
+        } catch {
+          outcome = "error";
+        }
+      }
+      setDecodes((current) => new Map(current).set(scanCase.id, outcome));
+    }, 0);
+  };
+
   return (
     <View testID="scan-screen" style={[styles.screen, { paddingTop: insets.top + 16 }]}>
+      <View testID="scan-decode" accessible accessibilityLabel={decodeProbeLabel(decodes)} style={styles.resultsProbe} />
       <Text style={styles.title}>QR scanability</Text>
       <Text testID="scan-case" style={styles.text}>{specimen.id}</Text>
       <View style={[styles.stage, specimen.darkBackdrop && styles.dark]}>
         <QRCode
+          ref={qrRef}
           testID="scan-qr"
           size={240}
           {...specimen.props}
-          onReady={() => setResult(specimen.expectedError ? "FAIL:accepted" : `ready:${specimen.id}`)}
+          onReady={() => {
+            setResult(specimen.expectedError ? "FAIL:accepted" : `ready:${specimen.id}`);
+            decodeCurrent(specimen);
+          }}
           onError={(error) => setResult(specimen.expectedError && !validation.valid && validation.errors.some((issue) => error.message.includes(issue.message)) ? `rejected:${specimen.id}` : `FAIL:${error.message}`)}
         />
       </View>
@@ -83,4 +124,5 @@ const styles = StyleSheet.create({
   stage: { width: 320, height: 320, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
   dark: { backgroundColor: "#101112" },
   button: { padding: 16, borderRadius: 12, backgroundColor: "#1E293B" },
+  resultsProbe: { width: "100%", height: 1 },
 });

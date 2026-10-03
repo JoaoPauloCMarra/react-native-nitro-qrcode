@@ -47,4 +47,16 @@ press id="e2e-run-stress"
 scroll bottom
 wait id="e2e-stress-result"
 wait text "ok:count=40:ms="
+scroll top
+wait id="e2e-probe"
+press id="e2e-run-warnings"
+wait text "warnings=bad-quiet-zone,logo-too-large,low-contrast,low-ecl-for-logo,too-small-size;"
+press id="e2e-export-b64"
+wait text "ok:b64="
+press id="e2e-run-metrics-off"
+wait text "ok:metrics-off:requests=0"
+press id="e2e-keep-previous"
+wait text "keep=off:ready"
+press id="e2e-run-boundary"
+wait text "boundary:empty=ok:size=ok;"
 close

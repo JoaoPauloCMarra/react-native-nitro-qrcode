@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { Component, useRef, useState, type ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   NitroQRCode,
@@ -53,6 +53,35 @@ const EMPTY: LabResult = {
 
 const STRESS_COUNT = 40;
 
+type ProbeResult = {
+  warnings?: string;
+  refBase64?: string;
+  metricsOff?: string;
+  boundaryEmpty?: string;
+  boundarySize?: string;
+};
+
+type BoundaryProps = {
+  children: ReactNode;
+  onCaught: (error: Error) => void;
+};
+
+class LabErrorBoundary extends Component<BoundaryProps, { caught: boolean }> {
+  state = { caught: false };
+
+  static getDerivedStateFromError() {
+    return { caught: true };
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onCaught(error);
+  }
+
+  render() {
+    return this.state.caught ? null : this.props.children;
+  }
+}
+
 export function QrcodeE2eLab() {
   const qrRef = useRef<QRCodeRef>(null);
   const [preset, setPreset] = useState<QRCodePreset>("default");
@@ -61,6 +90,8 @@ export function QrcodeE2eLab() {
   const [forceEmpty, setForceEmpty] = useState(false);
   const [auditUri, setAuditUri] = useState<string>();
   const [results, setResults] = useState<LabResult>(EMPTY);
+  const [probe, setProbe] = useState<ProbeResult>({});
+  const [showBoundaries, setShowBoundaries] = useState(false);
 
   const liveValue = forceEmpty ? "" : LAB_VALUE;
 
@@ -202,6 +233,73 @@ export function QrcodeE2eLab() {
     }));
   };
 
+  const runWarnings = () => {
+    const result = NitroQRCode.validateOptions({
+      value: LAB_VALUE,
+      size: 64,
+      quietZone: 0,
+      foregroundColor: "#EEEEEE",
+      logoAreaSize: 32,
+      errorCorrectionLevel: "L",
+    });
+    const codes = [...new Set(result.warnings.map((warning) => warning.code))].sort();
+    setProbe((current) => ({
+      ...current,
+      warnings: result.errors.length === 0 ? `warnings=${codes.join(",")};` : `warnings=fail:${result.errors[0]?.code ?? "none"};`,
+    }));
+  };
+
+  const exportBase64 = () => {
+    let base64: string | undefined;
+    try {
+      base64 = qrRef.current?.toPngBase64();
+    } catch {
+      base64 = undefined;
+    }
+    setProbe((current) => ({
+      ...current,
+      refBase64: base64?.startsWith("iVBOR") ? `ok:b64=${base64.length};` : "fail:b64-unavailable;",
+    }));
+  };
+
+  const runMetricsOff = () => {
+    const wasEnabled = getQRCodeMetrics().enabled;
+    setQRCodeMetricsEnabled(true);
+    resetQRCodeMetrics();
+    setQRCodeMetricsEnabled(false);
+    const silent = toPngBase64({ value: `${LAB_VALUE}#metrics-off`, size: 64 });
+    setQRCodeMetricsEnabled(true);
+    const disabled = getQRCodeMetrics();
+    toPngBase64({ value: `${LAB_VALUE}#metrics-on`, size: 64 });
+    const resumed = getQRCodeMetrics();
+    resetQRCodeMetrics();
+    setQRCodeMetricsEnabled(wasEnabled);
+    const silentCorrectly =
+      silent.startsWith("iVBOR") &&
+      disabled.requests === 0 &&
+      disabled.cacheHits === 0 &&
+      disabled.cacheMisses === 0 &&
+      resumed.requests === 1;
+    setProbe((current) => ({
+      ...current,
+      metricsOff: silentCorrectly
+        ? `ok:metrics-off:requests=${disabled.requests}:resumed=${resumed.requests};`
+        : `fail:metrics-off:requests=${disabled.requests}:resumed=${resumed.requests};`,
+    }));
+  };
+
+  const probeLabel = [
+    probe.warnings,
+    probe.refBase64,
+    probe.metricsOff,
+    `keep=${keepPrevious ? "on" : "off"}:${results.error === "ok:ready" ? "ready" : "pending"};`,
+    probe.boundaryEmpty === undefined && probe.boundarySize === undefined
+      ? undefined
+      : `boundary:empty=${probe.boundaryEmpty ?? "pending"}:size=${probe.boundarySize ?? "pending"};`,
+  ]
+    .filter((token) => token !== undefined)
+    .join(" ");
+
   const exportUri = () => {
     const uri = qrRef.current?.toPngDataUri();
     setResults((current) => ({
@@ -217,6 +315,7 @@ export function QrcodeE2eLab() {
       <Text style={styles.subtitle}>
         Deterministic controls for every public QRCode API.
       </Text>
+      <View testID="e2e-probe" accessible accessibilityLabel={probeLabel} style={styles.resultsProbe} />
 
       <QRCode
         ref={qrRef}
@@ -304,6 +403,42 @@ export function QrcodeE2eLab() {
         <LabButton testID="e2e-export-uri" label="Export URI" onPress={exportUri} />
         <LabButton testID="e2e-run-stress" label="Stress PNG" onPress={runStress} />
       </View>
+      <View style={styles.row}>
+        <LabButton testID="e2e-run-warnings" label="Warnings" onPress={runWarnings} />
+        <LabButton testID="e2e-export-b64" label="Export base64" onPress={exportBase64} />
+        <LabButton testID="e2e-run-metrics-off" label="Metrics off" onPress={runMetricsOff} />
+        <LabButton
+          testID="e2e-run-boundary"
+          label="Error boundary"
+          onPress={() => {
+            setShowBoundaries(true);
+          }}
+        />
+      </View>
+      {showBoundaries ? (
+        <View style={styles.row}>
+          <LabErrorBoundary
+            onCaught={(error) => {
+              setProbe((current) => ({
+                ...current,
+                boundaryEmpty: error.message.includes("QRCode value must not be empty.") ? "ok" : "fail",
+              }));
+            }}
+          >
+            <QRCode testID="e2e-boundary-empty" value="" size={48} />
+          </LabErrorBoundary>
+          <LabErrorBoundary
+            onCaught={(error) => {
+              setProbe((current) => ({
+                ...current,
+                boundarySize: error.message.includes("integer between 1 and 2048") ? "ok" : "fail",
+              }));
+            }}
+          >
+            <QRCode testID="e2e-boundary-size" value={LAB_VALUE} size={0} />
+          </LabErrorBoundary>
+        </View>
+      ) : null}
 
       <LabButton testID="e2e-run-audit" label="Audit regressions" onPress={() => { void runAudit(); }} />
       <ResultRow testID="e2e-audit-result" value={results.audit} />
@@ -395,6 +530,10 @@ const styles = StyleSheet.create({
   },
   buttonTextSelected: {
     color: "#F8FAFC",
+  },
+  resultsProbe: {
+    height: 1,
+    width: "100%",
   },
   result: {
     color: "#0F172A",
