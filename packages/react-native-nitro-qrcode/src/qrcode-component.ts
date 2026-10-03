@@ -4,6 +4,8 @@ import {
   useImperativeHandle,
   useMemo,
   useState,
+  useEffect,
+  useRef,
   type ForwardRefExoticComponent,
   type Ref,
   type RefAttributes,
@@ -37,6 +39,7 @@ import {
 import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 
 export type QRCodeProps = QRCodeOptions & {
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
   logo?: ReactNode;
@@ -218,6 +221,7 @@ export function createQRCodeComponent(
       hideLogoUntilReady = DEFAULT_HIDE_LOGO_UNTIL_READY,
       onReady,
       onError,
+      accessibilityLabel,
       style,
       imageStyle,
       logo,
@@ -444,13 +448,34 @@ export function createQRCodeComponent(
     const [imageState, setImageState] = useState<{
       requested: string | undefined;
       loaded: string | undefined;
-    }>({ requested: uri, loaded: undefined });
+      loadedValue: string | undefined;
+      error: Error | undefined;
+    }>({
+      requested: uri,
+      loaded: undefined,
+      loadedValue: undefined,
+      error: undefined,
+    });
     if (imageState.requested !== uri) {
       setImageState({
         requested: uri,
         loaded: keepPreviousImage ? imageState.loaded : undefined,
+        loadedValue: keepPreviousImage ? imageState.loadedValue : undefined,
+        error: undefined,
       });
     }
+    const onImageErrorRef = useRef(onError);
+    useEffect(() => {
+      onImageErrorRef.current = onError;
+    }, [onError]);
+    useEffect(() => {
+      if (imageState.error !== undefined)
+        onImageErrorRef.current?.(imageState.error);
+    }, [imageState.error]);
+    const imagePending =
+      uri !== undefined &&
+      imageState.loaded !== uri &&
+      imageState.error === undefined;
     const imageUris = uri === undefined ? [] : [uri];
     if (
       keepPreviousImage &&
@@ -476,6 +501,9 @@ export function createQRCodeComponent(
     if (generationError !== undefined) {
       throw generationError;
     }
+    if (imageState.error !== undefined && onError === undefined) {
+      throw imageState.error;
+    }
 
     return createElement(
       View,
@@ -485,10 +513,13 @@ export function createQRCodeComponent(
         accessible: true,
         accessibilityRole: "image" as const,
         accessibilityLabel:
-          displayedValue === undefined
-            ? generatingAccessibilityLabel()
-            : qrCodeAccessibilityLabel(displayedValue),
-        accessibilityState: { busy: pending },
+          accessibilityLabel ??
+          (imageState.loadedValue === undefined
+            ? imageState.error === undefined
+              ? generatingAccessibilityLabel()
+              : "QR code unavailable"
+            : qrCodeAccessibilityLabel(imageState.loadedValue)),
+        accessibilityState: { busy: pending || imagePending },
       },
       uri === undefined && placeholder,
       imageUris.map((imageUri) =>
@@ -506,7 +537,20 @@ export function createQRCodeComponent(
           onLoad: () => {
             setImageState((current) =>
               current.requested === imageUri && current.loaded !== imageUri
-                ? { requested: imageUri, loaded: imageUri }
+                ? {
+                    ...current,
+                    loaded: imageUri,
+                    loadedValue: displayedValue,
+                    error: undefined,
+                  }
+                : current,
+            );
+          },
+          onError: () => {
+            const error = new Error("QRCode image failed to load.");
+            setImageState((current) =>
+              current.requested === imageUri && current.error === undefined
+                ? { ...current, error }
                 : current,
             );
           },

@@ -75,6 +75,7 @@ const validOptions: QRCodeOptions = {
 };
 
 const validProps: QRCodeProps = {
+  accessibilityLabel: "Código de pagamento",
   ...validOptions,
   size: 2048,
   logoBackgroundColor: "transparent",
@@ -88,6 +89,11 @@ const validProps: QRCodeProps = {
 };
 
 void validProps;
+const webLabeledProps: Web.QRCodeProps = validProps;
+void webLabeledProps;
+// @ts-expect-error Accessibility labels are text, never arbitrary payloads.
+const invalidLabel: QRCodeProps = { value: "payload", accessibilityLabel: 123 };
+void invalidLabel;
 
 const pngBytes: ArrayBuffer = toPngArrayBuffer(validOptions);
 const pngBase64: string = toPngBase64(validOptions);
