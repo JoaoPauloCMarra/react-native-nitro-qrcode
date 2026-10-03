@@ -1,0 +1,13 @@
+open "com.qrcode.example" "qrcode://e2e-combo" --relaunch
+wait id="e2e-combo-screen"
+wait id="e2e-combo-ready"
+wait text "e2e-combo-done" 120000
+wait id="e2e-combo-report"
+wait text "fail=0;"
+wait text "race=ok;"
+wait text "leak=ok;"
+wait id="e2e-combo-rerender"
+wait text "ok:requests=1:ticks=12"
+wait id="e2e-combo-visuals"
+wait text "ok:ready=" 60000
+close

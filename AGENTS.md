@@ -35,7 +35,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 
 ## Replay Maintenance
 
-- Keep `e2e/qrcode-replay-coverage.json`, its source lock, and all five `.ad` flows aligned with library and example changes. Follow `docs/qa/agent-device-replay.md`.
+- Keep `e2e/qrcode-replay-coverage.json`, its source lock, and all seven `.ad` flows aligned with library and example changes. Follow `docs/qa/agent-device-replay.md`.
 - Review assertions and pending prerequisites before `bun run example:replay:refresh`; then require `example:replay:check` and `example:replay:test` in device-free checks. A refreshed lock is not runtime evidence.
 - Use `example:replay -- --platform <ios|android>` with an exact `--udid` or `--serial`. Physical iPhones use `example:e2e:ios-device -- <udid> [manifest-flow-id]`, which preserves the CoreDevice deep-link route.
 - Keep real decoder, scanner, frame, accessibility, web and performance acceptance separate from generation callbacks. Record artifacts in OS temp. `agent-device test` closes each attempt session itself; the runner does not close sessions.

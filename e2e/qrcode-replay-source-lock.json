@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeSourceSha256": "26cf5b0861d8ada8140a7b22962f1cad677c1232666725dbf3bb672884de8415",
+  "runtimeSourceSha256": "fdeb7fe20bba7dd2953e1285228ec7dcc5ff5f69c1152fdf9b97f6a5572e90ce",
   "runtimeSourceFiles": [
     "apps/example/app.config.js",
     "apps/example/app/_layout.tsx",
@@ -18,6 +18,7 @@
     "apps/example/components/e2e-gate.tsx",
     "apps/example/components/e2e-lab.tsx",
     "apps/example/components/generation-matrix.ts",
+    "apps/example/components/scan-decode.ts",
     "apps/example/metro.config.js",
     "apps/example/package.json",
     "apps/example/plugins/with-gradle-assignment-syntax.js",
@@ -76,13 +77,15 @@
     "packages/react-native-nitro-qrcode/src/use-qrcode-generation.ts",
     "packages/react-native-nitro-qrcode/src/validation.ts"
   ],
-  "replayInputsSha256": "a07e0b32cb01db7afc503611b69dbc53478388f4ef5b0cf9eb539b5a8adc97f5",
+  "replayInputsSha256": "4e49e12138ef14096e604dc3b4ca01fc4a9f56c360992e66664f694b224fec65",
   "replayInputs": [
+    "e2e/qa-combo.ad",
     "e2e/qa-deeplink.ad",
     "e2e/qa-full-features.ad",
     "e2e/qa-image-swap.ad",
     "e2e/qa-render-stress.ad",
     "e2e/qa-scanability.ad",
+    "e2e/qa-visuals.ad",
     "e2e/qrcode-replay-coverage.json"
   ],
   "suites": [
@@ -90,6 +93,8 @@
     "render-stress",
     "image-swap",
     "scanability",
+    "combo",
+    "visuals",
     "deeplink"
   ]
 }

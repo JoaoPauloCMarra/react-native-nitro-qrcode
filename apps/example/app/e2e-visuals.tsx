@@ -102,6 +102,9 @@ export default function QrcodeE2eVisualsScreen() {
       <Text style={styles.subtitle}>
         Every look with and without a center logo. Times the full wall.
       </Text>
+      <Text testID="e2e-visuals-generation" style={styles.metric}>
+        {`generation=${generation};`}
+      </Text>
       <Text testID="e2e-visuals-ready-count" style={styles.metric}>
         {elapsed === "(idle)"
           ? `ready=${readyIds.length}/${SPECIMENS.length}`

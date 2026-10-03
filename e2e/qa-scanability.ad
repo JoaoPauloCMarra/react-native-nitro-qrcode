@@ -1,8 +1,10 @@
 open "com.qrcode.example" "qrcode://e2e-scanability" --relaunch
 wait id="scan-screen"
 wait id="scan-result"
+wait id="scan-decode"
 
 wait text "ready:default"
+wait text "decode:default=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/default.png"
 press id="scan-next"
@@ -11,6 +13,7 @@ wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/small.png"
 press id="scan-next"
 wait text "ready:large"
+wait text "decode:large=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/large.png"
 press id="scan-next"
@@ -19,6 +22,7 @@ wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/unicode.png"
 press id="scan-next"
 wait text "ready:long"
+wait text "decode:long=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/long.png"
 press id="scan-next"
@@ -51,30 +55,37 @@ wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/classy-logo.png"
 press id="scan-next"
 wait text "ready:linear"
+wait text "decode:linear=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/linear.png"
 press id="scan-next"
 wait text "ready:radial"
+wait text "decode:radial=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/radial.png"
 press id="scan-next"
 wait text "ready:logo"
+wait text "decode:logo=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/logo.png"
 press id="scan-next"
 wait text "ready:transparent-light"
+wait text "decode:transparent-light=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/transparent-light.png"
 press id="scan-next"
 wait text "ready:transparent-dark"
+wait text "decode:transparent-dark=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/transparent-dark.png"
 press id="scan-next"
 wait text "ready:quiet-zone"
+wait text "decode:quiet-zone=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/quiet-zone.png"
 press id="scan-next"
 wait text "ready:clear-previous"
+wait text "decode:clear-previous=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/clear-previous.png"
 press id="scan-next"
@@ -83,6 +94,7 @@ wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/invalid-empty.png"
 press id="scan-next"
 wait text "ready:recover"
+wait text "decode:recover=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/recover.png"
 press id="scan-next"
@@ -95,11 +107,13 @@ wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/strict-white-gradient.png"
 press id="scan-next"
 wait text "ready:strict-dark-gradient"
+wait text "decode:strict-dark-gradient=ok;"
 wait text "QR code for accept-dark-gradient"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/strict-dark-gradient.png"
 press id="scan-next"
 wait text "ready:final-recover"
+wait text "decode:final-recover=ok;"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/final-recover.png"
 close
