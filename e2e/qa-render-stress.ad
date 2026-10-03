@@ -2,6 +2,7 @@ open "com.qrcode.example" "qrcode://e2e-render" --relaunch
 wait "stable"
 wait id="e2e-render-screen"
 wait text "e2e-ready"
+wait id="e2e-render-ready-count"
 wait text "ok:ready=15/15:ms="
 wait id="e2e-render-qr-default"
 scroll bottom
@@ -9,5 +10,7 @@ wait id="e2e-render-qr-padded"
 wait text "Padded whitespace"
 scroll top
 press id="e2e-render-remount"
+wait id="e2e-render-generation"
+wait text "generation=1"
 wait text "ok:ready=15/15:ms="
 close

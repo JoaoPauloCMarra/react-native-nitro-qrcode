@@ -15,7 +15,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 - Root quality gate: `bun run check` (lint including root scripts, types, coverage, C++ tests, build, example checks, lifecycle tests). CI gate: `bun run check:ci` (adds C++ sanitizers). Device-free release gate: `bun run release:preflight:ci` (adds benchmark, package audit, and dry-run publish; used by the publish workflow). Local release gate: `bun run release:preflight` (runs `release:preflight:ci`, then `example:smoke -- --strict`).
 - Example React Compiler is on (`experiments.reactCompiler`). Never write try/finally without catch inside a React component or hook. The compiler cannot lower it ("Handle TryStatement without a catch clause") and skips the whole function. Use promise.finally() for async cleanup, or a real catch that handles or reports the error. try/catch/finally is not this bailout. Example lint fails that form (`TryStatement[handler=null]` via `compiler-bailout/no-try-without-catch`). A compiler bailout fails the check. It is not a type or lint warning to ignore.
 - Example checks: `bun run example:check`; native builds via `example:android:assemble` / `example:ios:build` after `example:prebuild`.
-- Example E2E scripts open labs by scheme (`qrcode://e2e`, `qrcode://e2e-render`, …). Do not route flows through the home `open-e2e-lab` gate. On a physical iPhone use `bun run example:e2e:ios-device -- <udid>` (`bash scripts/run-ios-device-e2e.sh`), which rejects suites with no steps, launches via CoreDevice `--payload-url` then attaches agent-device.
+- Example E2E scripts open labs by scheme (`qrcode://e2e`, `qrcode://e2e-render`, …). Do not route flows through the home `open-e2e-lab` gate. On a physical iPhone use `bun run example:e2e:ios-device -- <udid> [manifest-flow-id]` (`bash scripts/run-ios-device-e2e.sh`), which runs `example:replay -- --physical-ios`. The runner rejects flows that do not open exactly one QR lab, launches each lab URL via CoreDevice `--payload-url`, waits 2 s, then attaches `agent-device test` without a relaunch.
 - LLVM: CI pins LLVM 18; the C++ scripts prefer `clang++-18`/`llvm-profdata-18`/`llvm-cov-18` and fall back to unversioned tools.
 
 ## Universal Rules
@@ -32,3 +32,10 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 - Guard `static_cast<int>` from `NaN`/`Inf`/fractional inputs in C++ option parsing.
 - Keep `cpp/qrcodegen` and `cpp/vendor/fpng/{fpng.cpp,fpng.h}` vendored sources unmodified; wrap changes in `core/`/`bindings/` or `fpng_unity.cpp` instead. See `cpp/qrcodegen/README.nayuki.markdown` and `cpp/vendor/fpng/README.md` for the pinned commits and synchronization policy. Do not vendor zlib-ng, replace Nayuki, or add a Rust FFI for styled modules. New looks stay on `layout: "matrix"` (`classy`, `diamond`, `squircle`).
 - Cache ownership lives in `cpp/core/BoundedCache.hpp` (bounded LRU); the output cache keeps 128 entries/4 MiB and the matrix cache keeps 32 entries/512 KiB.
+
+## Replay Maintenance
+
+- Keep `e2e/qrcode-replay-coverage.json`, its source lock, and all five `.ad` flows aligned with library and example changes. Follow `docs/qa/agent-device-replay.md`.
+- Review assertions and pending prerequisites before `bun run example:replay:refresh`; then require `example:replay:check` and `example:replay:test` in device-free checks. A refreshed lock is not runtime evidence.
+- Use `example:replay -- --platform <ios|android>` with an exact `--udid` or `--serial`. Physical iPhones use `example:e2e:ios-device -- <udid> [manifest-flow-id]`, which preserves the CoreDevice deep-link route.
+- Keep real decoder, scanner, frame, accessibility, web and performance acceptance separate from generation callbacks. Record artifacts in OS temp. `agent-device test` closes each attempt session itself; the runner does not close sessions.

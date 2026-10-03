@@ -1,4 +1,6 @@
 open "com.qrcode.example" "qrcode://e2e-scanability" --relaunch
+wait id="scan-screen"
+wait id="scan-result"
 
 wait text "ready:default"
 wait stable 1000 5000
@@ -87,6 +89,15 @@ press id="scan-next"
 wait text "rejected:strict-low-contrast"
 wait stable 1000 5000
 screenshot "${OUTPUT_DIR}/strict-low-contrast.png"
+press id="scan-next"
+wait text "rejected:strict-white-gradient"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/strict-white-gradient.png"
+press id="scan-next"
+wait text "ready:strict-dark-gradient"
+wait text "QR code for accept-dark-gradient"
+wait stable 1000 5000
+screenshot "${OUTPUT_DIR}/strict-dark-gradient.png"
 press id="scan-next"
 wait text "ready:final-recover"
 wait stable 1000 5000

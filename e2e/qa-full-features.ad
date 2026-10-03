@@ -4,20 +4,27 @@ wait id="e2e-screen"
 wait text "e2e-ready"
 wait id="e2e-lab"
 press id="e2e-run-helpers"
+wait id="e2e-helpers-result"
 wait text "ok:png="
 press id="e2e-run-namespace"
+wait id="e2e-namespace-result"
 wait text "ok:nitro:"
 press id="e2e-run-cache"
+wait id="e2e-cache-result"
 wait text "ok:cleared:"
 wait text "->0:bytes=0"
 press id="e2e-run-metrics"
+wait id="e2e-metrics-result"
 wait text "ok:requests=1:reset=0"
 press id="e2e-run-validation"
+wait id="e2e-validation-result"
 wait text "ok:valid=true"
 press id="e2e-run-audit"
+wait id="e2e-audit-result"
 wait text "ok:bounds:boost:metrics:nul-image-ready"
 press id="e2e-export-uri"
 scroll bottom
+wait id="e2e-export-uri-result"
 wait text "ok:uri="
 scroll top
 press id="e2e-preset-branded"
@@ -28,13 +35,16 @@ wait text "ok:valid=true:invalid=false"
 scroll top
 press id="e2e-force-empty"
 scroll bottom
-wait text "ok:error:"
+wait id="e2e-error-result"
+wait text "ok:error:empty"
 scroll top
 press id="e2e-force-empty"
 scroll bottom
+wait id="e2e-error-result"
 wait text "ok:ready"
 scroll top
 press id="e2e-run-stress"
 scroll bottom
+wait id="e2e-stress-result"
 wait text "ok:count=40:ms="
 close

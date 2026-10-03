@@ -59,6 +59,12 @@ jobs:
       - name: Lint
         run: bun run lint:check
 
+      - name: Lint root scripts
+        run: bun run lint:scripts
+
+      - name: Verify replay maintenance
+        run: bun run example:replay:check && bun run example:replay:test
+
       - name: Typecheck package
         run: bun run typecheck
 
