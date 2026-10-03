@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { QRCode, type QRCodeProps } from "react-native-nitro-qrcode";
+import { QRCode, validateOptions, type QRCodeProps } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ScanCase = {
@@ -33,6 +33,8 @@ const SCAN_CASES: readonly ScanCase[] = [
   { id: "invalid-empty", expectedError: true, props: { value: "" } },
   { id: "recover", props: { value: "https://nitro.dev/scan/recover" } },
   { id: "strict-low-contrast", expectedError: true, props: { value: "reject-low-contrast", foregroundColor: "#EEEEEE", backgroundColor: "#FFFFFF", scanSafe: "strict" } },
+  { id: "strict-white-gradient", expectedError: true, props: { value: "reject-white-gradient", foregroundColor: "#000000", backgroundColor: "#FFFFFF", gradient: { type: "linear", colors: ["#FFFFFF", "#FFFFFF"] }, scanSafe: "strict" } },
+  { id: "strict-dark-gradient", props: { value: "accept-dark-gradient", foregroundColor: "#FFFFFF", backgroundColor: "#FFFFFF", gradient: { type: "linear", colors: ["#000000", "#111111"] }, scanSafe: "strict" } },
   { id: "final-recover", props: { value: "https://nitro.dev/scan/final-recover", imageStyle: { opacity: 0.9 } } },
 ];
 
@@ -41,17 +43,19 @@ export default function ScanabilityScreen() {
   const [index, setIndex] = useState(0);
   const [result, setResult] = useState("pending");
   const specimen = SCAN_CASES[index];
+  const validation = validateOptions(specimen.props);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 16 }]}>
+    <View testID="scan-screen" style={[styles.screen, { paddingTop: insets.top + 16 }]}>
       <Text style={styles.title}>QR scanability</Text>
       <Text testID="scan-case" style={styles.text}>{specimen.id}</Text>
       <View style={[styles.stage, specimen.darkBackdrop && styles.dark]}>
         <QRCode
+          testID="scan-qr"
           size={240}
           {...specimen.props}
           onReady={() => setResult(specimen.expectedError ? "FAIL:accepted" : `ready:${specimen.id}`)}
-          onError={(error) => setResult(specimen.expectedError ? `rejected:${specimen.id}` : `FAIL:${error.message}`)}
+          onError={(error) => setResult(specimen.expectedError && !validation.valid && validation.errors.some((issue) => error.message.includes(issue.message)) ? `rejected:${specimen.id}` : `FAIL:${error.message}`)}
         />
       </View>
       <Text testID="scan-result" style={styles.text}>{result}</Text>

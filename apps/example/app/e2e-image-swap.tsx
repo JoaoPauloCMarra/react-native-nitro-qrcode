@@ -9,6 +9,7 @@ export default function ImageSwapScreen() {
   const insets = useSafeAreaInsets();
   const [cycle, setCycle] = useState(1);
   const [readyCycle, setReadyCycle] = useState(0);
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -18,11 +19,12 @@ export default function ImageSwapScreen() {
   }, []);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 24 }]}>
+    <View testID="image-swap-screen" style={[styles.screen, { paddingTop: insets.top + 24 }]}>
       <Text style={styles.title}>QR image swap · issue 25</Text>
       <Text testID="swap-cycle" style={styles.text}>Cycle {cycle}</Text>
       <View style={styles.stage}>
         <QRCode
+          testID="swap-qr"
           value={`https://example.com/scan/${cycle}?payload=${PAYLOAD}&cycle=${cycle}`}
           size={272}
           backgroundColor="#FFFFFF"
@@ -31,9 +33,12 @@ export default function ImageSwapScreen() {
           quietZone={8}
           keepPreviousImage
           onReady={() => setReadyCycle(cycle)}
+          onError={(failure) => setError(failure.message)}
         />
       </View>
       <Text testID="swap-ready" style={styles.text}>Generated {readyCycle}</Text>
+      <Text testID="swap-error" style={styles.text}>{error ? `FAIL:${error}` : "errors=0"}</Text>
+      <QRCode value="opaque-test-payment-payload" accessibilityLabel="Código de pagamento" size={64} testID="custom-label-qr" onError={(failure) => setError(failure.message)} />
       <Text style={styles.text}>The QR must stay visible between updates.</Text>
     </View>
   );

@@ -69,6 +69,7 @@ export default function QrcodeE2eRenderScreen() {
       <Text testID="e2e-ready" style={styles.ready}>
         e2e-ready
       </Text>
+      <Text testID="e2e-render-generation">generation={generation}</Text>
       <Text style={styles.title}>Render wall</Text>
       <Text style={styles.subtitle}>
         Consumer-shaped QR variants: presets, shapes, sizes, unicode, and long
