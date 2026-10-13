@@ -6,7 +6,6 @@ import * as path from "node:path";
 import {
   createMockContext,
   installCanvas,
-  type MockContext,
 } from "./helpers/canvas";
 import { createMockHybridObject } from "./helpers/nitro-mock";
 
