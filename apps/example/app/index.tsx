@@ -15,6 +15,7 @@ import {
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
   getQRCodeMetrics,
+  PRESET_SHAPE_OPTIONS,
   QRCode,
   toPngBase64Async,
   toPngDataUri,
@@ -50,58 +51,6 @@ const LOOK_PRESETS = [
   "mosaic",
   "fluid",
 ] as const satisfies readonly QRCodePreset[];
-const LOOK_SHAPES: Record<
-  (typeof LOOK_PRESETS)[number],
-  {
-    bodyShape: QRCodeBodyShape;
-    eyeFrameShape: QRCodeEyeFrameShape;
-    eyeballShape: QRCodeEyeBallShape;
-    bodyDensity: QRCodeBodyDensity;
-  }
-> = {
-  default: {
-    bodyShape: "square",
-    eyeFrameShape: "square",
-    eyeballShape: "square",
-    bodyDensity: "dense",
-  },
-  rounded: {
-    bodyShape: "rounded",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  dots: {
-    bodyShape: "circle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    bodyDensity: "dense",
-  },
-  branded: {
-    bodyShape: "rounded",
-    eyeFrameShape: "square",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  classy: {
-    bodyShape: "classy",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  mosaic: {
-    bodyShape: "diamond",
-    eyeFrameShape: "rounded",
-    eyeballShape: "circle",
-    bodyDensity: "balanced",
-  },
-  fluid: {
-    bodyShape: "squircle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    bodyDensity: "sparse",
-  },
-};
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
 const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
 const BODY_SHAPES = [
@@ -202,15 +151,6 @@ const DEFAULT_FINDER_INNER_CONFIG: SolidColorConfig = {
   color: "#FFF7ED",
 };
 
-const DEFAULT_SHAPE_OPTIONS: QRCodeShapeOptions = {
-  shape: "square",
-  eyeFrameShape: "square",
-  eyeballShape: "square",
-  bodyDensity: "dense",
-  gap: 0,
-  eyePatternGap: 0,
-};
-
 const LOGO_PADDING_CONFIG: Record<LogoPaddingPreset, number> = {
   none: 0,
   small: 2,
@@ -288,7 +228,8 @@ export default function DemoScreen() {
 
   const shapeOptions = useMemo<QRCodeShapeOptions>(
     () =>
-      resolveShapeOptions({
+      resolveShapeOverrides({
+        look,
         bodyShape,
         eyeFrameShape,
         eyeballShape,
@@ -296,7 +237,15 @@ export default function DemoScreen() {
         alignmentShape,
         timingShape,
       }),
-    [alignmentShape, bodyDensity, bodyShape, eyeFrameShape, eyeballShape, timingShape],
+    [
+      alignmentShape,
+      bodyDensity,
+      bodyShape,
+      eyeFrameShape,
+      eyeballShape,
+      look,
+      timingShape,
+    ],
   );
   const foregroundColor = resolveForegroundColor(foregroundConfig);
   const backgroundColor = resolveBackgroundColor(backgroundConfig);
@@ -349,7 +298,7 @@ export default function DemoScreen() {
       quietZoneColor,
       finderInnerColor,
       gradient,
-      shapeOptions,
+      shapeOptions: { ...PRESET_SHAPE_OPTIONS[look], ...shapeOptions },
       logoAreaSize,
       logoAreaBorderRadius,
     }),
@@ -364,6 +313,7 @@ export default function DemoScreen() {
       gradient,
       logoAreaBorderRadius,
       logoAreaSize,
+      look,
       quietZoneColor,
       shapeOptions,
       showLogo,
@@ -647,12 +597,12 @@ export default function DemoScreen() {
               <LooksConfigPanel
                 look={look}
                 onLookChange={(nextLook) => {
-                  const next = LOOK_SHAPES[nextLook];
+                  const next = PRESET_SHAPE_OPTIONS[nextLook];
                   setLook(nextLook);
-                  setBodyShape(next.bodyShape);
-                  setEyeFrameShape(next.eyeFrameShape);
-                  setEyeballShape(next.eyeballShape);
-                  setBodyDensity(next.bodyDensity);
+                  setBodyShape(next.shape ?? "square");
+                  setEyeFrameShape(next.eyeFrameShape ?? "square");
+                  setEyeballShape(next.eyeballShape ?? "square");
+                  setBodyDensity(next.bodyDensity ?? "dense");
                 }}
               />
             ) : null}
@@ -1439,7 +1389,8 @@ function getDensityLabel(value: QRCodeBodyDensity): string {
   return "Dense";
 }
 
-function resolveShapeOptions({
+function resolveShapeOverrides({
+  look,
   bodyShape,
   eyeFrameShape,
   eyeballShape,
@@ -1447,6 +1398,7 @@ function resolveShapeOptions({
   alignmentShape,
   timingShape,
 }: {
+  look: QRCodePreset;
   bodyShape: QRCodeBodyShape;
   eyeFrameShape: QRCodeEyeFrameShape;
   eyeballShape: QRCodeEyeBallShape;
@@ -1454,21 +1406,18 @@ function resolveShapeOptions({
   alignmentShape: RegionShapeChoice;
   timingShape: RegionShapeChoice;
 }): QRCodeShapeOptions {
+  const preset = PRESET_SHAPE_OPTIONS[look];
   return {
-    shape: bodyShape,
-    eyeFrameShape,
-    eyeballShape,
-    alignmentShape:
-      alignmentShape === "match" ? undefined : alignmentShape,
-    timingShape: timingShape === "match" ? undefined : timingShape,
-    bodyDensity,
-    gap: 0,
-    eyePatternGap: 0,
-    cornerRadius: DEFAULT_SHAPE_OPTIONS.cornerRadius,
-    eyePatternCornerRadius:
-      eyeFrameShape !== "square" || eyeballShape !== "square"
-        ? undefined
-        : DEFAULT_SHAPE_OPTIONS.eyePatternCornerRadius,
+    ...(bodyShape !== (preset.shape ?? "square") ? { shape: bodyShape } : {}),
+    ...(eyeFrameShape !== (preset.eyeFrameShape ?? "square")
+      ? { eyeFrameShape }
+      : {}),
+    ...(eyeballShape !== (preset.eyeballShape ?? "square")
+      ? { eyeballShape }
+      : {}),
+    ...(bodyDensity !== (preset.bodyDensity ?? "dense") ? { bodyDensity } : {}),
+    ...(alignmentShape === "match" ? {} : { alignmentShape }),
+    ...(timingShape === "match" ? {} : { timingShape }),
   };
 }
 

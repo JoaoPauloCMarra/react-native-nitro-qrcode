@@ -8,6 +8,10 @@ Breaking changes are always listed first in each release section.
 
 ## [Next]
 
+### Added
+
+- `PRESET_SHAPE_OPTIONS` is exported from the package root (native and web): the frozen shape table behind each `preset` name, for builder UIs and for spreading a preset into `shapeOptions` of the imperative helpers.
+
 ### Fixed
 
 - Web PNG output keeps the finder patterns of styled or custom-coloured QR codes when the background is transparent. A fully transparent finder hole or eye-stroke layer now erases the pixels beneath it instead of leaving the frame colour in place, so the composited image scans.

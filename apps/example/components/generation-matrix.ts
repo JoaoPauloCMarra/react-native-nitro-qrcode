@@ -1,5 +1,6 @@
 import {
   NitroQRCode,
+  PRESET_SHAPE_OPTIONS,
   clearQRCodeCache,
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
@@ -18,7 +19,6 @@ import {
   type QRCodeOptions,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
-import { PRESET_SHAPE_OPTIONS } from "../../../packages/react-native-nitro-qrcode/src/defaults";
 
 const SHAPES: readonly QRCodeBodyShape[] = [
   "square",

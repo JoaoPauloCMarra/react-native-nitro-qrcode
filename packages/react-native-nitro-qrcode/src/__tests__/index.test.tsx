@@ -95,6 +95,7 @@ import {
   toPngDataUriAsync,
   toSvgString,
   validateOptions,
+  PRESET_SHAPE_OPTIONS as NativePresetShapeOptions,
 } from "../index";
 import * as Web from "../index.web";
 import { mergePresetShapeOptions, PRESET_SHAPE_OPTIONS } from "../defaults";
@@ -124,6 +125,22 @@ describe("entrypoint export parity", () => {
   it("re-exports validateOptions on both entrypoints", () => {
     expect(validateOptions).toBe(NitroQRCode.validateOptions);
     expect(Web.validateOptions).toBe(Web.NitroQRCode.validateOptions);
+  });
+
+  it("exports the same frozen preset table on both entrypoints", () => {
+    expect(NativePresetShapeOptions).toBe(PRESET_SHAPE_OPTIONS);
+    expect(Web.PRESET_SHAPE_OPTIONS).toBe(PRESET_SHAPE_OPTIONS);
+    expect(Object.keys(NativePresetShapeOptions)).toEqual([
+      "default",
+      "rounded",
+      "dots",
+      "branded",
+      "classy",
+      "mosaic",
+      "fluid",
+    ]);
+    expect(Object.isFrozen(NativePresetShapeOptions)).toBe(true);
+    expect(Object.isFrozen(NativePresetShapeOptions.dots)).toBe(true);
   });
 });
 

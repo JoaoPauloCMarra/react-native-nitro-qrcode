@@ -32,6 +32,7 @@ import {
   toPngDataUri,
   toPngDataUriAsync,
   toSvgString,
+  PRESET_SHAPE_OPTIONS,
   validateOptions,
 } from "../index";
 
@@ -222,3 +223,10 @@ expectFalse<
     NonNullable<QRCodeProps["onReady"]>
   >
 >();
+
+const dotsGap: number | undefined = PRESET_SHAPE_OPTIONS.dots.gap;
+void dotsGap;
+// @ts-expect-error preset tables are read-only
+PRESET_SHAPE_OPTIONS.dots.gap = 2;
+// @ts-expect-error preset tables are read-only
+PRESET_SHAPE_OPTIONS.dots = { shape: "square" };

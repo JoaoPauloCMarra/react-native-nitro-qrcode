@@ -350,6 +350,8 @@ Generation input bounds:
 
 Undefined component props do not erase preset defaults. Explicit values, including zero radii, override the preset. Native gradients use the first or last stop color outside the declared stop range.
 
+`PRESET_SHAPE_OPTIONS` exports the read-only shape table behind each `preset` name (a frozen `Record<QRCodePreset, QRCodeShapeOptions>`). Use it to seed a builder UI or to spread a preset into `shapeOptions` for the imperative helpers, which take no `preset` option: `shapeOptions: { ...PRESET_SHAPE_OPTIONS.dots, gap: 0 }`.
+
 Option loss and platform differences:
 
 - **SVG output** encodes the matrix with quiet zone, background, foreground,

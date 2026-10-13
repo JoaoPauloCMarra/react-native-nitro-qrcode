@@ -53,7 +53,7 @@ export const DEFAULT_KEEP_PREVIOUS_IMAGE = true;
 
 export const DEFAULT_HIDE_LOGO_UNTIL_READY = true;
 
-export const PRESET_SHAPE_OPTIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
+const PRESET_DEFINITIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
   default: {
     shape: "square",
     eyeFrameShape: "square",
@@ -114,6 +114,17 @@ export const PRESET_SHAPE_OPTIONS: Record<QRCodePreset, QRCodeShapeOptions> = {
     eyePatternCornerRadius: 0,
   },
 };
+
+export const PRESET_SHAPE_OPTIONS: Readonly<
+  Record<QRCodePreset, Readonly<QRCodeShapeOptions>>
+> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(PRESET_DEFINITIONS).map(([name, options]) => [
+      name,
+      Object.freeze(options),
+    ]),
+  ) as Record<QRCodePreset, Readonly<QRCodeShapeOptions>>,
+);
 
 export function mergePresetShapeOptions(
   options: QRCodeShapeOptions | undefined,

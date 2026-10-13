@@ -42,7 +42,7 @@ export function installRasterCanvas(): RasterCanvas {
   let pixels = new Uint8ClampedArray(0);
   let fillStyle: unknown = "#000000";
   let operation: Op = "source-over";
-  const stack: Array<{ fillStyle: unknown; operation: Op }> = [];
+  const stack: { fillStyle: unknown; operation: Op }[] = [];
   let subpaths: Point[][] = [];
 
   const paint = (x: number, y: number, op: Op, color: number[]) => {

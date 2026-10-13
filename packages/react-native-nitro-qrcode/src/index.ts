@@ -53,6 +53,7 @@ export type {
 } from "./colors";
 export type { QRCodeScanabilityWarning } from "./scan-policy";
 export type { QRCodePreset } from "./defaults";
+export { PRESET_SHAPE_OPTIONS } from "./defaults";
 export type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 export {
   validateOptions,
