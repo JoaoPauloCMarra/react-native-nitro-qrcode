@@ -111,6 +111,16 @@ int main() {
         .size();
   });
 
+  constexpr int StreamedThreshold = 256;
+  QRCodeGenerator streamedGenerator({}, QRCodeGenerator::DefaultMaxCacheBytes,
+                                    StreamedThreshold);
+  runBenchmark("rgba-gradient-streamed-png-cold", RenderRuns, [&](int index) {
+    return streamedGenerator
+        .renderPngBase64(
+            "https://example.com/streamed/" + std::to_string(index), gradient)
+        .size();
+  });
+
   GenerateOptions palette = indexed;
   palette.logoAreaSize = 66;
   palette.logoAreaBorderRadius = 14;
