@@ -122,3 +122,66 @@ describe("translucent layer colors on web", () => {
     expect(near(canvas.pixelAt(41, 70), [0, 0, 0, 128])).toBe(true);
   });
 });
+
+describe("stacked translucent layers on web", () => {
+  const near = (actual: number[], expected: number[]) =>
+    actual.every((value, index) => Math.abs(value - (expected[index] ?? 0)) <= 1);
+
+  function bodyModulePixel() {
+    const matrix = Web.getMatrix({ value: "hello" });
+    const bytes = Buffer.from(matrix.packedBase64, "base64");
+    for (let y = 8; y < matrix.size - 8; y++) {
+      for (let x = 8; x < matrix.size - 8; x++) {
+        const index = y * matrix.size + x;
+        if (x !== 6 && y !== 6 && ((bytes[index >> 3] ?? 0) >> (7 - (index & 7))) & 1) {
+          return [(x + 4) * 10 + 5, (y + 4) * 10 + 5] as const;
+        }
+      }
+    }
+    throw new Error("no body module");
+  }
+
+  it("blends a translucent body module over the background, not over its stroke", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      foregroundColor: "#0000FF80",
+      strokeColor: "#FF0000",
+    });
+    const [x, y] = bodyModulePixel();
+    expect(near(canvas.pixelAt(x, y), [127, 127, 255, 255])).toBe(true);
+  });
+
+  it("blends a translucent eye color over the background, not over the eye stroke", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      eyeColor: "#0000FF80",
+      eyeStrokeColor: "#FF0000",
+    });
+    expect(near(canvas.pixelAt(45, 70), [127, 127, 255, 255])).toBe(true);
+  });
+});
+
+describe("translucent modules over a transparent web background", () => {
+  it("keeps the module alpha without repainting a background", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      backgroundColor: "transparent",
+      foregroundColor: "#00000080",
+      shapeOptions: { gap: 1 },
+    });
+    const covered = Array.from({ length: 290 }, (_, x) => canvas.pixelAt(x, 45)).filter(
+      (pixel) => pixel[3] > 0,
+    );
+    expect(covered.length).toBeGreaterThan(0);
+    expect(covered.every((pixel) => Math.abs(pixel[3] - 128) <= 1)).toBe(true);
+  });
+});

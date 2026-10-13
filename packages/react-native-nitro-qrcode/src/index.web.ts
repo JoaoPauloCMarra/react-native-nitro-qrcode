@@ -433,13 +433,13 @@ function drawPlanRows(
   startRow: number,
   endRow: number,
 ): void {
+  const background = toSvgColor(options.backgroundColor);
   for (const row of plan.rows) {
     if (row.moduleY < startRow || row.moduleY >= endRow) {
       continue;
     }
     for (const module of row.modules) {
-      if (module.stroke !== undefined && module.strokeGap !== undefined) {
-        context.fillStyle = toSvgColor(options.strokeColor);
+      const drawAt = (gap: number) => {
         drawModule(
           context,
           module.x0,
@@ -447,43 +447,33 @@ function drawPlanRows(
           module.x1,
           module.y1,
           module.shape,
-          module.gap,
+          gap,
           module.cornerRadius,
           module.neighbors,
         );
-        context.fillStyle = resolvePlanFill(
-          options,
-          foregroundFill,
-          module.layer,
-        );
-        drawModule(
+      };
+      const strokeGap = module.strokeGap;
+      if (module.stroke !== undefined && strokeGap !== undefined) {
+        paintOrErase(context, toSvgColor(options.strokeColor), background, () => {
+          drawAt(module.gap);
+        });
+        paintOrErase(
           context,
-          module.x0,
-          module.y0,
-          module.x1,
-          module.y1,
-          module.shape,
-          module.strokeGap,
-          module.cornerRadius,
-          module.neighbors,
+          resolvePlanFill(options, foregroundFill, module.layer),
+          background,
+          () => {
+            drawAt(strokeGap);
+          },
         );
         continue;
       }
-      context.fillStyle = resolvePlanFill(
-        options,
-        foregroundFill,
-        module.layer,
-      );
-      drawModule(
+      paintOrErase(
         context,
-        module.x0,
-        module.y0,
-        module.x1,
-        module.y1,
-        module.shape,
-        module.gap,
-        module.cornerRadius,
-        module.neighbors,
+        resolvePlanFill(options, foregroundFill, module.layer),
+        background,
+        () => {
+          drawAt(module.gap);
+        },
       );
     }
   }
@@ -747,6 +737,7 @@ function drawGroupedFinder(
     );
     return { x, y, size: end - x };
   };
+  const background = toSvgColor(options.backgroundColor);
   const frameShape = options.shapeOptions.eyeFrameShape;
   const strokeInset = frameShape === "square" ? 0.3 : 0.65;
   const hasEyeStroke = drawsEyeStroke(options);
@@ -761,6 +752,7 @@ function drawGroupedFinder(
     rect(0, 7),
     frameShape,
     hasEyeStroke ? toSvgColor(options.eyeStrokeColor) : eyeFill,
+    background,
     options.shapeOptions.eyePatternCornerRadius,
   );
   if (hasEyeStroke) {
@@ -769,6 +761,7 @@ function drawGroupedFinder(
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
       eyeFill,
+      background,
       options.shapeOptions.eyePatternCornerRadius,
     );
   }
@@ -777,6 +770,7 @@ function drawGroupedFinder(
     rect(1, 5),
     frameShape,
     toSvgColor(options.finderInnerColor),
+    background,
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -802,6 +796,7 @@ function drawGroupedFinder(
       options.explicitColors.eyeball,
       options.eyeballColor,
     ),
+    background,
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -811,9 +806,10 @@ function drawFinderShape(
   rect: { x: number; y: number; size: number },
   shape: QRCodeShape,
   fill: CanvasFill,
+  background: string,
   cornerRadius: number,
 ): void {
-  paintOrErase(context, fill, () =>
+  paintOrErase(context, fill, background, () =>
     drawFinderPath(context, rect, shape, cornerRadius),
   );
 }
@@ -821,15 +817,23 @@ function drawFinderShape(
 function paintOrErase(
   context: CanvasRenderingContext2D,
   fill: CanvasFill,
+  background: string,
   draw: () => void,
 ): void {
-  if (typeof fill === "string" && parseRgbaColor(fill).alpha === 0) {
+  const alpha = typeof fill === "string" ? parseRgbaColor(fill).alpha : 255;
+  if (alpha < 255) {
     context.save();
     context.globalCompositeOperation = "destination-out";
     context.fillStyle = "#000000";
     draw();
     context.restore();
-    return;
+    if (alpha === 0) {
+      return;
+    }
+    if (parseRgbaColor(background).alpha > 0) {
+      context.fillStyle = background;
+      draw();
+    }
   }
   context.fillStyle = fill;
   draw();

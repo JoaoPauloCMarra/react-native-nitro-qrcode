@@ -379,9 +379,8 @@ Option loss and platform differences:
   background color on both platforms, so the PNG pixel is the blended color
   (opaque over an opaque background, translucent over a translucent or
   `"transparent"` one). It does not keep the module's own alpha on an opaque
-  background. Where the web canvas stacks layers (body strokes, eye strokes,
-  the finder inner color), a translucent top layer also blends with the layer
-  beneath it; use opaque colors there for identical output on both platforms.
+  background, and it does not blend with another layer drawn beneath it (body
+  stroke, eye stroke, finder inner color).
 - **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
   shorthand expand to full hex before the native bridge). The native ABI
   itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the

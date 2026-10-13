@@ -1115,6 +1115,18 @@ void testTranslucentLayersCompositeOverBackground() {
       width, height);
   assert(near(pixelAt(rgba, width, edge, mid), {0, 0, 0, 0}));
 
+  GenerateOptions stacked;
+  stacked.size = size;
+  setExplicitFinderColors(stacked, "#0000FF80", "#0000FF80");
+  setColor(stacked.eyeStrokeColor, stacked.eyeStroke, "#FF0000");
+  stacked.eyeStrokeSet = true;
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", stacked),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 0, 0, 255}));
+  assert(near(pixelAt(rgba, width, (4 * size) / 37 + 4, mid),
+              {127, 127, 255, 255}));
+
   setExplicitFinderColors(eye, "#00000000", "#00000000");
   rgba = decodeRgbaPng(
       generator.renderPngBase64("https://example.com/translucent", eye), width,
