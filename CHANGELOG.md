@@ -10,11 +10,12 @@ Breaking changes are always listed first in each release section.
 
 ### Breaking changes
 
-No API removals. Three output changes and one validation change can affect existing callers:
+No API removals. Four output changes and one validation change can affect existing callers:
 
 - Output change, finder edges: styled finder patterns (custom `eyeColor`, `eyeballColor`, `eyeStrokeColor`, `finderInnerColor`, or any non-square eye shape) now start and end on the same `floor(index * pixelSize / totalModules)` pixel boundaries as the module grid and quiet zone, on native and web. Native previously rounded these edges, which could shift a finder by 1 px and leave a seam against a coloured quiet zone. Native PNG bytes for those options differ from 0.10.0 by up to 1 px along the finder edges. Migration: re-snapshot visual or byte-exact tests that cover styled finders.
 - Output change, translucent colors: a translucent `foregroundColor`, gradient stop, or layer color (`eyeColor`, `eyeballColor`, `strokeColor`, and so on) is now composited over the QR background color on native and web, instead of native storing the raw RGBA value. For example `eyeColor: "#FF000080"` on a white background used to give a translucent red pixel on native and an opaque pink pixel on web; both now give opaque pink. A fully transparent layer color shows the background on both platforms. Migration: use opaque colors for identical output everywhere, give the code a `"transparent"` background if you relied on the module alpha showing the surface behind the PNG, and re-snapshot visual tests.
 - Output change, web stacked layers: web PNG output now blends a translucent module, eye, or finder layer color over the QR background instead of over the stroke or frame drawn beneath it, matching native. Migration: use opaque colors for stroke, eye stroke and finder inner layers, or re-snapshot visual tests.
+- Output change, default error correction with a logo: when `errorCorrectionLevel` is omitted and a logo area is reserved (a `logo` prop, or `logoAreaSize` above 0), error correction now defaults to `H` instead of `M`, on native and web. In 0.10.0 the default `M` could not recover the 28% logo area the component reserves, so such codes often failed to scan. Migration: pass `errorCorrectionLevel="M"` to keep the old level, and re-snapshot visual tests that cover logo codes.
 - Validation change, component props: the `QRCode` component no longer silently drops incomplete gradient values. A `gradient` with fewer than 2 colors, `locations` that do not match the color count, a `start` or `end` missing a coordinate, or more than 8 colors (previously truncated to 8) now reports a validation error through `onError`, the same as the imperative helpers. In 0.10.0 these inputs were ignored. Migration: pass 2 to 8 colors, matching `locations`, and complete `{ x, y }` points, or omit `gradient`.
 
 ### Added
@@ -24,6 +25,7 @@ No API removals. Three output changes and one validation change can affect exist
 
 ### Fixed
 
+- The `low-ecl-for-logo` warning now follows what each error correction level recovers: it fires when the logo area exceeds 15% of `size` with `L`, 20% with `M`, or 25% with `Q`. Before, only `L` and `M` above 20% warned, so a 30% logo with `Q` passed although host decode tests failed. Host tests also decode the rendered PNG and SVG with a second decoder at each level.
 - Web PNG output keeps the finder patterns of styled or custom-coloured QR codes when the background is transparent. A fully transparent finder hole or eye-stroke layer now erases the pixels beneath it instead of leaving the frame colour in place, so the composited image scans.
 
 ## [0.10.0] - 2026-10-03
