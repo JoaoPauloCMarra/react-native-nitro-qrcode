@@ -7,6 +7,7 @@ import {
   type QRCodeColor,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
+import { PRESETS } from "../components/generation-matrix";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Specimen = {
@@ -21,16 +22,6 @@ type Specimen = {
   alignmentShape?: QRCodeBodyShape;
   timingShape?: QRCodeBodyShape;
 };
-
-const PRESETS: readonly QRCodePreset[] = [
-  "default",
-  "rounded",
-  "dots",
-  "branded",
-  "classy",
-  "mosaic",
-  "fluid",
-];
 
 const SPECIMENS: readonly Specimen[] = [
   ...PRESETS.flatMap((preset) => [

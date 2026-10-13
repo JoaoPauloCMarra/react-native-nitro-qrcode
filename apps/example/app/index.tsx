@@ -36,21 +36,13 @@ import {
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { E2eGate } from "../components/e2e-gate";
+import { PRESETS } from "../components/generation-matrix";
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
 const APP_ICON = require("../assets/icon.png");
 const PAYLOAD_INITIAL_SELECTION = { start: 0, end: 0 };
 const CONFIG_TABS = ["looks", "color", "shapes", "logo"] as const;
-const LOOK_PRESETS = [
-  "default",
-  "rounded",
-  "dots",
-  "branded",
-  "classy",
-  "mosaic",
-  "fluid",
-] as const satisfies readonly QRCodePreset[];
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
 const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
 const BODY_SHAPES = [
@@ -929,7 +921,7 @@ function LooksConfigPanel({
     <View style={styles.builderPanel}>
       <ControlGroup label="Modern looks">
         <View style={styles.shapeGrid}>
-          {LOOK_PRESETS.map((option) => {
+          {PRESETS.map((option) => {
             const selected = option === look;
             return (
               <Pressable

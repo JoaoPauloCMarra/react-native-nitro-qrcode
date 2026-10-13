@@ -15,18 +15,9 @@ import {
   type QRCodePreset,
   type QRCodeRef,
 } from "react-native-nitro-qrcode";
+import { PRESETS } from "./generation-matrix";
 
 const LAB_VALUE = "https://example.com/nitro-qrcode-e2e";
-const PRESETS: readonly QRCodePreset[] = [
-  "default",
-  "rounded",
-  "dots",
-  "branded",
-  "classy",
-  "mosaic",
-  "fluid",
-];
-
 type LabResult = {
   audit: string;
   helpers: string;
