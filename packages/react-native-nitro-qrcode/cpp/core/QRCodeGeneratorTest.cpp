@@ -90,16 +90,31 @@ std::string legacyCacheRequest(const std::string &value,
     return request;
   }
 
-  appendLegacyCacheNumber(request, options.size);
-  appendLegacyCacheNumber(request, options.quietZone);
+  const auto appendGradient = [&request, &options]() {
+    appendLegacyCachePart(request, options.gradient.type);
+    for (const auto &color : options.gradient.colors) {
+      appendLegacyCacheNumber(request, color.r);
+      appendLegacyCacheNumber(request, color.g);
+      appendLegacyCacheNumber(request, color.b);
+      appendLegacyCacheNumber(request, color.a);
+    }
+    for (double location : options.gradient.locations) {
+      appendLegacyCachePart(request, legacyCacheDouble(location));
+    }
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startX));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  };
   if (output == "svg") {
+    appendLegacyCacheNumber(request, options.quietZone);
     appendLegacyCachePart(request, options.foregroundColor);
     appendLegacyCachePart(request, options.backgroundColor);
-    appendLegacyCachePart(request, options.strokeColor);
-    appendLegacyCachePart(request, options.eyeColor);
-    appendLegacyCachePart(request, options.eyeStrokeColor);
-    appendLegacyCachePart(request, options.eyeballColor);
+    appendGradient();
+    return request;
   }
+  appendLegacyCacheNumber(request, options.size);
+  appendLegacyCacheNumber(request, options.quietZone);
   const auto appendColor = [&request](const auto &color) {
     appendLegacyCacheNumber(request, color.r);
     appendLegacyCacheNumber(request, color.g);
@@ -129,20 +144,7 @@ std::string legacyCacheRequest(const std::string &value,
   appendLegacyCachePart(request, options.layout);
   appendLegacyCacheNumber(request, options.logoAreaSize);
   appendLegacyCacheNumber(request, options.logoAreaBorderRadius);
-  appendLegacyCachePart(request, options.gradient.type);
-  for (const auto &color : options.gradient.colors) {
-    appendLegacyCacheNumber(request, color.r);
-    appendLegacyCacheNumber(request, color.g);
-    appendLegacyCacheNumber(request, color.b);
-    appendLegacyCacheNumber(request, color.a);
-  }
-  for (double location : options.gradient.locations) {
-    appendLegacyCachePart(request, legacyCacheDouble(location));
-  }
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startX));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  appendGradient();
   appendLegacyCacheNumber(request, (options.strokeSet ? 1 : 0) |
                                        (options.eyeSet ? 2 : 0) |
                                        (options.eyeStrokeSet ? 4 : 0) |
@@ -1173,6 +1175,43 @@ void testTranslucentBackgroundHoleAndTransparentLayerParity() {
           std::array<int, 4>{255, 255, 255, 128}));
 }
 
+void testSvgCacheIgnoresPngOnlyOptions() {
+  QRCodeGenerator generator;
+  GenerateOptions base;
+  const std::string first =
+      generator.generateSvgString("https://example.com/svg-key", base);
+  assert(generator.getCacheSize() == 1);
+
+  GenerateOptions styled = base;
+  styled.size = 321;
+  styled.moduleShape = "circle";
+  styled.eyePatternShape = "rounded";
+  styled.gap = 2;
+  styled.logoAreaSize = 40;
+  setExplicitFinderColors(styled, "#FF0000", "#00FF00");
+  styled.quietZoneFill = parseColor("#CCCCCC");
+  assert(generator.generateSvgString("https://example.com/svg-key", styled) ==
+         first);
+  assert(generator.getCacheSize() == 1);
+
+  GenerateOptions differentBackground = base;
+  setColor(differentBackground.backgroundColor, differentBackground.background,
+           "#EEEEEE");
+  generator.generateSvgString("https://example.com/svg-key",
+                              differentBackground);
+  assert(generator.getCacheSize() == 2);
+
+  GenerateOptions invalid = styled;
+  invalid.gap = 999;
+  bool threw = false;
+  try {
+    generator.generateSvgString("https://example.com/svg-key", invalid);
+  } catch (const std::invalid_argument &) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 void testTransparentBackgroundPng() {
   QRCodeGenerator generator;
   GenerateOptions options;
@@ -1782,6 +1821,7 @@ int main() {
   testGroupedFinderEdgesUseFloorBoundaries();
   testTranslucentLayersCompositeOverBackground();
   testTranslucentBackgroundHoleAndTransparentLayerParity();
+  testSvgCacheIgnoresPngOnlyOptions();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

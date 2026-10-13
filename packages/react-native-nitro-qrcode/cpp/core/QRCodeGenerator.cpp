@@ -1436,6 +1436,7 @@ QRCodeGenerator::renderPngDataUri(const std::string &value,
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
                                                const GenerateOptions &options) {
   rejectOversizedValue(value, options);
+  validateOptions(value, options);
   const std::string request = cacheRequest(value, options, "svg");
   const std::string key = cacheKey(request);
   if (const auto cached = getCacheEntry(key, request)) {
@@ -1549,16 +1550,31 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
     return request;
   }
 
-  appendCacheNumber(request, options.size);
-  appendCacheNumber(request, options.quietZone);
+  const auto appendGradient = [&request, &options]() {
+    appendCachePart(request, options.gradient.type);
+    for (const auto &color : options.gradient.colors) {
+      appendCacheNumber(request, color.r);
+      appendCacheNumber(request, color.g);
+      appendCacheNumber(request, color.b);
+      appendCacheNumber(request, color.a);
+    }
+    for (double location : options.gradient.locations) {
+      appendCachePart(request, cacheDouble(location));
+    }
+    appendCachePart(request, cacheDouble(options.gradient.startX));
+    appendCachePart(request, cacheDouble(options.gradient.startY));
+    appendCachePart(request, cacheDouble(options.gradient.endX));
+    appendCachePart(request, cacheDouble(options.gradient.endY));
+  };
   if (output == "svg") {
+    appendCacheNumber(request, options.quietZone);
     appendCachePart(request, options.foregroundColor);
     appendCachePart(request, options.backgroundColor);
-    appendCachePart(request, options.strokeColor);
-    appendCachePart(request, options.eyeColor);
-    appendCachePart(request, options.eyeStrokeColor);
-    appendCachePart(request, options.eyeballColor);
+    appendGradient();
+    return request;
   }
+  appendCacheNumber(request, options.size);
+  appendCacheNumber(request, options.quietZone);
   const auto appendColor = [&request](const Color &color) {
     appendCacheNumber(request, color.r);
     appendCacheNumber(request, color.g);
@@ -1588,20 +1604,7 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendCachePart(request, options.layout);
   appendCacheNumber(request, options.logoAreaSize);
   appendCacheNumber(request, options.logoAreaBorderRadius);
-  appendCachePart(request, options.gradient.type);
-  for (const auto &color : options.gradient.colors) {
-    appendCacheNumber(request, color.r);
-    appendCacheNumber(request, color.g);
-    appendCacheNumber(request, color.b);
-    appendCacheNumber(request, color.a);
-  }
-  for (double location : options.gradient.locations) {
-    appendCachePart(request, cacheDouble(location));
-  }
-  appendCachePart(request, cacheDouble(options.gradient.startX));
-  appendCachePart(request, cacheDouble(options.gradient.startY));
-  appendCachePart(request, cacheDouble(options.gradient.endX));
-  appendCachePart(request, cacheDouble(options.gradient.endY));
+  appendGradient();
   appendCacheNumber(request, (options.strokeSet ? 1 : 0) |
                                  (options.eyeSet ? 2 : 0) |
                                  (options.eyeStrokeSet ? 4 : 0) |
