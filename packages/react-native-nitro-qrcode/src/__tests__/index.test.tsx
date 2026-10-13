@@ -1109,6 +1109,42 @@ describe("native QRCode API", () => {
     expect(onError.mock.calls[0]?.[0]?.message).toBe("native-boom");
   });
 
+  it.each([
+    ["a single color", { colors: ["#000000"] }, "gradient.colors must contain"],
+    [
+      "locations shorter than colors",
+      { colors: ["#000000", "#FFFFFF", "#FF0000"], locations: [0] },
+      "gradient.locations must match",
+    ],
+    [
+      "a start point without y",
+      { colors: ["#000000", "#FFFFFF"], start: { x: 0.5 } },
+      "gradient.start.y must be",
+    ],
+    [
+      "more than eight colors",
+      {
+        colors: Array.from({ length: 9 }, (_, index) => `#00000${index}`),
+      },
+      "gradient.colors must contain",
+    ],
+  ])("reports %s as a gradient error instead of dropping it", async (_name, gradient, message) => {
+    const onError = jest.fn();
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "bad-gradient",
+          onError,
+          gradient: gradient as never,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining(message) }),
+    );
+  });
+
   it("reports a BigInt shape option through onError instead of crashing the render", async () => {
     const onError = jest.fn();
     await act(async () => {
