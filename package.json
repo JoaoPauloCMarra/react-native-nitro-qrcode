@@ -82,11 +82,11 @@
   },
   "overrides": {
     "caniuse-lite": "1.0.30001810",
-    "expo": "~57.0.26",
+    "expo": "~57.0.28",
     "expo-asset": "~57.0.18",
     "expo-constants": "~57.0.19",
     "expo-font": "~57.0.4",
-    "expo-linking": "~57.0.11",
+    "expo-linking": "~57.0.12",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

@@ -63,7 +63,7 @@ Supports React Native 0.77 or newer and Expo SDK 53 or newer (the
 Expo SDK 57.
 
 The current example and package gate use React Native `0.86.3` and Expo SDK 57
-(`expo@~57.0.26`).
+(`expo@~57.0.28`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
 Strict TypeScript compatibility. Expo SDK 57 selects React Native `0.86.3`; do
 not override that version in the example. The baseline uses React `19.2.3` and
