@@ -2,7 +2,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = process.env.CODEGEN_CHECK_ROOT ?? path.resolve(__dirname, "..");
 const packageDir = path.join(
   projectRoot,
   "packages",
@@ -53,33 +53,24 @@ function restoreDirectory(source, target) {
   }
 }
 
-function walkFiles(dir) {
-  const files = [];
-  if (!fs.existsSync(dir)) {
-    return files;
+function listLines(args) {
+  const result = run("git", args);
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   }
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...walkFiles(full));
-    } else {
-      files.push(full);
-    }
-  }
-  return files.sort();
+  return result.stdout.split("\n").filter((line) => line.length > 0);
 }
 
-function fingerprint(dir) {
-  const before = new Map();
-  for (const file of walkFiles(dir)) {
-    before.set(path.relative(dir, file), fs.readFileSync(file, "utf8"));
-  }
-  return before;
+function findDrift() {
+  const scope = path.relative(projectRoot, generatedDir);
+  return [
+    ...listLines(["diff", "--name-only", "--", scope]),
+    ...listLines(["ls-files", "--others", "--exclude-standard", "--", scope]),
+  ];
 }
 
 const snapshotDir = path.join(tmpDir, "generated-snapshot");
 snapshotDirectory(generatedDir, snapshotDir);
-const beforeFingerprint = fingerprint(generatedDir);
 
 const codegen = run("bun", ["run", "codegen"], { cwd: packageDir });
 if (codegen.status !== 0) {
@@ -90,21 +81,13 @@ if (codegen.status !== 0) {
   process.exit(codegen.status ?? 1);
 }
 
-const afterFingerprint = fingerprint(generatedDir);
-const drift = [];
-for (const [relative, content] of afterFingerprint) {
-  if (!beforeFingerprint.has(relative) || beforeFingerprint.get(relative) !== content) {
-    drift.push(relative);
-  }
+let drift;
+try {
+  drift = findDrift();
+} finally {
+  restoreDirectory(snapshotDir, generatedDir);
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 }
-for (const relative of beforeFingerprint.keys()) {
-  if (!afterFingerprint.has(relative)) {
-    drift.push(relative);
-  }
-}
-
-restoreDirectory(snapshotDir, generatedDir);
-fs.rmSync(tmpDir, { recursive: true, force: true });
 
 if (drift.length > 0) {
   console.error(
