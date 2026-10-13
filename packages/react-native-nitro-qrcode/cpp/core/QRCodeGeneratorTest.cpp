@@ -1134,6 +1134,45 @@ void testTranslucentLayersCompositeOverBackground() {
   assert(near(pixelAt(rgba, width, edge, mid), {255, 255, 255, 255}));
 }
 
+void testTranslucentBackgroundHoleAndTransparentLayerParity() {
+  QRCodeGenerator generator;
+  const int size = 200;
+  const int total = 37;
+  const int mid = ((4 * size) / total + (11 * size) / total) / 2;
+  const int holeX = (5 * size) / total + 1;
+  const auto pixel = [](const std::vector<uint8_t> &rgba, int width, int x,
+                        int y) {
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) +
+         static_cast<size_t>(x)) *
+        4;
+    return std::array<int, 4>{rgba[offset], rgba[offset + 1],
+                              rgba[offset + 2], rgba[offset + 3]};
+  };
+
+  GenerateOptions options;
+  options.size = size;
+  setColor(options.backgroundColor, options.background, "#FFFFFF80");
+  options.quietZoneFill = options.background;
+  options.finderInner = options.background;
+  setExplicitFinderColors(options, "#FF0000", "#FF0000");
+  int width = 0;
+  int height = 0;
+  auto rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", options),
+      width, height);
+  assert((pixel(rgba, width, holeX, mid) == std::array<int, 4>{255, 255, 255, 128}));
+
+  GenerateOptions transparentLayer = options;
+  setExplicitFinderColors(transparentLayer, "#FF000000", "#FF000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                transparentLayer),
+      width, height);
+  assert((pixel(rgba, width, (4 * size) / total, mid) ==
+          std::array<int, 4>{255, 255, 255, 128}));
+}
+
 void testTransparentBackgroundPng() {
   QRCodeGenerator generator;
   GenerateOptions options;
@@ -1742,6 +1781,7 @@ int main() {
   testOutputMatchesPreviousRelease();
   testGroupedFinderEdgesUseFloorBoundaries();
   testTranslucentLayersCompositeOverBackground();
+  testTranslucentBackgroundHoleAndTransparentLayerParity();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

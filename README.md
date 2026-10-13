@@ -380,7 +380,7 @@ Option loss and platform differences:
   (opaque over an opaque background, translucent over a translucent or
   `"transparent"` one). It does not keep the module's own alpha on an opaque
   background, and it does not blend with another layer drawn beneath it (body
-  stroke, eye stroke, finder inner color).
+  stroke, eye stroke, finder inner color). A fully transparent layer color shows the background.
 - **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
   shorthand expand to full hex before the native bridge). The native ABI
   itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the

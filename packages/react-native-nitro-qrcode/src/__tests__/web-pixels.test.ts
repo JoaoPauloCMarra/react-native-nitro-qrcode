@@ -2,6 +2,7 @@ import jsQR from "jsqr";
 
 import { PRESET_SHAPE_OPTIONS } from "../defaults";
 import * as Web from "../index.web";
+import { installRecordingCanvas } from "./helpers/canvas";
 import { installRasterCanvas } from "./helpers/raster-canvas";
 
 afterEach(() => {
@@ -41,7 +42,7 @@ describe("transparent finder layers on web", () => {
     expect(decoded?.data).toBe("hello");
   });
 
-  it("erases a fully transparent finder inner colour on an opaque background", () => {
+  it("shows the opaque background through a fully transparent finder inner colour", () => {
     const canvas = installRasterCanvas();
     Web.toPngDataUri({
       value: "hello",
@@ -50,10 +51,10 @@ describe("transparent finder layers on web", () => {
       eyeColor: "#FF0000",
       finderInnerColor: "#00000000",
     });
-    expect(canvas.pixelAt(4 * 10 + 15, 4 * 10 + 15)[3]).toBe(0);
+    expect(canvas.pixelAt(4 * 10 + 15, 4 * 10 + 15)).toEqual([255, 255, 255, 255]);
   });
 
-  it("erases the inner eye-stroke frame when the eye colour is fully transparent", () => {
+  it("shows the opaque background through a fully transparent eye color over the eye stroke", () => {
     const canvas = installRasterCanvas();
     Web.toPngDataUri({
       value: "hello",
@@ -62,7 +63,7 @@ describe("transparent finder layers on web", () => {
       eyeColor: "#FF000000",
       eyeStrokeColor: "#0000FF",
     });
-    expect(canvas.pixelAt(4 * 10 + 5, 4 * 10 + 30)[3]).toBe(0);
+    expect(canvas.pixelAt(4 * 10 + 5, 4 * 10 + 30)).toEqual([255, 255, 255, 255]);
     expect(canvas.pixelAt(4 * 10 + 1, 4 * 10 + 30)).toEqual([0, 0, 255, 255]);
   });
 });
@@ -183,5 +184,50 @@ describe("translucent modules over a transparent web background", () => {
     );
     expect(covered.length).toBeGreaterThan(0);
     expect(covered.every((pixel) => Math.abs(pixel[3] - 128) <= 1)).toBe(true);
+  });
+});
+
+describe("translucent backgrounds and opaque-path painting on web", () => {
+  const near = (actual: number[], expected: number[]) =>
+    actual.every((value, index) => Math.abs(value - (expected[index] ?? 0)) <= 1);
+
+  it("paints a translucent background once inside the finder hole", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      backgroundColor: "#FFFFFF80",
+      eyeColor: "#FF0000",
+    });
+    expect(near(canvas.pixelAt(4 * 10 + 15, 4 * 10 + 35), [255, 255, 255, 128])).toBe(true);
+  });
+
+  it("shows a translucent background through a fully transparent layer", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      backgroundColor: "#FFFFFF80",
+      eyeColor: "#FF000000",
+      eyeStrokeColor: "#0000FF",
+    });
+    expect(near(canvas.pixelAt(4 * 10 + 5, 4 * 10 + 30), [255, 255, 255, 128])).toBe(true);
+  });
+
+  it("paints pre-blended opaque colors without erasing on an opaque background", () => {
+    const { calls } = installRecordingCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      eyeColor: "#FF000080",
+      shapeOptions: { eyeFrameShape: "rounded", eyeballShape: "rounded" },
+    });
+    const fills = calls.filter((call) => call.op === "fill").map((call) => call.fill);
+    expect(fills).toContain("#FF7F7F");
+    expect(fills).not.toContain("#FF000080");
+    expect(calls.some((call) => call.op === "save")).toBe(false);
   });
 });

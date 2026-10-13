@@ -65,6 +65,31 @@ export function parseRgbaColor(value: string): ParsedRgbaColor {
   };
 }
 
+export function compositeOver(
+  source: ParsedRgbaColor,
+  backdrop: ParsedRgbaColor,
+): ParsedRgbaColor {
+  if (source.alpha === 255) {
+    return source;
+  }
+  const backdropWeight = backdrop.alpha * (255 - source.alpha);
+  const outAlpha = source.alpha * 255 + backdropWeight;
+  if (outAlpha === 0) {
+    return { red: 0, green: 0, blue: 0, alpha: 0 };
+  }
+  const channel = (top: number, bottom: number) =>
+    Math.floor(
+      (top * source.alpha * 255 + bottom * backdropWeight + Math.floor(outAlpha / 2)) /
+        outAlpha,
+    );
+  return {
+    red: channel(source.red, backdrop.red),
+    green: channel(source.green, backdrop.green),
+    blue: channel(source.blue, backdrop.blue),
+    alpha: Math.floor((outAlpha + 127) / 255),
+  };
+}
+
 export function areRgbaColorsEqual(first: string, second: string): boolean {
   const firstColor = parseRgbaColor(first);
   const secondColor = parseRgbaColor(second);
@@ -89,12 +114,15 @@ function toHexByte(value: number): string {
   return value.toString(16).padStart(2, "0").toUpperCase();
 }
 
-export function toSvgColor(value: string): string {
-  const color = parseRgbaColor(value);
+export function formatRgbaColor(color: ParsedRgbaColor): string {
   const rgb = `#${toHexByte(color.red)}${toHexByte(color.green)}${toHexByte(
     color.blue,
   )}`;
   return color.alpha === 255 ? rgb : `${rgb}${toHexByte(color.alpha)}`;
+}
+
+export function toSvgColor(value: string): string {
+  return formatRgbaColor(parseRgbaColor(value));
 }
 
 export function parseHexColor(color: string): {

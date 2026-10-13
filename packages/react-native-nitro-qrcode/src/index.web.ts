@@ -9,7 +9,10 @@ import {
 } from "./metrics";
 import {
   areRgbaColorsEqual,
+  compositeOver,
+  formatRgbaColor,
   parseRgbaColor,
+  type ParsedRgbaColor,
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
@@ -433,7 +436,7 @@ function drawPlanRows(
   startRow: number,
   endRow: number,
 ): void {
-  const background = toSvgColor(options.backgroundColor);
+  const backdrop = createBackdrop(options);
   for (const row of plan.rows) {
     if (row.moduleY < startRow || row.moduleY >= endRow) {
       continue;
@@ -454,13 +457,13 @@ function drawPlanRows(
       };
       const strokeGap = module.strokeGap;
       if (module.stroke !== undefined && strokeGap !== undefined) {
-        paintOrErase(context, toSvgColor(options.strokeColor), background, () => {
+        paintOrErase(context, toSvgColor(options.strokeColor), backdrop, () => {
           drawAt(module.gap);
         });
         paintOrErase(
           context,
           resolvePlanFill(options, foregroundFill, module.layer),
-          background,
+          backdrop,
           () => {
             drawAt(strokeGap);
           },
@@ -470,7 +473,7 @@ function drawPlanRows(
       paintOrErase(
         context,
         resolvePlanFill(options, foregroundFill, module.layer),
-        background,
+        backdrop,
         () => {
           drawAt(module.gap);
         },
@@ -701,6 +704,7 @@ function drawGroupedFinders(
     [matrixSize - 7, 0],
     [0, matrixSize - 7],
   ] as const;
+  const backdrop = createBackdrop(options);
   for (const [moduleX, moduleY] of origins) {
     drawGroupedFinder(
       context,
@@ -711,6 +715,7 @@ function drawGroupedFinders(
       pixelSize,
       options,
       foregroundFill,
+      backdrop,
     );
   }
 }
@@ -724,6 +729,7 @@ function drawGroupedFinder(
   pixelSize: number,
   options: NormalizedOptions,
   foregroundFill: CanvasFill,
+  backdrop: Backdrop,
 ): void {
   const rect = (offset: number, span: number) => {
     const x = Math.floor(
@@ -737,7 +743,6 @@ function drawGroupedFinder(
     );
     return { x, y, size: end - x };
   };
-  const background = toSvgColor(options.backgroundColor);
   const frameShape = options.shapeOptions.eyeFrameShape;
   const strokeInset = frameShape === "square" ? 0.3 : 0.65;
   const hasEyeStroke = drawsEyeStroke(options);
@@ -752,7 +757,7 @@ function drawGroupedFinder(
     rect(0, 7),
     frameShape,
     hasEyeStroke ? toSvgColor(options.eyeStrokeColor) : eyeFill,
-    background,
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
   if (hasEyeStroke) {
@@ -761,7 +766,7 @@ function drawGroupedFinder(
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
       eyeFill,
-      background,
+      backdrop,
       options.shapeOptions.eyePatternCornerRadius,
     );
   }
@@ -770,7 +775,7 @@ function drawGroupedFinder(
     rect(1, 5),
     frameShape,
     toSvgColor(options.finderInnerColor),
-    background,
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -796,7 +801,7 @@ function drawGroupedFinder(
       options.explicitColors.eyeball,
       options.eyeballColor,
     ),
-    background,
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -806,37 +811,68 @@ function drawFinderShape(
   rect: { x: number; y: number; size: number },
   shape: QRCodeShape,
   fill: CanvasFill,
-  background: string,
+  backdrop: Backdrop,
   cornerRadius: number,
 ): void {
-  paintOrErase(context, fill, background, () =>
+  paintOrErase(context, fill, backdrop, () =>
     drawFinderPath(context, rect, shape, cornerRadius),
   );
+}
+
+type Backdrop = {
+  css: string;
+  color: ParsedRgbaColor;
+  paints: Map<string, { color: ParsedRgbaColor; blended: string }>;
+};
+
+function createBackdrop(options: NormalizedOptions): Backdrop {
+  const css = toSvgColor(options.backgroundColor);
+  return { css, color: parseRgbaColor(css), paints: new Map() };
 }
 
 function paintOrErase(
   context: CanvasRenderingContext2D,
   fill: CanvasFill,
-  background: string,
+  backdrop: Backdrop,
   draw: () => void,
 ): void {
-  const alpha = typeof fill === "string" ? parseRgbaColor(fill).alpha : 255;
-  if (alpha < 255) {
-    context.save();
-    context.globalCompositeOperation = "destination-out";
-    context.fillStyle = "#000000";
+  if (typeof fill !== "string") {
+    context.fillStyle = fill;
     draw();
-    context.restore();
-    if (alpha === 0) {
-      return;
-    }
-    if (parseRgbaColor(background).alpha > 0) {
-      context.fillStyle = background;
-      draw();
-    }
+    return;
   }
-  context.fillStyle = fill;
+  let paint = backdrop.paints.get(fill);
+  if (paint === undefined) {
+    const color = parseRgbaColor(fill);
+    paint = {
+      color,
+      blended: formatRgbaColor(compositeOver(color, backdrop.color)),
+    };
+    backdrop.paints.set(fill, paint);
+  }
+  if (paint.color.alpha === 255) {
+    context.fillStyle = fill;
+    draw();
+    return;
+  }
+  if (backdrop.color.alpha === 255) {
+    context.fillStyle = paint.blended;
+    draw();
+    return;
+  }
+  context.save();
+  context.globalCompositeOperation = "destination-out";
+  context.fillStyle = "#000000";
   draw();
+  context.restore();
+  if (backdrop.color.alpha > 0) {
+    context.fillStyle = backdrop.css;
+    draw();
+  }
+  if (paint.color.alpha > 0 && fill !== backdrop.css) {
+    context.fillStyle = fill;
+    draw();
+  }
 }
 
 function drawFinderPath(
