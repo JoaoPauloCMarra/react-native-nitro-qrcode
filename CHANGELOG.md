@@ -12,6 +12,10 @@ Breaking changes are always listed first in each release section.
 
 - Web PNG output keeps the finder patterns of styled or custom-coloured QR codes when the background is transparent. A fully transparent finder hole or eye-stroke layer now erases the pixels beneath it instead of leaving the frame colour in place, so the composited image scans.
 
+### Changed
+
+- Output change: styled finder patterns (custom `eyeColor`, `eyeballColor`, `eyeStrokeColor`, `finderInnerColor`, or any non-square eye shape) now start and end on the same `floor(index * pixelSize / totalModules)` pixel boundaries as the module grid and quiet zone, on native and web. Native previously rounded these edges, which could shift a finder by 1 px and leave a seam against a coloured quiet zone. Native PNG bytes for those options differ from 0.10.0 by up to 1 px along the finder edges.
+
 ## [0.10.0] - 2026-10-03
 
 ### Breaking changes

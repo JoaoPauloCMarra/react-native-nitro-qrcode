@@ -737,13 +737,13 @@ function drawGroupedFinder(
   foregroundFill: CanvasFill,
 ): void {
   const rect = (offset: number, span: number) => {
-    const x = Math.round(
+    const x = Math.floor(
       ((moduleX + quietZone + offset) * pixelSize) / totalModules,
     );
-    const y = Math.round(
+    const y = Math.floor(
       ((moduleY + quietZone + offset) * pixelSize) / totalModules,
     );
-    const end = Math.round(
+    const end = Math.floor(
       ((moduleX + quietZone + offset + span) * pixelSize) / totalModules,
     );
     return { x, y, size: end - x };

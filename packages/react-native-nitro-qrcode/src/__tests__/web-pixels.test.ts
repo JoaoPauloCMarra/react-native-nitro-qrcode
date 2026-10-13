@@ -66,3 +66,19 @@ describe("transparent finder layers on web", () => {
     expect(canvas.pixelAt(4 * 10 + 1, 4 * 10 + 30)).toEqual([0, 0, 255, 255]);
   });
 });
+
+describe("grouped finder edges on web", () => {
+  it("starts the finder frame on the floored quiet-zone edge", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 100,
+      quietZone: 4,
+      quietZoneColor: "#00FF00",
+      eyeColor: "#FF0000",
+    });
+    const edge = Math.floor((4 * 100) / 29);
+    expect(canvas.pixelAt(edge - 1, edge + 12)).toEqual([0, 255, 0, 255]);
+    expect(canvas.pixelAt(edge, edge + 12)).toEqual([255, 0, 0, 255]);
+  });
+});

@@ -1055,7 +1055,7 @@ void testOutputMatchesPreviousRelease() {
   setColor(layered.quietZoneColor, layered.quietZoneFill, "#EEEEEE");
   setColor(layered.finderInnerColor, layered.finderInner, "#FFFF00");
   assert(readPngHeader(generator.renderPngBase64(value, layered)).colorType == 3);
-  assert(pixelHash(layered) == 17958135356535734173ULL);
+  assert(pixelHash(layered) == 10701135780977932667ULL);
 
   GenerateOptions stroked;
   stroked.size = 257;
@@ -1065,7 +1065,42 @@ void testOutputMatchesPreviousRelease() {
   setColor(stroked.strokeColor, stroked.stroke, "#0000FF");
   stroked.strokeSet = true;
   setExplicitFinderColors(stroked, "#DC2626", "#DC2626");
-  assert(pixelHash(stroked) == 10899789426982616000ULL);
+  assert(pixelHash(stroked) == 8876103607966326928ULL);
+}
+
+void testGroupedFinderEdgesUseFloorBoundaries() {
+  QRCodeGenerator generator;
+  for (const int size : {100, 200}) {
+    GenerateOptions options;
+    options.size = size;
+    options.quietZone = 4;
+    setColor(options.quietZoneColor, options.quietZoneFill, "#00FF00");
+    setExplicitFinderColors(options, "#FF0000", "#FF0000");
+    int width = 0;
+    int height = 0;
+    const auto rgba = decodeRgbaPng(
+        generator.renderPngBase64("https://example.com/finder-color", options),
+        width, height);
+    const int totalModules = 37;
+    const int inner0 = (4 * size) / totalModules;
+    const int inner1 = (11 * size) / totalModules;
+    const auto pixel = [&](int x, int y) {
+      const size_t offset =
+          (static_cast<size_t>(y) * static_cast<size_t>(width) +
+           static_cast<size_t>(x)) *
+          4;
+      return std::array<uint8_t, 3>{rgba[offset], rgba[offset + 1],
+                                    rgba[offset + 2]};
+    };
+    const std::array<uint8_t, 3> red = {255, 0, 0};
+    const std::array<uint8_t, 3> green = {0, 255, 0};
+    const int mid = (inner0 + inner1) / 2;
+    assert(pixel(inner0 - 1, mid) == green);
+    assert(pixel(inner0, mid) == red);
+    assert(pixel(mid, inner0 - 1) == green);
+    assert(pixel(mid, inner0) == red);
+    assert(pixel(inner1 - 1, mid) == red);
+  }
 }
 
 void testTransparentBackgroundPng() {
@@ -1678,6 +1713,7 @@ int main() {
   testGradientFillsInheritedLayers();
   testExplicitBlackStrokeMeansNoStroke();
   testOutputMatchesPreviousRelease();
+  testGroupedFinderEdgesUseFloorBoundaries();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

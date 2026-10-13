@@ -756,7 +756,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
   const auto modulePosition = [imageSize, quietZone,
                                totalModules](int module, double offset) {
     return static_cast<int>(
-        std::round(((static_cast<double>(module + quietZone) + offset) *
+        std::floor(((static_cast<double>(module + quietZone) + offset) *
                     static_cast<double>(imageSize)) /
                    static_cast<double>(totalModules)));
   };
