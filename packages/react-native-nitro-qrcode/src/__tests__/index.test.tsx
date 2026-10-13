@@ -3,28 +3,18 @@ import TestRenderer, { act } from "react-test-renderer";
 import jsQR from "jsqr";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  createMockContext,
+  installCanvas,
+  type MockContext,
+} from "./helpers/canvas";
+import { createMockHybridObject } from "./helpers/nitro-mock";
 
 const PNG_SIGNATURE = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
 ]);
 
-const mockHybridObject = {
-  generatePngArrayBufferObject: jest.fn(() => PNG_SIGNATURE.buffer),
-  generatePngArrayBufferAsyncObject: jest.fn(async () => PNG_SIGNATURE.buffer),
-  generatePngBase64Object: jest.fn(() => "png-base64"),
-  generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
-  generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
-  generatePngDataUriAsyncObject: jest.fn(
-    async () => "data:image/png;base64,png-base64",
-  ),
-  generateSvgStringObject: jest.fn(() => "<svg />"),
-  getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
-  getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
-  getMatrixSize: jest.fn(() => 21),
-  clearCache: jest.fn(),
-  getCacheSize: jest.fn(() => 2),
-  getCacheBytes: jest.fn(() => 256),
-};
+const mockHybridObject = createMockHybridObject(PNG_SIGNATURE.buffer);
 
 jest.mock("react-native-nitro-modules", () => ({
   NitroModules: {
@@ -1563,106 +1553,8 @@ describe("native QRCode API", () => {
   });
 });
 
-type MockGradient = {
-  addColorStop: jest.Mock<void, [number, string]>;
-};
-
-type MockContext = {
-  arc: jest.Mock<void, [number, number, number, number, number]>;
-  clearRect: jest.Mock<void, [number, number, number, number]>;
-  fillStyle: string | MockGradient;
-  globalCompositeOperation: GlobalCompositeOperation;
-  lineCap: CanvasLineCap;
-  lineWidth: number;
-  strokeStyle: string | MockGradient;
-  beginPath: jest.Mock<void, []>;
-  bezierCurveTo: jest.Mock<
-    void,
-    [number, number, number, number, number, number]
-  >;
-  closePath: jest.Mock<void, []>;
-  createLinearGradient: jest.Mock<
-    MockGradient,
-    [number, number, number, number]
-  >;
-  createRadialGradient: jest.Mock<
-    MockGradient,
-    [number, number, number, number, number, number]
-  >;
-  ellipse: jest.Mock<
-    void,
-    [number, number, number, number, number, number, number]
-  >;
-  fill: jest.Mock<void, []>;
-  fillRect: jest.Mock<void, [number, number, number, number]>;
-  lineTo: jest.Mock<void, [number, number]>;
-  moveTo: jest.Mock<void, [number, number]>;
-  quadraticCurveTo: jest.Mock<void, [number, number, number, number]>;
-  restore: jest.Mock<void, []>;
-  rotate: jest.Mock<void, [number]>;
-  save: jest.Mock<void, []>;
-  stroke: jest.Mock<void, []>;
-  translate: jest.Mock<void, [number, number]>;
-};
-
 const originalDocument = globalThis.document;
 const originalBtoa = globalThis.btoa;
-
-function createMockGradient(): MockGradient {
-  return {
-    addColorStop: jest.fn(),
-  };
-}
-
-function createMockContext(): MockContext {
-  return {
-    arc: jest.fn(),
-    clearRect: jest.fn(),
-    fillStyle: "",
-    globalCompositeOperation: "source-over",
-    lineCap: "butt",
-    lineWidth: 1,
-    strokeStyle: "",
-    beginPath: jest.fn(),
-    bezierCurveTo: jest.fn(),
-    closePath: jest.fn(),
-    createLinearGradient: jest
-      .fn<MockGradient, [number, number, number, number]>()
-      .mockImplementation(() => createMockGradient()),
-    createRadialGradient: jest
-      .fn<MockGradient, [number, number, number, number, number, number]>()
-      .mockImplementation(() => createMockGradient()),
-    ellipse: jest.fn(),
-    fill: jest.fn(),
-    fillRect: jest.fn(),
-    lineTo: jest.fn(),
-    moveTo: jest.fn(),
-    quadraticCurveTo: jest.fn(),
-    restore: jest.fn(),
-    rotate: jest.fn(),
-    save: jest.fn(),
-    stroke: jest.fn(),
-    translate: jest.fn(),
-  };
-}
-
-function installCanvas(
-  getContext: () => MockContext | null = createMockContext,
-) {
-  const canvas = {
-    width: 0,
-    height: 0,
-    getContext: jest.fn(getContext),
-    toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
-  };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: {
-      createElement: jest.fn(() => canvas),
-    },
-  });
-  return canvas;
-}
 
 function restoreWebEnvironment() {
   Object.defineProperty(globalThis, "document", {

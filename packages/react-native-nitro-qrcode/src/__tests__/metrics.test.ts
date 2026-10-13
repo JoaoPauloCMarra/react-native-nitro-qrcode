@@ -8,25 +8,11 @@ import {
   setQRCodeMetricsEnabled,
 } from "../metrics";
 import { createElement } from "react";
+import { createMockHybridObject } from "./helpers/nitro-mock";
+import { installCanvas } from "./helpers/canvas";
 import TestRenderer, { act } from "react-test-renderer";
 
-const mockHybridObject = {
-  generatePngArrayBufferObject: jest.fn(() => new ArrayBuffer(8)),
-  generatePngArrayBufferAsyncObject: jest.fn(async () => new ArrayBuffer(8)),
-  generatePngBase64Object: jest.fn(() => "png-base64"),
-  generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
-  generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
-  generatePngDataUriAsyncObject: jest.fn(
-    async () => "data:image/png;base64,png-base64",
-  ),
-  generateSvgStringObject: jest.fn(() => "<svg />"),
-  getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
-  getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
-  getMatrixSize: jest.fn(() => 21),
-  clearCache: jest.fn(),
-  getCacheSize: jest.fn(() => 2),
-  getCacheBytes: jest.fn(() => 256),
-};
+const mockHybridObject = createMockHybridObject(new ArrayBuffer(8));
 
 jest.mock("react-native-nitro-modules", () => ({
   NitroModules: {
@@ -223,22 +209,7 @@ describe("generation metrics", () => {
 
   it("reports the same browser cache bytes through named and grouped metrics", () => {
     const originalDocument = globalThis.document;
-    const context = {
-      fillStyle: "",
-      fillRect: jest.fn(),
-      clearRect: jest.fn(),
-    };
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        createElement: jest.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: jest.fn(() => context),
-          toDataURL: jest.fn(() => "data:image/png;base64,metrics-png"),
-        })),
-      },
-    });
+    installCanvas(undefined, "data:image/png;base64,metrics-png");
 
     try {
       Web.clearQRCodeCache();
@@ -281,17 +252,7 @@ describe("generation metrics", () => {
     setQRCodeMetricsEnabled(true);
     resetQRCodeMetrics();
     const originalDocument = globalThis.document;
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        createElement: jest.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: jest.fn(() => null),
-          toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
-        })),
-      },
-    });
+    installCanvas(() => null);
 
     expect(() => Web.toPngDataUri({ value: "web-fail" })).toThrow(
       "2D canvas",
@@ -385,41 +346,7 @@ describe("generation metrics", () => {
     setQRCodeMetricsEnabled(false);
     resetQRCodeMetrics();
     const originalDocument = globalThis.document;
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        createElement: jest.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: jest.fn(() => ({
-            arc: jest.fn(),
-            clearRect: jest.fn(),
-            fillStyle: "",
-            globalCompositeOperation: "source-over",
-            lineCap: "butt",
-            lineWidth: 1,
-            strokeStyle: "",
-            beginPath: jest.fn(),
-            bezierCurveTo: jest.fn(),
-            closePath: jest.fn(),
-            createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
-            createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
-            ellipse: jest.fn(),
-            fill: jest.fn(),
-            fillRect: jest.fn(),
-            lineTo: jest.fn(),
-            moveTo: jest.fn(),
-            quadraticCurveTo: jest.fn(),
-            restore: jest.fn(),
-            rotate: jest.fn(),
-            save: jest.fn(),
-            stroke: jest.fn(),
-            translate: jest.fn(),
-          })),
-          toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
-        })),
-      },
-    });
+    installCanvas();
     clearQRCodeCache();
 
     expect(Web.toPngDataUri({ value: "web-disabled" })).toBe(

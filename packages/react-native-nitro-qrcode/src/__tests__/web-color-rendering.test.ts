@@ -1,47 +1,7 @@
 import * as Web from "../index.web";
+import { installRecordingCanvas as installRecorder } from "./helpers/canvas";
 
-type MockCanvas = {
-  getContext: jest.Mock;
-  toDataURL: jest.Mock;
-};
-
-function installRecordingCanvas(): MockCanvas {
-  const operations: string[] = [];
-  let context: Record<string, unknown>;
-  const record = (name: string, args: unknown[] = []) => {
-    operations.push(
-      `${name}:${args.join(",")}:fill=${String(context.fillStyle)}`,
-    );
-  };
-  const method = (name: string) =>
-    jest.fn((...args: unknown[]) => {
-      record(name, args);
-    });
-  context = {
-    fillStyle: "",
-    globalCompositeOperation: "source-over",
-    clearRect: method("clearRect"),
-    fillRect: method("fillRect"),
-    beginPath: method("beginPath"),
-    fill: method("fill"),
-    lineTo: method("lineTo"),
-    moveTo: method("moveTo"),
-    quadraticCurveTo: method("quadraticCurveTo"),
-    save: method("save"),
-    restore: method("restore"),
-  };
-  const canvas: MockCanvas = {
-    getContext: jest.fn(() => context),
-    toDataURL: jest.fn(() =>
-      `data:image/png;base64,${Buffer.from(operations.join("|"), "utf8").toString("base64")}`,
-    ),
-  };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: { createElement: jest.fn(() => canvas) },
-  });
-  return canvas;
-}
+const installRecordingCanvas = () => installRecorder().canvas;
 
 const equivalentOptions = {
   value: "equivalent-web-colors",
