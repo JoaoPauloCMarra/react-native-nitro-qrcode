@@ -163,7 +163,7 @@ describe("generation metrics", () => {
     expect(asyncSnapshot.failedRequests).toBe(1);
   });
 
-  it("is disabled by default outside development and reports zeroed state", () => {
+  it("reports zeroed state after reset", () => {
     setQRCodeMetricsEnabled(false);
     resetQRCodeMetrics();
     const snapshot = getQRCodeMetrics();

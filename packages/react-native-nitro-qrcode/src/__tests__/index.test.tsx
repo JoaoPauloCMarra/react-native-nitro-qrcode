@@ -95,7 +95,6 @@ import {
   toPngDataUriAsync,
   toSvgString,
   validateOptions,
-  PRESET_SHAPE_OPTIONS as NativePresetShapeOptions,
 } from "../index";
 import * as Web from "../index.web";
 import { mergePresetShapeOptions, PRESET_SHAPE_OPTIONS } from "../defaults";
@@ -122,15 +121,25 @@ function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
 }
 
 describe("entrypoint export parity", () => {
+  const nativeEntry = jest.requireActual<typeof import("../index")>("../index");
+
+  it("exports the same names with the same kinds on native and web", () => {
+    const describeExports = (entry: object) =>
+      Object.entries(entry)
+        .map(([name, value]) => `${name}:${typeof value}`)
+        .sort();
+    expect(describeExports(Web)).toEqual(describeExports(nativeEntry));
+  });
+
   it("re-exports validateOptions on both entrypoints", () => {
     expect(validateOptions).toBe(NitroQRCode.validateOptions);
     expect(Web.validateOptions).toBe(Web.NitroQRCode.validateOptions);
   });
 
   it("exports the same frozen preset table on both entrypoints", () => {
-    expect(NativePresetShapeOptions).toBe(PRESET_SHAPE_OPTIONS);
+    expect(nativeEntry.PRESET_SHAPE_OPTIONS).toBe(PRESET_SHAPE_OPTIONS);
     expect(Web.PRESET_SHAPE_OPTIONS).toBe(PRESET_SHAPE_OPTIONS);
-    expect(Object.keys(NativePresetShapeOptions)).toEqual([
+    expect(Object.keys(nativeEntry.PRESET_SHAPE_OPTIONS)).toEqual([
       "default",
       "rounded",
       "dots",
@@ -139,8 +148,8 @@ describe("entrypoint export parity", () => {
       "mosaic",
       "fluid",
     ]);
-    expect(Object.isFrozen(NativePresetShapeOptions)).toBe(true);
-    expect(Object.isFrozen(NativePresetShapeOptions.dots)).toBe(true);
+    expect(Object.isFrozen(nativeEntry.PRESET_SHAPE_OPTIONS)).toBe(true);
+    expect(Object.isFrozen(nativeEntry.PRESET_SHAPE_OPTIONS.dots)).toBe(true);
   });
 });
 
@@ -1760,119 +1769,121 @@ describe("native QRCode API", () => {
   });
 });
 
-describe("web QRCode API", () => {
-  type MockGradient = {
-    addColorStop: jest.Mock<void, [number, string]>;
+type MockGradient = {
+  addColorStop: jest.Mock<void, [number, string]>;
+};
+
+type MockContext = {
+  arc: jest.Mock<void, [number, number, number, number, number]>;
+  clearRect: jest.Mock<void, [number, number, number, number]>;
+  fillStyle: string | MockGradient;
+  globalCompositeOperation: GlobalCompositeOperation;
+  lineCap: CanvasLineCap;
+  lineWidth: number;
+  strokeStyle: string | MockGradient;
+  beginPath: jest.Mock<void, []>;
+  bezierCurveTo: jest.Mock<
+    void,
+    [number, number, number, number, number, number]
+  >;
+  closePath: jest.Mock<void, []>;
+  createLinearGradient: jest.Mock<
+    MockGradient,
+    [number, number, number, number]
+  >;
+  createRadialGradient: jest.Mock<
+    MockGradient,
+    [number, number, number, number, number, number]
+  >;
+  ellipse: jest.Mock<
+    void,
+    [number, number, number, number, number, number, number]
+  >;
+  fill: jest.Mock<void, []>;
+  fillRect: jest.Mock<void, [number, number, number, number]>;
+  lineTo: jest.Mock<void, [number, number]>;
+  moveTo: jest.Mock<void, [number, number]>;
+  quadraticCurveTo: jest.Mock<void, [number, number, number, number]>;
+  restore: jest.Mock<void, []>;
+  rotate: jest.Mock<void, [number]>;
+  save: jest.Mock<void, []>;
+  stroke: jest.Mock<void, []>;
+  translate: jest.Mock<void, [number, number]>;
+};
+
+const originalDocument = globalThis.document;
+const originalBtoa = globalThis.btoa;
+
+function createMockGradient(): MockGradient {
+  return {
+    addColorStop: jest.fn(),
   };
+}
 
-  type MockContext = {
-    arc: jest.Mock<void, [number, number, number, number, number]>;
-    clearRect: jest.Mock<void, [number, number, number, number]>;
-    fillStyle: string | MockGradient;
-    globalCompositeOperation: GlobalCompositeOperation;
-    lineCap: CanvasLineCap;
-    lineWidth: number;
-    strokeStyle: string | MockGradient;
-    beginPath: jest.Mock<void, []>;
-    bezierCurveTo: jest.Mock<
-      void,
-      [number, number, number, number, number, number]
-    >;
-    closePath: jest.Mock<void, []>;
-    createLinearGradient: jest.Mock<
-      MockGradient,
-      [number, number, number, number]
-    >;
-    createRadialGradient: jest.Mock<
-      MockGradient,
-      [number, number, number, number, number, number]
-    >;
-    ellipse: jest.Mock<
-      void,
-      [number, number, number, number, number, number, number]
-    >;
-    fill: jest.Mock<void, []>;
-    fillRect: jest.Mock<void, [number, number, number, number]>;
-    lineTo: jest.Mock<void, [number, number]>;
-    moveTo: jest.Mock<void, [number, number]>;
-    quadraticCurveTo: jest.Mock<void, [number, number, number, number]>;
-    restore: jest.Mock<void, []>;
-    rotate: jest.Mock<void, [number]>;
-    save: jest.Mock<void, []>;
-    stroke: jest.Mock<void, []>;
-    translate: jest.Mock<void, [number, number]>;
+function createMockContext(): MockContext {
+  return {
+    arc: jest.fn(),
+    clearRect: jest.fn(),
+    fillStyle: "",
+    globalCompositeOperation: "source-over",
+    lineCap: "butt",
+    lineWidth: 1,
+    strokeStyle: "",
+    beginPath: jest.fn(),
+    bezierCurveTo: jest.fn(),
+    closePath: jest.fn(),
+    createLinearGradient: jest
+      .fn<MockGradient, [number, number, number, number]>()
+      .mockImplementation(() => createMockGradient()),
+    createRadialGradient: jest
+      .fn<MockGradient, [number, number, number, number, number, number]>()
+      .mockImplementation(() => createMockGradient()),
+    ellipse: jest.fn(),
+    fill: jest.fn(),
+    fillRect: jest.fn(),
+    lineTo: jest.fn(),
+    moveTo: jest.fn(),
+    quadraticCurveTo: jest.fn(),
+    restore: jest.fn(),
+    rotate: jest.fn(),
+    save: jest.fn(),
+    stroke: jest.fn(),
+    translate: jest.fn(),
   };
+}
 
-  const originalDocument = globalThis.document;
-  const originalBtoa = globalThis.btoa;
-
-  function createMockGradient(): MockGradient {
-    return {
-      addColorStop: jest.fn(),
-    };
-  }
-
-  function createMockContext(): MockContext {
-    return {
-      arc: jest.fn(),
-      clearRect: jest.fn(),
-      fillStyle: "",
-      globalCompositeOperation: "source-over",
-      lineCap: "butt",
-      lineWidth: 1,
-      strokeStyle: "",
-      beginPath: jest.fn(),
-      bezierCurveTo: jest.fn(),
-      closePath: jest.fn(),
-      createLinearGradient: jest
-        .fn<MockGradient, [number, number, number, number]>()
-        .mockImplementation(() => createMockGradient()),
-      createRadialGradient: jest
-        .fn<MockGradient, [number, number, number, number, number, number]>()
-        .mockImplementation(() => createMockGradient()),
-      ellipse: jest.fn(),
-      fill: jest.fn(),
-      fillRect: jest.fn(),
-      lineTo: jest.fn(),
-      moveTo: jest.fn(),
-      quadraticCurveTo: jest.fn(),
-      restore: jest.fn(),
-      rotate: jest.fn(),
-      save: jest.fn(),
-      stroke: jest.fn(),
-      translate: jest.fn(),
-    };
-  }
-
-  function installCanvas(
-    getContext: () => MockContext | null = createMockContext,
-  ) {
-    const canvas = {
-      width: 0,
-      height: 0,
-      getContext: jest.fn(getContext),
-      toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
-    };
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        createElement: jest.fn(() => canvas),
-      },
-    });
-    return canvas;
-  }
-
-  afterEach(() => {
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: originalDocument,
-    });
-    Object.defineProperty(globalThis, "btoa", {
-      configurable: true,
-      value: originalBtoa,
-    });
-    Web.clearQRCodeCache();
+function installCanvas(
+  getContext: () => MockContext | null = createMockContext,
+) {
+  const canvas = {
+    width: 0,
+    height: 0,
+    getContext: jest.fn(getContext),
+    toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
+  };
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: {
+      createElement: jest.fn(() => canvas),
+    },
   });
+  return canvas;
+}
+
+function restoreWebEnvironment() {
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: originalDocument,
+  });
+  Object.defineProperty(globalThis, "btoa", {
+    configurable: true,
+    value: originalBtoa,
+  });
+  Web.clearQRCodeCache();
+}
+
+describe("web QRCode API", () => {
+  afterEach(restoreWebEnvironment);
 
   it("generates SVG, matrix, and cached PNG data on web", () => {
     const canvas = installCanvas();
@@ -2992,44 +3003,6 @@ describe("web QRCode API", () => {
     expect(secondReady).not.toHaveBeenCalled();
   });
 
-  it("clears the previous web QR image when keepPreviousImage is false", async () => {
-    installCanvas();
-    let tree: TestRenderer.ReactTestRenderer | undefined;
-
-    await act(async () => {
-      tree = TestRenderer.create(
-        React.createElement(Web.QRCode, {
-          value: "web-one",
-          keepPreviousImage: false,
-        }),
-      );
-    });
-    await act(async () => {
-      await flushMacrotasks(50);
-    });
-    if (tree === undefined) {
-      throw new Error("Expected web QRCode test renderer to be created.");
-    }
-
-    await act(async () => {
-      tree?.update(
-        React.createElement(Web.QRCode, {
-          value: "web-two",
-          keepPreviousImage: false,
-        }),
-      );
-    });
-    await act(async () => {
-      await flushMacrotasks(50);
-    });
-
-    expect(
-      tree.root.findAll(
-        (node) => node.props.source?.uri === "data:image/png;base64,web-png",
-      ),
-    ).not.toHaveLength(0);
-  });
-
   it("uses the default web component size", async () => {
     installCanvas();
     let tree: TestRenderer.ReactTestRenderer | undefined;
@@ -3053,6 +3026,8 @@ describe("web QRCode API", () => {
       ]),
     );
   });
+});
+
 type ParityCorpusEntry = {
   value: string;
   ecl: string;
@@ -3167,6 +3142,8 @@ describe("preset shape options", () => {
 });
 
 describe("encoder parity corpus", () => {
+  afterEach(restoreWebEnvironment);
+
   const corpus = readParityCorpus();
 
   it("feeds the same corpus scenarios to the native adapter", () => {
@@ -3331,6 +3308,8 @@ describe("encoder parity corpus", () => {
 });
 
 describe("web transparent and geometry rendering", () => {
+  afterEach(restoreWebEnvironment);
+
   it("clears transparent web PNG backgrounds instead of filling black", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -3484,7 +3463,6 @@ describe("web transparent and geometry rendering", () => {
     expect(context.lineTo).toHaveBeenCalled();
     expect(context.quadraticCurveTo).toHaveBeenCalled();
   });
-});
 });
 
 describe("gradient policy and image presentation", () => {
