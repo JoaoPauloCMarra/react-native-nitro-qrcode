@@ -103,6 +103,7 @@ void testHybridQRCodeMethods() {
       options.gradientColors, options.gradientLocations, options.gradientStartX,
       options.gradientStartY, options.gradientEndX, options.gradientEndY);
   assert(svg.find("<svg") != std::string::npos);
+  assert(qrCode->generateSvgStringObject(options) == svg);
   const std::string packed = qrCode->getMatrixPackedBase64(
       options.value, options.errorCorrectionLevel, options.minVersion,
       options.maxVersion, options.mask, options.boostEcl);

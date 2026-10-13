@@ -104,6 +104,11 @@ void testObjectAbiNumericCastsAtEveryField() {
       qrCode->generateSvgString("svg", value, "M", "#000000", "#FFFFFF", 1, 40,
                                 -1, true, "none", {}, {}, 0, 0, 1, 1);
     });
+    expectThrow<std::invalid_argument>([&]() {
+      GenerateOptions invalid = makeOptions("svg");
+      invalid.minVersion = value;
+      qrCode->generateSvgStringObject(invalid);
+    });
   }
   assert(qrCode->getCacheSize() == 0);
 }

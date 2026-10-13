@@ -174,6 +174,12 @@ std::shared_ptr<Promise<std::string>> HybridQRCode::generatePngDataUriAsync(
       });
 }
 
+std::string
+HybridQRCode::generateSvgStringObject(const GenerateOptions &options) {
+  return generator_.generateSvgString(options.value,
+                                      makeGenerateOptions(options));
+}
+
 std::string HybridQRCode::generateSvgString(
     const std::string &value, double quietZone,
     const std::string &errorCorrectionLevel, const std::string &foregroundColor,

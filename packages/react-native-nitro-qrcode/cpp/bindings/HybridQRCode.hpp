@@ -31,6 +31,8 @@ public:
   std::shared_ptr<Promise<std::string>>
   generatePngDataUriAsyncObject(const GenerateOptions &options) override;
 
+  std::string generateSvgStringObject(const GenerateOptions &options) override;
+
   std::string generatePngBase64(
       const std::string &value, double size, double quietZone,
       const std::string &errorCorrectionLevel,

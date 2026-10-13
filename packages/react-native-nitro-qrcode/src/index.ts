@@ -66,7 +66,6 @@ export {
 
 const NativeQRCode = NitroModules.createHybridObject<HybridQRCode>("QRCode");
 
-type NativeSvgArgs = Parameters<HybridQRCode["generateSvgString"]>;
 type NativeMatrixArgs = Parameters<HybridQRCode["getMatrixObject"]>;
 
 function explicitColor(explicit: boolean, color: string): string | undefined {
@@ -117,27 +116,6 @@ function toNativeGenerateOptions(
     gradientEndX: normalized.gradient.endX,
     gradientEndY: normalized.gradient.endY,
   };
-}
-
-function toNativeSvgArgs(normalized: NormalizedOptions): NativeSvgArgs {
-  return [
-    normalized.value,
-    normalized.quietZone,
-    normalized.errorCorrectionLevel,
-    normalized.foregroundColor,
-    normalized.backgroundColor,
-    normalized.minVersion,
-    normalized.maxVersion,
-    normalized.mask,
-    normalized.boostEcl,
-    normalized.gradient.type,
-    normalized.gradient.colors,
-    normalized.gradient.locations,
-    normalized.gradient.startX,
-    normalized.gradient.startY,
-    normalized.gradient.endX,
-    normalized.gradient.endY,
-  ];
 }
 
 function toNativeMatrixArgs(normalized: NormalizedOptions): NativeMatrixArgs {
@@ -210,7 +188,7 @@ export async function toPngDataUriAsync(
 export function toSvgString(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
   return measuredSync(() =>
-    NativeQRCode.generateSvgString(...toNativeSvgArgs(normalized)),
+    NativeQRCode.generateSvgStringObject(toNativeGenerateOptions(normalized)),
   );
 }
 

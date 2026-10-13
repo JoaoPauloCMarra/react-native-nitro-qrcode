@@ -19,7 +19,7 @@ const mockHybridObject = {
   generatePngDataUriAsyncObject: jest.fn(
     async () => "data:image/png;base64,png-base64",
   ),
-  generateSvgString: jest.fn(() => "<svg />"),
+  generateSvgStringObject: jest.fn(() => "<svg />"),
   getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
   getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
   getMatrixSize: jest.fn(() => 21),
