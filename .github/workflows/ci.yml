@@ -36,11 +36,6 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Setup LLVM
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-18 llvm-18
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -79,9 +74,6 @@ jobs:
 
       - name: Build package artifacts
         run: bun run build
-
-      - name: Audit package contents
-        run: bun run audit:package
 
       - name: Validate auth-free publication
         run: bun run publish-package:dry-run

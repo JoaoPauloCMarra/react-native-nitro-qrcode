@@ -222,6 +222,44 @@ function hasTestId(source, id) {
   );
 }
 
+function validateSuite(root, suite, seenIds, seenPaths) {
+  if (
+    !suite ||
+    typeof suite.id !== "string" ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(suite.id) ||
+    seenIds.has(suite.id) ||
+    typeof suite.path !== "string" ||
+    !suite.path.startsWith("e2e/") ||
+    suite.path.includes("..") ||
+    suite.path.includes("\\") ||
+    !suite.path.endsWith(".ad") ||
+    seenPaths.has(suite.path) ||
+    typeof suite.purpose !== "string" ||
+    suite.purpose.trim() === ""
+  ) {
+    throw new Error(
+      "QRCode replay manifest contains an invalid or duplicate flow",
+    );
+  }
+  seenIds.add(suite.id);
+  seenPaths.add(suite.path);
+  const suiteFile = inside(root, suite.path);
+  if (!fs.existsSync(suiteFile) || !fs.lstatSync(suiteFile).isFile()) {
+    throw new Error(`Replay flow is missing: ${suite.path}`);
+  }
+  const source = fs.readFileSync(suiteFile, "utf8");
+  const commands = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+  if (commands.at(-1) !== "close") {
+    throw new Error(
+      `${suite.path} must close its app flow as its final command`,
+    );
+  }
+  return source;
+}
+
 function readCoverageManifest(root, manifestPath = manifestRelativePath) {
   const absoluteRoot = path.resolve(root);
   const manifestFile = inside(absoluteRoot, manifestPath);
@@ -251,41 +289,10 @@ function readCoverageManifest(root, manifestPath = manifestRelativePath) {
   const suitePaths = new Set();
   const suiteFiles = new Map();
   for (const suite of manifest.suites) {
-    if (
-      !suite ||
-      typeof suite.id !== "string" ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(suite.id) ||
-      suiteIds.has(suite.id) ||
-      typeof suite.path !== "string" ||
-      !suite.path.startsWith("e2e/") ||
-      suite.path.includes("..") ||
-      suite.path.includes("\\") ||
-      !suite.path.endsWith(".ad") ||
-      suitePaths.has(suite.path) ||
-      typeof suite.purpose !== "string" ||
-      suite.purpose.trim() === ""
-    ) {
-      throw new Error(
-        "QRCode replay manifest contains an invalid or duplicate flow",
-      );
-    }
-    suiteIds.add(suite.id);
-    suitePaths.add(suite.path);
-    const suiteFile = inside(absoluteRoot, suite.path);
-    if (!fs.existsSync(suiteFile) || !fs.lstatSync(suiteFile).isFile()) {
-      throw new Error(`Replay flow is missing: ${suite.path}`);
-    }
-    const source = fs.readFileSync(suiteFile, "utf8");
-    const commands = source
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line !== "" && !line.startsWith("#"));
-    if (commands.at(-1) !== "close") {
-      throw new Error(
-        `${suite.path} must close its app flow as its final command`,
-      );
-    }
-    suiteFiles.set(suite.path, source);
+    suiteFiles.set(
+      suite.path,
+      validateSuite(absoluteRoot, suite, suiteIds, suitePaths),
+    );
   }
 
   const featureIds = new Set();
@@ -545,6 +552,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  validateSuite,
   hasTestId,
   checkReplayFreshness,
   collectRuntimeFiles,

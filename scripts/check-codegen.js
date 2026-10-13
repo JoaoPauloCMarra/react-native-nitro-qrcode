@@ -38,19 +38,7 @@ function snapshotDirectory(source, target) {
 
 function restoreDirectory(source, target) {
   fs.rmSync(target, { recursive: true, force: true });
-  fs.mkdirSync(target, { recursive: true });
-  if (!fs.existsSync(source)) {
-    return;
-  }
-  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-    const from = path.join(source, entry.name);
-    const to = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      snapshotDirectory(from, to);
-    } else {
-      fs.copyFileSync(from, to);
-    }
-  }
+  snapshotDirectory(source, target);
 }
 
 function listLines(args) {

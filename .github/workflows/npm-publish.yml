@@ -37,9 +37,6 @@ jobs:
       package_name: ${{ steps.metadata.outputs.package_name }}
       package_version: ${{ steps.metadata.outputs.package_version }}
       release_commit: ${{ steps.metadata.outputs.release_commit }}
-      expected_name: ${{ steps.metadata.outputs.package_name }}
-      expected_version: ${{ steps.metadata.outputs.package_version }}
-      expected_git_head: ${{ steps.metadata.outputs.release_commit }}
       release_tag: ${{ steps.metadata.outputs.release_tag }}
       dist_tag: ${{ steps.metadata.outputs.dist_tag }}
       already_published: ${{ steps.registry.outputs.already_published }}
@@ -166,9 +163,6 @@ jobs:
           fi
 
       - name: Release preflight
-        env:
-          CC: clang-18
-          CXX: clang++-18
         run: bun run release:preflight:ci
 
   publish:
