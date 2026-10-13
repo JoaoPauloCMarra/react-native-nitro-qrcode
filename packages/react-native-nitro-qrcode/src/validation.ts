@@ -338,7 +338,7 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
     32,
   );
   const requestedEcl = normalizeEcl(
-    options.errorCorrectionLevel ?? DEFAULT_ECL,
+    options.errorCorrectionLevel ?? (logoAreaSize > 0 ? "H" : DEFAULT_ECL),
   );
   const quietZone =
     scanSafe === false

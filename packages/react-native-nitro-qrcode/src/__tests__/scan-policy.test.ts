@@ -62,3 +62,58 @@ describe("scanability color policy", () => {
     ).toBe(true);
   });
 });
+
+describe("scanability logo policy", () => {
+  const codes = (
+    errorCorrectionLevel: "L" | "M" | "Q" | "H",
+    logoAreaSize: number,
+  ) =>
+    scanabilityWarnings(
+      normalizeOptions({
+        value: "logo-policy",
+        size: 512,
+        errorCorrectionLevel,
+        logoAreaSize,
+      }),
+    ).map((warning) => warning.code);
+
+  it("defaults the error correction level to H when a logo area is reserved", () => {
+    expect(
+      normalizeOptions({ value: "logo-default", logoAreaSize: 64 })
+        .errorCorrectionLevel,
+    ).toBe("H");
+    expect(
+      normalizeOptions({ value: "no-logo-default" }).errorCorrectionLevel,
+    ).toBe("M");
+    expect(
+      normalizeOptions({
+        value: "logo-explicit",
+        logoAreaSize: 64,
+        errorCorrectionLevel: "L",
+      }).errorCorrectionLevel,
+    ).toBe("L");
+  });
+
+  it.each([
+    ["L", 96],
+    ["M", 128],
+    ["Q", 154],
+  ] as const)(
+    "warns when %s error correction cannot recover a %i px logo area",
+    (level, logo) => {
+      expect(codes(level, logo)).toContain("low-ecl-for-logo");
+    },
+  );
+
+  it.each([
+    ["L", 64],
+    ["M", 96],
+    ["Q", 128],
+    ["H", 150],
+  ] as const)(
+    "accepts %s error correction with a %i px logo area",
+    (level, logo) => {
+      expect(codes(level, logo)).not.toContain("low-ecl-for-logo");
+    },
+  );
+});

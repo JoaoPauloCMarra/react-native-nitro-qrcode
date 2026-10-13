@@ -23,6 +23,12 @@ export const SCANABILITY_LOGO_SIZE_LIMIT = 0.3;
 
 export const SCANABILITY_LOW_CONTRAST = 2.5;
 
+export const SCANABILITY_LOGO_SIZE_LIMIT_BY_ECL = {
+  L: 0.15,
+  M: 0.2,
+  Q: 0.25,
+} as const;
+
 export function scanabilityWarnings(
   options: NormalizedOptions,
 ): QRCodeScanabilityWarning[] {
@@ -61,15 +67,15 @@ export function scanabilityWarnings(
   }
 
   if (
-    options.logoAreaSize > 0 &&
-    (options.errorCorrectionLevel === "L" ||
-      options.errorCorrectionLevel === "M") &&
-    options.logoAreaSize > options.size * 0.2
+    options.errorCorrectionLevel !== "H" &&
+    options.logoAreaSize >
+      options.size *
+        SCANABILITY_LOGO_SIZE_LIMIT_BY_ECL[options.errorCorrectionLevel]
   ) {
     warnings.push({
       code: "low-ecl-for-logo",
       message:
-        "errorCorrectionLevel is low for a large logo. Use Q/H to reduce decode failures.",
+        "errorCorrectionLevel is too low for this logo area. Use a higher level (H recovers the most) or shrink the logo.",
     });
   }
 
