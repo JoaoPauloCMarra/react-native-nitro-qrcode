@@ -9,6 +9,7 @@ import {
 } from "./metrics";
 import {
   areRgbaColorsEqual,
+  parseRgbaColor,
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
@@ -813,7 +814,34 @@ function drawFinderShape(
   fill: CanvasFill,
   cornerRadius: number,
 ): void {
+  paintOrErase(context, fill, () =>
+    drawFinderPath(context, rect, shape, cornerRadius),
+  );
+}
+
+function paintOrErase(
+  context: CanvasRenderingContext2D,
+  fill: CanvasFill,
+  draw: () => void,
+): void {
+  if (typeof fill === "string" && parseRgbaColor(fill).alpha === 0) {
+    context.save();
+    context.globalCompositeOperation = "destination-out";
+    context.fillStyle = "#000000";
+    draw();
+    context.restore();
+    return;
+  }
   context.fillStyle = fill;
+  draw();
+}
+
+function drawFinderPath(
+  context: CanvasRenderingContext2D,
+  rect: { x: number; y: number; size: number },
+  shape: QRCodeShape,
+  cornerRadius: number,
+): void {
   if (shape === "circle") {
     context.beginPath();
     context.arc(

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [Next]
+
+### Fixed
+
+- Web PNG output keeps the finder patterns of styled or custom-coloured QR codes when the background is transparent. A fully transparent finder hole or eye-stroke layer now erases the pixels beneath it instead of leaving the frame colour in place, so the composited image scans.
+
 ## [0.10.0] - 2026-10-03
 
 ### Breaking changes
