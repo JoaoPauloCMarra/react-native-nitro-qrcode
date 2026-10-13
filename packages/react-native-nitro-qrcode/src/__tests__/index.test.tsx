@@ -1109,6 +1109,43 @@ describe("native QRCode API", () => {
     expect(onError.mock.calls[0]?.[0]?.message).toBe("native-boom");
   });
 
+  it("reports a BigInt shape option through onError instead of crashing the render", async () => {
+    const onError = jest.fn();
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "unserializable",
+          onError,
+          shapeOptions: { layout: BigInt(1) as unknown as "matrix" },
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining("layout must be") }),
+    );
+  });
+
+  it("renders a gradient that cannot be serialized", async () => {
+    const onError = jest.fn();
+    const gradient: Record<string, unknown> = {
+      colors: ["#000000", "#FFFFFF"],
+    };
+    gradient.self = gradient;
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "circular",
+          onError,
+          gradient: gradient as never,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalled();
+  });
+
   it("exposes imperative export methods on the QR component", async () => {
     const qrRef = React.createRef<QRCodeRef>();
     let tree: TestRenderer.ReactTestRenderer | undefined;

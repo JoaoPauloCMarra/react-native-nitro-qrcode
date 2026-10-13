@@ -84,9 +84,20 @@ function validateComponentSize(size: number): void {
   }
 }
 
+function contentKey(value: unknown): string | undefined {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+}
+
 function useStableValue<T>(value: T): T {
-  const key = JSON.stringify(value);
+  const key = contentKey(value);
   const [held, setHeld] = useState({ key, value });
+  if (key === undefined) {
+    return value;
+  }
   if (held.key !== key) {
     setHeld({ key, value });
     return value;
