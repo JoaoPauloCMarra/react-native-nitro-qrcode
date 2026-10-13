@@ -29,10 +29,10 @@ import {
   type NitroQRCodeApi,
   type NormalizedGradient,
   type NormalizedOptions,
+  type NormalizedShapeOptions,
   type QRCodeMatrix,
   type QRCodeOptions,
   type QRCodeShape,
-  type QRCodeShapeOptions,
 } from "./validation";
 import { createQRCodeComponent } from "./qrcode-component";
 import type { QRCodeProps, QRCodeRef } from "./qrcode-component";
@@ -654,11 +654,10 @@ function modulePixel(
   return Math.floor((moduleIndex * pixelSize) / totalModules);
 }
 
-function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
+function canDrawSquareRuns(options: NormalizedShapeOptions): boolean {
   return (
     options.shape === "square" &&
     options.eyeFrameShape === "square" &&
-    options.eyePatternShape === "square" &&
     options.eyeballShape === "square" &&
     options.alignmentShape === "square" &&
     options.timingShape === "square" &&
