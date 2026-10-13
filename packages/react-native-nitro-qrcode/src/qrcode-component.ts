@@ -23,18 +23,13 @@ import {
 import {
   DEFAULT_BACKGROUND,
   type QRCodeBackgroundColor,
-  type QRCodeColor,
 } from "./colors";
 import type { QRCodePreset } from "./defaults";
 import { styles } from "./styles";
 import { useQRCodeGeneration } from "./use-qrcode-generation";
 import {
   scaleShapeOptions,
-  type QRCodeGradient,
-  type QRCodeGradientColors,
-  type QRCodeGradientLocations,
   type QRCodeOptions,
-  type QRCodeShapeOptions,
 } from "./validation";
 import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 
@@ -89,103 +84,14 @@ function validateComponentSize(size: number): void {
   }
 }
 
-function createGradientColors(
-  color0: QRCodeColor | undefined,
-  color1: QRCodeColor | undefined,
-  color2: QRCodeColor | undefined,
-  color3: QRCodeColor | undefined,
-  color4: QRCodeColor | undefined,
-  color5: QRCodeColor | undefined,
-  color6: QRCodeColor | undefined,
-  color7: QRCodeColor | undefined,
-): QRCodeGradientColors | undefined {
-  if (color0 === undefined || color1 === undefined) {
-    return undefined;
+function useStableValue<T>(value: T): T {
+  const key = JSON.stringify(value);
+  const [held, setHeld] = useState({ key, value });
+  if (held.key !== key) {
+    setHeld({ key, value });
+    return value;
   }
-
-  if (color2 === undefined) {
-    return [color0, color1];
-  }
-
-  if (color3 === undefined) {
-    return [color0, color1, color2];
-  }
-
-  if (color4 === undefined) {
-    return [color0, color1, color2, color3];
-  }
-
-  if (color5 === undefined) {
-    return [color0, color1, color2, color3, color4];
-  }
-
-  if (color6 === undefined) {
-    return [color0, color1, color2, color3, color4, color5];
-  }
-
-  if (color7 === undefined) {
-    return [color0, color1, color2, color3, color4, color5, color6];
-  }
-
-  return [color0, color1, color2, color3, color4, color5, color6, color7];
-}
-
-function createGradientLocations(
-  location0: number | undefined,
-  location1: number | undefined,
-  location2: number | undefined,
-  location3: number | undefined,
-  location4: number | undefined,
-  location5: number | undefined,
-  location6: number | undefined,
-  location7: number | undefined,
-): QRCodeGradientLocations | undefined {
-  if (location0 === undefined || location1 === undefined) {
-    return undefined;
-  }
-
-  if (location2 === undefined) {
-    return [location0, location1];
-  }
-
-  if (location3 === undefined) {
-    return [location0, location1, location2];
-  }
-
-  if (location4 === undefined) {
-    return [location0, location1, location2, location3];
-  }
-
-  if (location5 === undefined) {
-    return [location0, location1, location2, location3, location4];
-  }
-
-  if (location6 === undefined) {
-    return [location0, location1, location2, location3, location4, location5];
-  }
-
-  if (location7 === undefined) {
-    return [
-      location0,
-      location1,
-      location2,
-      location3,
-      location4,
-      location5,
-      location6,
-    ];
-  }
-
-  return [
-    location0,
-    location1,
-    location2,
-    location3,
-    location4,
-    location5,
-    location6,
-    location7,
-  ];
+  return held.value;
 }
 
 export function createQRCodeComponent(
@@ -241,136 +147,8 @@ export function createQRCodeComponent(
     const rasterScale = rasterSize / size;
     const resolvedLogoAreaSize =
       logoAreaSize ?? (logo !== undefined ? Math.round(size * 0.28) : 0);
-    const hasShapeOptions = shapeOptions !== undefined;
-    const shapeOptionsLayout = shapeOptions?.layout;
-    const shapeOptionsShape = shapeOptions?.shape;
-    const shapeOptionsEyeFrameShape = shapeOptions?.eyeFrameShape;
-    const shapeOptionsEyeballShape = shapeOptions?.eyeballShape;
-    const shapeOptionsEyePatternShape = shapeOptions?.eyePatternShape;
-    const shapeOptionsGap = shapeOptions?.gap;
-    const shapeOptionsEyePatternGap = shapeOptions?.eyePatternGap;
-    const shapeOptionsBodyDensity = shapeOptions?.bodyDensity;
-    const shapeOptionsCornerRadius = shapeOptions?.cornerRadius;
-    const shapeOptionsEyePatternCornerRadius =
-      shapeOptions?.eyePatternCornerRadius;
-    const shapeOptionsAlignmentShape = shapeOptions?.alignmentShape;
-    const shapeOptionsTimingShape = shapeOptions?.timingShape;
-    const gradientType = gradient?.type;
-    const gradientColors = gradient?.colors;
-    const gradientColor0 = gradientColors?.[0];
-    const gradientColor1 = gradientColors?.[1];
-    const gradientColor2 = gradientColors?.[2];
-    const gradientColor3 = gradientColors?.[3];
-    const gradientColor4 = gradientColors?.[4];
-    const gradientColor5 = gradientColors?.[5];
-    const gradientColor6 = gradientColors?.[6];
-    const gradientColor7 = gradientColors?.[7];
-    const gradientLocations = gradient?.locations;
-    const gradientLocation0 = gradientLocations?.[0];
-    const gradientLocation1 = gradientLocations?.[1];
-    const gradientLocation2 = gradientLocations?.[2];
-    const gradientLocation3 = gradientLocations?.[3];
-    const gradientLocation4 = gradientLocations?.[4];
-    const gradientLocation5 = gradientLocations?.[5];
-    const gradientLocation6 = gradientLocations?.[6];
-    const gradientLocation7 = gradientLocations?.[7];
-    const gradientStartX = gradient?.start?.x;
-    const gradientStartY = gradient?.start?.y;
-    const gradientEndX = gradient?.end?.x;
-    const gradientEndY = gradient?.end?.y;
-    const stableShapeOptions = useMemo<QRCodeShapeOptions | undefined>(
-      () =>
-        !hasShapeOptions
-          ? undefined
-          : {
-              layout: shapeOptionsLayout,
-              shape: shapeOptionsShape,
-              eyeFrameShape: shapeOptionsEyeFrameShape,
-              eyeballShape: shapeOptionsEyeballShape,
-              eyePatternShape: shapeOptionsEyePatternShape,
-              gap: shapeOptionsGap,
-              eyePatternGap: shapeOptionsEyePatternGap,
-              bodyDensity: shapeOptionsBodyDensity,
-              cornerRadius: shapeOptionsCornerRadius,
-              eyePatternCornerRadius: shapeOptionsEyePatternCornerRadius,
-              alignmentShape: shapeOptionsAlignmentShape,
-              timingShape: shapeOptionsTimingShape,
-            },
-      [
-        hasShapeOptions,
-        shapeOptionsLayout,
-        shapeOptionsShape,
-        shapeOptionsEyeFrameShape,
-        shapeOptionsEyeballShape,
-        shapeOptionsEyePatternShape,
-        shapeOptionsGap,
-        shapeOptionsEyePatternGap,
-        shapeOptionsBodyDensity,
-        shapeOptionsCornerRadius,
-        shapeOptionsEyePatternCornerRadius,
-        shapeOptionsAlignmentShape,
-        shapeOptionsTimingShape,
-      ],
-    );
-    const stableGradient = useMemo<QRCodeGradient | undefined>(() => {
-      const colors = createGradientColors(
-        gradientColor0,
-        gradientColor1,
-        gradientColor2,
-        gradientColor3,
-        gradientColor4,
-        gradientColor5,
-        gradientColor6,
-        gradientColor7,
-      );
-
-      return colors === undefined
-        ? undefined
-        : {
-            type: gradientType,
-            colors,
-            locations: createGradientLocations(
-              gradientLocation0,
-              gradientLocation1,
-              gradientLocation2,
-              gradientLocation3,
-              gradientLocation4,
-              gradientLocation5,
-              gradientLocation6,
-              gradientLocation7,
-            ),
-            start:
-              gradientStartX === undefined || gradientStartY === undefined
-                ? undefined
-                : { x: gradientStartX, y: gradientStartY },
-            end:
-              gradientEndX === undefined || gradientEndY === undefined
-                ? undefined
-                : { x: gradientEndX, y: gradientEndY },
-          };
-    }, [
-      gradientColor0,
-      gradientColor1,
-      gradientColor2,
-      gradientColor3,
-      gradientColor4,
-      gradientColor5,
-      gradientColor6,
-      gradientColor7,
-      gradientEndX,
-      gradientEndY,
-      gradientLocation0,
-      gradientLocation1,
-      gradientLocation2,
-      gradientLocation3,
-      gradientLocation4,
-      gradientLocation5,
-      gradientLocation6,
-      gradientLocation7,
-      gradientStartX,
-      gradientStartY,
-      gradientType,
-    ]);
+    const stableShapeOptions = useStableValue(shapeOptions);
+    const stableGradient = useStableValue(gradient);
 
     const options = useMemo<QRCodeOptions>(
       () => ({
