@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeSourceSha256": "a01f231d05643ce9c12e702c151165e26cf66e29536e55ec84bf527e88b9b500",
+  "runtimeSourceSha256": "624e9daf39b23ea0ae3ed049ef14766e6334ddb42d6e9dbb5e99f6ae4b5aa1da",
   "runtimeSourceFiles": [
     "apps/example/app.config.js",
     "apps/example/app/_layout.tsx",
@@ -22,6 +22,7 @@
     "apps/example/components/scan-decode.ts",
     "apps/example/metro.config.js",
     "apps/example/package.json",
+    "apps/example/plugins/with-fast-gradle-properties.js",
     "apps/example/plugins/with-gradle-assignment-syntax.js",
     "apps/example/tsconfig.json",
     "bun.lock",
