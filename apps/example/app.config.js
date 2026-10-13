@@ -1,3 +1,13 @@
+const { spawnSync } = require("node:child_process");
+
+const ccacheAvailable =
+  process.env.QRCODE_EXAMPLE_CCACHE !== "0" &&
+  spawnSync("ccache", ["--version"], { stdio: "ignore" }).status === 0;
+
+const androidAbis = process.env.QRCODE_EXAMPLE_ANDROID_ABIS
+  ? process.env.QRCODE_EXAMPLE_ANDROID_ABIS.split(",")
+  : undefined;
+
 module.exports = {
   expo: {
     name: "Nitro QRCode",
@@ -27,7 +37,14 @@ module.exports = {
     },
     plugins: [
       "expo-router",
-      ["expo-build-properties", { ios: { enableSceneSupport: true } }],
+      [
+        "expo-build-properties",
+        {
+          ios: { enableSceneSupport: true, ccacheEnabled: ccacheAvailable },
+          android: androidAbis ? { buildArchs: androidAbis } : {},
+        },
+      ],
+      "./plugins/with-fast-gradle-properties",
       "./plugins/with-gradle-assignment-syntax",
       "react-native-nitro-qrcode",
       "expo-status-bar",

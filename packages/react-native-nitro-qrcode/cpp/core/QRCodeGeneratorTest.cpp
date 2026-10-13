@@ -1,7 +1,9 @@
 #include "QRCodeGenerator.hpp"
 #include "parity-corpus.hpp"
+#include "../tests/TestSupport.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -22,6 +24,9 @@ using NitroQRCode::GenerateOptions;
 using NitroQRCode::parityCorpus;
 using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
+using TestSupport::base64Decode;
+using TestSupport::forEachPngChunk;
+using TestSupport::readU32;
 
 void runQRCodeBridgeOptionsTests();
 void runQRCodeScanTests();
@@ -40,63 +45,16 @@ void assertPngHeader(const std::string &encoded) {
   assert(encoded.rfind("iVBORw0KGgo", 0) == 0);
 }
 
-std::vector<uint8_t> base64Decode(const std::string &encoded) {
-  std::vector<int> values(256, -1);
-  const std::string alphabet =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  for (size_t index = 0; index < alphabet.size(); index++) {
-    values[static_cast<unsigned char>(alphabet[index])] =
-        static_cast<int>(index);
-  }
-
-  std::vector<uint8_t> output;
-  int accumulator = 0;
-  int bits = -8;
-  for (unsigned char character : encoded) {
-    if (character == '=') {
-      break;
-    }
-    const int value = values[character];
-    if (value < 0) {
-      continue;
-    }
-    accumulator = (accumulator << 6) | value;
-    bits += 6;
-    if (bits >= 0) {
-      output.push_back(static_cast<uint8_t>((accumulator >> bits) & 0xFF));
-      bits -= 8;
-    }
-  }
-  return output;
-}
-
-uint32_t readU32(const std::vector<uint8_t> &bytes, size_t offset) {
-  return (static_cast<uint32_t>(bytes[offset]) << 24) |
-         (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
-         static_cast<uint32_t>(bytes[offset + 3]);
-}
-
 void assertPngCrcs(const std::string &encoded) {
   const std::vector<uint8_t> png = base64Decode(encoded);
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const size_t crcOffset = dataOffset + chunkSize;
-    assert(crcOffset + 4 <= png.size());
-
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const size_t typeOffset = chunk.dataOffset - 4;
     uLong crc = ::crc32(0L, Z_NULL, 0);
-    crc = ::crc32(crc, &png[typeOffset], 4 + chunkSize);
-    assert(static_cast<uint32_t>(crc) == readU32(png, crcOffset));
-
-    offset = crcOffset + 4;
-    if (std::string(reinterpret_cast<const char *>(&png[typeOffset]), 4) ==
-        "IEND") {
-      break;
-    }
-  }
+    crc = ::crc32(crc, &png[typeOffset], 4 + chunk.size);
+    assert(static_cast<uint32_t>(crc) ==
+           readU32(png, chunk.dataOffset + chunk.size));
+    return chunk.type != "IEND";
+  });
 }
 
 void appendLegacyCachePart(std::string &request, const std::string &part) {
@@ -132,16 +90,31 @@ std::string legacyCacheRequest(const std::string &value,
     return request;
   }
 
-  appendLegacyCacheNumber(request, options.size);
-  appendLegacyCacheNumber(request, options.quietZone);
+  const auto appendGradient = [&request, &options]() {
+    appendLegacyCachePart(request, options.gradient.type);
+    for (const auto &color : options.gradient.colors) {
+      appendLegacyCacheNumber(request, color.r);
+      appendLegacyCacheNumber(request, color.g);
+      appendLegacyCacheNumber(request, color.b);
+      appendLegacyCacheNumber(request, color.a);
+    }
+    for (double location : options.gradient.locations) {
+      appendLegacyCachePart(request, legacyCacheDouble(location));
+    }
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startX));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
+    appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  };
   if (output == "svg") {
+    appendLegacyCacheNumber(request, options.quietZone);
     appendLegacyCachePart(request, options.foregroundColor);
     appendLegacyCachePart(request, options.backgroundColor);
-    appendLegacyCachePart(request, options.strokeColor);
-    appendLegacyCachePart(request, options.eyeColor);
-    appendLegacyCachePart(request, options.eyeStrokeColor);
-    appendLegacyCachePart(request, options.eyeballColor);
+    appendGradient();
+    return request;
   }
+  appendLegacyCacheNumber(request, options.size);
+  appendLegacyCacheNumber(request, options.quietZone);
   const auto appendColor = [&request](const auto &color) {
     appendLegacyCacheNumber(request, color.r);
     appendLegacyCacheNumber(request, color.g);
@@ -171,20 +144,7 @@ std::string legacyCacheRequest(const std::string &value,
   appendLegacyCachePart(request, options.layout);
   appendLegacyCacheNumber(request, options.logoAreaSize);
   appendLegacyCacheNumber(request, options.logoAreaBorderRadius);
-  appendLegacyCachePart(request, options.gradient.type);
-  for (const auto &color : options.gradient.colors) {
-    appendLegacyCacheNumber(request, color.r);
-    appendLegacyCacheNumber(request, color.g);
-    appendLegacyCacheNumber(request, color.b);
-    appendLegacyCacheNumber(request, color.a);
-  }
-  for (double location : options.gradient.locations) {
-    appendLegacyCachePart(request, legacyCacheDouble(location));
-  }
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startX));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.startY));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endX));
-  appendLegacyCachePart(request, legacyCacheDouble(options.gradient.endY));
+  appendGradient();
   appendLegacyCacheNumber(request, (options.strokeSet ? 1 : 0) |
                                        (options.eyeSet ? 2 : 0) |
                                        (options.eyeStrokeSet ? 4 : 0) |
@@ -218,35 +178,32 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
   std::vector<uint8_t> trns;
   int bitDepth = 8;
   int colorType = 6;
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
-    assert(dataOffset + chunkSize + 4 <= png.size());
-    if (type == "IHDR") {
-      width = static_cast<int>(readU32(png, dataOffset));
-      height = static_cast<int>(readU32(png, dataOffset + 4));
-      bitDepth = png[dataOffset + 8];
-      colorType = png[dataOffset + 9];
-      assert((colorType == 6 && bitDepth == 8) ||
-             (colorType == 3 && (bitDepth == 1 || bitDepth == 2 ||
-                                 bitDepth == 4 || bitDepth == 8)));
-    } else if (type == "PLTE") {
-      palette.assign(png.begin() + dataOffset,
-                     png.begin() + dataOffset + chunkSize);
-    } else if (type == "tRNS") {
-      trns.assign(png.begin() + dataOffset,
-                  png.begin() + dataOffset + chunkSize);
-    } else if (type == "IDAT") {
-      compressed.insert(compressed.end(), png.begin() + dataOffset,
-                        png.begin() + dataOffset + chunkSize);
-    } else if (type == "IEND") {
-      break;
-    }
-    offset = dataOffset + chunkSize + 4;
-  }
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const uint32_t chunkSize = chunk.size;
+    const size_t dataOffset = chunk.dataOffset;
+    const std::string &type = chunk.type;
+      if (type == "IHDR") {
+        width = static_cast<int>(readU32(png, dataOffset));
+        height = static_cast<int>(readU32(png, dataOffset + 4));
+        bitDepth = png[dataOffset + 8];
+        colorType = png[dataOffset + 9];
+        assert((colorType == 6 && bitDepth == 8) ||
+               (colorType == 3 && (bitDepth == 1 || bitDepth == 2 ||
+                                   bitDepth == 4 || bitDepth == 8)));
+      } else if (type == "PLTE") {
+        palette.assign(png.begin() + dataOffset,
+                       png.begin() + dataOffset + chunkSize);
+      } else if (type == "tRNS") {
+        trns.assign(png.begin() + dataOffset,
+                    png.begin() + dataOffset + chunkSize);
+      } else if (type == "IDAT") {
+        compressed.insert(compressed.end(), png.begin() + dataOffset,
+                          png.begin() + dataOffset + chunkSize);
+      } else if (type == "IEND") {
+        return false;
+      }
+    return true;
+  });
 
   const size_t bytesPerPixel = colorType == 6 ? 4 : 1;
   const size_t rowBytes =
@@ -334,32 +291,29 @@ std::vector<uint8_t> decodeIndexedAlphaPng(const std::string &encoded,
   std::vector<uint8_t> palette;
   std::vector<uint8_t> trns;
   std::vector<uint8_t> compressed;
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
-    assert(dataOffset + chunkSize + 4 <= png.size());
-    if (type == "IHDR") {
-      width = static_cast<int>(readU32(png, dataOffset));
-      height = static_cast<int>(readU32(png, dataOffset + 4));
-      assert(png[dataOffset + 8] == 1);
-      assert(png[dataOffset + 9] == 3);
-    } else if (type == "PLTE") {
-      palette.assign(png.begin() + dataOffset,
-                     png.begin() + dataOffset + chunkSize);
-    } else if (type == "tRNS") {
-      trns.assign(png.begin() + dataOffset,
-                  png.begin() + dataOffset + chunkSize);
-    } else if (type == "IDAT") {
-      compressed.insert(compressed.end(), png.begin() + dataOffset,
-                        png.begin() + dataOffset + chunkSize);
-    } else if (type == "IEND") {
-      break;
-    }
-    offset = dataOffset + chunkSize + 4;
-  }
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const uint32_t chunkSize = chunk.size;
+    const size_t dataOffset = chunk.dataOffset;
+    const std::string &type = chunk.type;
+      if (type == "IHDR") {
+        width = static_cast<int>(readU32(png, dataOffset));
+        height = static_cast<int>(readU32(png, dataOffset + 4));
+        assert(png[dataOffset + 8] == 1);
+        assert(png[dataOffset + 9] == 3);
+      } else if (type == "PLTE") {
+        palette.assign(png.begin() + dataOffset,
+                       png.begin() + dataOffset + chunkSize);
+      } else if (type == "tRNS") {
+        trns.assign(png.begin() + dataOffset,
+                    png.begin() + dataOffset + chunkSize);
+      } else if (type == "IDAT") {
+        compressed.insert(compressed.end(), png.begin() + dataOffset,
+                          png.begin() + dataOffset + chunkSize);
+      } else if (type == "IEND") {
+        return false;
+      }
+    return true;
+  });
   assert(palette.size() >= 6);
   assert(trns.size() >= 2);
 
@@ -902,8 +856,8 @@ void setColor(std::string &name, Color &color, const std::string &value) {
 
 void setForeground(GenerateOptions &options, const std::string &foreground) {
   setColor(options.foregroundColor, options.foreground, foreground);
-  setColor(options.alignmentColor, options.alignment, foreground);
-  setColor(options.timingColor, options.timing, foreground);
+  options.alignment = parseColor(foreground);
+  options.timing = parseColor(foreground);
 }
 
 void setExplicitFinderColors(GenerateOptions &options, const std::string &eye,
@@ -1048,14 +1002,14 @@ void testOutputMatchesPreviousRelease() {
   setColor(layered.foregroundColor, layered.foreground, "#DC2626");
   setColor(layered.backgroundColor, layered.background, "#FFFFFF80");
   setExplicitFinderColors(layered, "#1E40AF", "#0F172A");
-  setColor(layered.alignmentColor, layered.alignment, "#00AA00");
-  setColor(layered.timingColor, layered.timing, "#AA00AA");
+  layered.alignment = parseColor("#00AA00");
+  layered.timing = parseColor("#AA00AA");
   layered.alignmentSet = true;
   layered.timingSet = true;
-  setColor(layered.quietZoneColor, layered.quietZoneFill, "#EEEEEE");
-  setColor(layered.finderInnerColor, layered.finderInner, "#FFFF00");
+  layered.quietZoneFill = parseColor("#EEEEEE");
+  layered.finderInner = parseColor("#FFFF00");
   assert(readPngHeader(generator.renderPngBase64(value, layered)).colorType == 3);
-  assert(pixelHash(layered) == 17958135356535734173ULL);
+  assert(pixelHash(layered) == 10701135780977932667ULL);
 
   GenerateOptions stroked;
   stroked.size = 257;
@@ -1065,7 +1019,197 @@ void testOutputMatchesPreviousRelease() {
   setColor(stroked.strokeColor, stroked.stroke, "#0000FF");
   stroked.strokeSet = true;
   setExplicitFinderColors(stroked, "#DC2626", "#DC2626");
-  assert(pixelHash(stroked) == 10899789426982616000ULL);
+  assert(pixelHash(stroked) == 8876103607966326928ULL);
+}
+
+void testGroupedFinderEdgesUseFloorBoundaries() {
+  QRCodeGenerator generator;
+  for (const int size : {100, 200}) {
+    GenerateOptions options;
+    options.size = size;
+    options.quietZone = 4;
+    options.quietZoneFill = parseColor("#00FF00");
+    setExplicitFinderColors(options, "#FF0000", "#FF0000");
+    int width = 0;
+    int height = 0;
+    const auto rgba = decodeRgbaPng(
+        generator.renderPngBase64("https://example.com/finder-color", options),
+        width, height);
+    const int totalModules = 37;
+    const int inner0 = (4 * size) / totalModules;
+    const int inner1 = (11 * size) / totalModules;
+    const auto pixel = [&](int x, int y) {
+      const size_t offset =
+          (static_cast<size_t>(y) * static_cast<size_t>(width) +
+           static_cast<size_t>(x)) *
+          4;
+      return std::array<uint8_t, 3>{rgba[offset], rgba[offset + 1],
+                                    rgba[offset + 2]};
+    };
+    const std::array<uint8_t, 3> red = {255, 0, 0};
+    const std::array<uint8_t, 3> green = {0, 255, 0};
+    const int mid = (inner0 + inner1) / 2;
+    assert(pixel(inner0 - 1, mid) == green);
+    assert(pixel(inner0, mid) == red);
+    assert(pixel(mid, inner0 - 1) == green);
+    assert(pixel(mid, inner0) == red);
+    assert(pixel(inner1 - 1, mid) == red);
+  }
+}
+
+void testTranslucentLayersCompositeOverBackground() {
+  QRCodeGenerator generator;
+  const auto pixelAt = [](const std::vector<uint8_t> &rgba, int width, int x,
+                          int y) {
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) +
+         static_cast<size_t>(x)) *
+        4;
+    return std::array<int, 4>{rgba[offset], rgba[offset + 1],
+                              rgba[offset + 2], rgba[offset + 3]};
+  };
+  const auto near = [](const std::array<int, 4> &actual,
+                       const std::array<int, 4> &expected) {
+    for (size_t index = 0; index < 4; index++) {
+      if (std::abs(actual[index] - expected[index]) > 1) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const int size = 200;
+  const int edge = (4 * size) / 37;
+  const int mid = (edge + (11 * size) / 37) / 2;
+
+  GenerateOptions eye;
+  eye.size = size;
+  setExplicitFinderColors(eye, "#FF000080", "#FF000080");
+  int width = 0;
+  int height = 0;
+  auto rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", eye), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 127, 127, 255}));
+
+  GenerateOptions flat;
+  flat.size = size;
+  setForeground(flat, "#00000080");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", flat), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {127, 127, 127, 255}));
+
+  GenerateOptions overTransparent = flat;
+  overTransparent.backgroundColor = "transparent";
+  overTransparent.background = parseColor("transparent");
+  overTransparent.quietZoneFill = overTransparent.background;
+  overTransparent.finderInner = overTransparent.background;
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                overTransparent),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {0, 0, 0, 128}));
+
+  setExplicitFinderColors(overTransparent, "#00000000", "#00000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                overTransparent),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {0, 0, 0, 0}));
+
+  GenerateOptions stacked;
+  stacked.size = size;
+  setExplicitFinderColors(stacked, "#0000FF80", "#0000FF80");
+  setColor(stacked.eyeStrokeColor, stacked.eyeStroke, "#FF0000");
+  stacked.eyeStrokeSet = true;
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", stacked),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 0, 0, 255}));
+  assert(near(pixelAt(rgba, width, (4 * size) / 37 + 4, mid),
+              {127, 127, 255, 255}));
+
+  setExplicitFinderColors(eye, "#00000000", "#00000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", eye), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 255, 255, 255}));
+}
+
+void testTranslucentBackgroundHoleAndTransparentLayerParity() {
+  QRCodeGenerator generator;
+  const int size = 200;
+  const int total = 37;
+  const int mid = ((4 * size) / total + (11 * size) / total) / 2;
+  const int holeX = (5 * size) / total + 1;
+  const auto pixel = [](const std::vector<uint8_t> &rgba, int width, int x,
+                        int y) {
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) +
+         static_cast<size_t>(x)) *
+        4;
+    return std::array<int, 4>{rgba[offset], rgba[offset + 1],
+                              rgba[offset + 2], rgba[offset + 3]};
+  };
+
+  GenerateOptions options;
+  options.size = size;
+  setColor(options.backgroundColor, options.background, "#FFFFFF80");
+  options.quietZoneFill = options.background;
+  options.finderInner = options.background;
+  setExplicitFinderColors(options, "#FF0000", "#FF0000");
+  int width = 0;
+  int height = 0;
+  auto rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", options),
+      width, height);
+  assert((pixel(rgba, width, holeX, mid) == std::array<int, 4>{255, 255, 255, 128}));
+
+  GenerateOptions transparentLayer = options;
+  setExplicitFinderColors(transparentLayer, "#FF000000", "#FF000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                transparentLayer),
+      width, height);
+  assert((pixel(rgba, width, (4 * size) / total, mid) ==
+          std::array<int, 4>{255, 255, 255, 128}));
+}
+
+void testSvgCacheIgnoresPngOnlyOptions() {
+  QRCodeGenerator generator;
+  GenerateOptions base;
+  const std::string first =
+      generator.generateSvgString("https://example.com/svg-key", base);
+  assert(generator.getCacheSize() == 1);
+
+  GenerateOptions styled = base;
+  styled.size = 321;
+  styled.moduleShape = "circle";
+  styled.eyePatternShape = "rounded";
+  styled.gap = 2;
+  styled.logoAreaSize = 40;
+  setExplicitFinderColors(styled, "#FF0000", "#00FF00");
+  styled.quietZoneFill = parseColor("#CCCCCC");
+  assert(generator.generateSvgString("https://example.com/svg-key", styled) ==
+         first);
+  assert(generator.getCacheSize() == 1);
+
+  GenerateOptions differentBackground = base;
+  setColor(differentBackground.backgroundColor, differentBackground.background,
+           "#EEEEEE");
+  generator.generateSvgString("https://example.com/svg-key",
+                              differentBackground);
+  assert(generator.getCacheSize() == 2);
+
+  GenerateOptions invalid = styled;
+  invalid.gap = 999;
+  bool threw = false;
+  try {
+    generator.generateSvgString("https://example.com/svg-key", invalid);
+  } catch (const std::invalid_argument &) {
+    threw = true;
+  }
+  assert(threw);
 }
 
 void testTransparentBackgroundPng() {
@@ -1075,9 +1219,7 @@ void testTransparentBackgroundPng() {
   options.quietZone = 4;
   options.backgroundColor = "transparent";
   options.background = parseColor("transparent");
-  options.quietZoneColor = "transparent";
   options.quietZoneFill = options.background;
-  options.finderInnerColor = "transparent";
   options.finderInner = options.background;
   const std::string encoded =
       generator.renderPngBase64("https://example.com/transparent", options);
@@ -1271,14 +1413,10 @@ void testRegionTokens() {
   const std::vector<uint8_t> baseline =
       generator.renderPngBytes("https://example.com/regions", options);
 
-  options.alignmentColor = "#CC0000";
-  options.alignment = parseColor(options.alignmentColor);
-  options.timingColor = "#00AA00";
-  options.timing = parseColor(options.timingColor);
-  options.quietZoneColor = "#E2E8F0";
-  options.quietZoneFill = parseColor(options.quietZoneColor);
-  options.finderInnerColor = "#FFF7ED";
-  options.finderInner = parseColor(options.finderInnerColor);
+  options.alignment = parseColor("#CC0000");
+  options.timing = parseColor("#00AA00");
+  options.quietZoneFill = parseColor("#E2E8F0");
+  options.finderInner = parseColor("#FFF7ED");
   options.alignmentShape = "diamond";
   options.timingShape = "circle";
   const std::vector<uint8_t> styled =
@@ -1605,11 +1743,13 @@ void testGradientStopBounds() {
           const double ny = static_cast<double>(y) / (height - 1);
           const double t = type == "linear" ? nx : std::hypot(nx - 0.5, ny - 0.5) / 0.5;
           const double progress = std::clamp((t - 0.3) / 0.5, 0.0, 1.0);
-          const auto expected = static_cast<uint8_t>(std::lround(255 * progress));
-          assert(rgba[offset] == expected);
-          assert(rgba[offset + 1] == expected);
-          assert(rgba[offset + 2] == expected);
-          assert(rgba[offset + 3] == (alpha ? static_cast<uint8_t>(std::lround(64 + 128 * progress)) : 255));
+          const double stopAlpha = alpha ? (64 + 128 * progress) / 255.0 : 1.0;
+          const double expected =
+              255 * progress * stopAlpha + 255 * (1.0 - stopAlpha);
+          for (size_t channel = 0; channel < 3; ++channel) {
+            assert(std::abs(rgba[offset + channel] - expected) <= 2.0);
+          }
+          assert(rgba[offset + 3] == 255);
           if (t <= 0.3) ++before;
           else if (t >= 0.8) ++after;
           else ++interior;
@@ -1678,6 +1818,10 @@ int main() {
   testGradientFillsInheritedLayers();
   testExplicitBlackStrokeMeansNoStroke();
   testOutputMatchesPreviousRelease();
+  testGroupedFinderEdgesUseFloorBoundaries();
+  testTranslucentLayersCompositeOverBackground();
+  testTranslucentBackgroundHoleAndTransparentLayerParity();
+  testSvgCacheIgnoresPngOnlyOptions();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

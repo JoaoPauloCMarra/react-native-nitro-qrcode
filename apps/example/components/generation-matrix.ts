@@ -1,5 +1,6 @@
 import {
   NitroQRCode,
+  PRESET_SHAPE_OPTIONS,
   clearQRCodeCache,
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
@@ -18,7 +19,6 @@ import {
   type QRCodeOptions,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
-import { PRESET_SHAPE_OPTIONS } from "../../../packages/react-native-nitro-qrcode/src/defaults";
 
 const SHAPES: readonly QRCodeBodyShape[] = [
   "square",
@@ -29,21 +29,13 @@ const SHAPES: readonly QRCodeBodyShape[] = [
   "classy",
 ];
 
-export const PRESETS: readonly QRCodePreset[] = [
-  "default",
-  "rounded",
-  "dots",
-  "branded",
-  "classy",
-  "mosaic",
-  "fluid",
-];
+export const PRESETS = Object.keys(PRESET_SHAPE_OPTIONS) as QRCodePreset[];
 
-export const ECLS = ["L", "M", "Q", "H"] as const;
-export const DENSITIES = ["sparse", "balanced", "dense"] as const;
-export const COLOR_MODES = ["solid", "linear", "radial"] as const;
-export const CACHE_MAX_ENTRIES = 128;
-export const CACHE_MAX_BYTES = 4 * 1024 * 1024;
+const ECLS = ["L", "M", "Q", "H"] as const;
+const DENSITIES = ["sparse", "balanced", "dense"] as const;
+const COLOR_MODES = ["solid", "linear", "radial"] as const;
+const CACHE_MAX_ENTRIES = 128;
+const CACHE_MAX_BYTES = 4 * 1024 * 1024;
 
 export type ComboGroup = "shapes" | "core" | "errors";
 
@@ -148,7 +140,7 @@ function applyColorMode(
   return options;
 }
 
-export function buildGenerationCases(): ComboCase[] {
+function buildGenerationCases(): ComboCase[] {
   const cases: ComboCase[] = [];
 
   for (const shape of SHAPES) {
@@ -676,4 +668,3 @@ export async function runComboSweep(
   };
 }
 
-export type { QRCodeBodyShape };

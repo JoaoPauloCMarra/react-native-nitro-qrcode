@@ -46,7 +46,7 @@ describe("bounded cache", () => {
     for (let index = 0; index < 6; index++) {
       byBytes.set(`key-${index}`, `request-${index}`, "123456");
     }
-    expect(byBytes.size()).toBeLessThanOrEqual(3);
+    expect(byBytes.size()).toBe(3);
 
     const byCount = createBoundedCache<string>(3, 1024, () => 1);
     for (let index = 0; index < 10; index++) {

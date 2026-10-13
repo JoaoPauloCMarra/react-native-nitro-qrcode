@@ -23,11 +23,9 @@ const mode = process.argv[2];
 try {
   if (mode === "prepare") lifecycle.prepare();
   else if (mode === "cleanup") lifecycle.cleanup();
-  else if (mode === "sync") lifecycle.sync();
-  else if (mode === "--check") lifecycle.check();
   else
     throw new LifecycleError(
-      "Usage: node scripts/sync-package-docs.js <prepare|cleanup|sync|--check>",
+      "Usage: node scripts/sync-package-docs.js <prepare|cleanup>",
     );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

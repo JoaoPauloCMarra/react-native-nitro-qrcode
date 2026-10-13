@@ -83,6 +83,10 @@ export type QRCodeShapeOptions = {
   timingShape?: QRCodeBodyShape;
 };
 
+export type NormalizedShapeOptions = Required<
+  Omit<QRCodeShapeOptions, "eyePatternShape">
+>;
+
 export type QRCodeGradientType = "linear" | "radial";
 
 export type QRCodeGradientPoint = {
@@ -232,7 +236,7 @@ export type NormalizedOptions = Required<
 > & {
   errorCorrectionLevel: "L" | "M" | "Q" | "H";
   scanSafe: false | "standard" | "strict";
-  shapeOptions: Required<QRCodeShapeOptions>;
+  shapeOptions: NormalizedShapeOptions;
   gradient: NormalizedGradient;
   explicitColors: NormalizedExplicitColors;
 };
@@ -334,7 +338,7 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
     32,
   );
   const requestedEcl = normalizeEcl(
-    options.errorCorrectionLevel ?? DEFAULT_ECL,
+    options.errorCorrectionLevel ?? (logoAreaSize > 0 ? "H" : DEFAULT_ECL),
   );
   const quietZone =
     scanSafe === false
@@ -457,7 +461,7 @@ export function normalizeGradient(
 
 export function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
-): Required<QRCodeShapeOptions> {
+): NormalizedShapeOptions {
   const shape = sanitizeShape(options?.shape, "shape");
   return {
     layout: sanitizeLayout(options?.layout),
@@ -466,9 +470,6 @@ export function normalizeShapeOptions(
       options?.eyeFrameShape ?? options?.eyePatternShape,
     ),
     eyeballShape: sanitizeEyeballShape(options?.eyeballShape),
-    eyePatternShape: sanitizeEyeFrameShape(
-      options?.eyeFrameShape ?? options?.eyePatternShape,
-    ),
     gap: sanitizeInteger(options?.gap, 0, "gap", 0, 256),
     eyePatternGap: sanitizeInteger(
       options?.eyePatternGap,

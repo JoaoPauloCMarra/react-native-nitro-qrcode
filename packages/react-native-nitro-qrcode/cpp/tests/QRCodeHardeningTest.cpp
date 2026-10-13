@@ -1,6 +1,7 @@
 #include "BoundedCache.hpp"
 #include "QRCodeBridgeOptions.hpp"
 #include "QRCodeGenerator.hpp"
+#include "TestSupport.hpp"
 #include "qrcodegen.hpp"
 
 #include <algorithm>
@@ -24,27 +25,15 @@ extern "C" {
 #include "quirc.h"
 }
 
-std::vector<uint8_t> decodePngBase64ToRgba(const std::string &encoded,
-                                           int &width, int &height);
-
 using NitroQRCode::BoundedCache;
 using NitroQRCode::Color;
 using NitroQRCode::GenerateOptions;
 using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
+using TestSupport::expectThrow;
+using TestSupport::readU32;
 
 namespace {
-
-template <typename Exception>
-std::string expectThrow(const std::function<void()> &callback) {
-  try {
-    callback();
-  } catch (const Exception &error) {
-    return error.what();
-  }
-  assert(false && "expected exception was not thrown");
-  return {};
-}
 
 bool startsWith(const std::string &value, const std::string &prefix) {
   return value.rfind(prefix, 0) == 0;
@@ -804,13 +793,6 @@ void testReturnedPngDoesNotRetainEncoderCapacity() {
   assert(direct.capacity() <= direct.size() * 2);
 }
 
-uint32_t readBigEndian32(const std::vector<uint8_t> &bytes, size_t offset) {
-  return (static_cast<uint32_t>(bytes[offset]) << 24) |
-         (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
-         static_cast<uint32_t>(bytes[offset + 3]);
-}
-
 size_t assertStreamedRgbaPngStructure(const std::vector<uint8_t> &png,
                                       int expectedSize) {
   const std::vector<uint8_t> signature = {137, 80, 78, 71, 13, 10, 26, 10};
@@ -818,35 +800,34 @@ size_t assertStreamedRgbaPngStructure(const std::vector<uint8_t> &png,
   assert(std::equal(signature.begin(), signature.end(), png.begin()));
   std::vector<std::string> types;
   size_t idatBytes = 0;
-  size_t offset = signature.size();
-  while (offset < png.size()) {
-    assert(offset + 12 <= png.size());
-    const size_t length = readBigEndian32(png, offset);
-    assert(offset + 12 + length <= png.size());
-    const std::string type(reinterpret_cast<const char *>(&png[offset + 4]), 4);
-    const uint32_t expectedCrc = static_cast<uint32_t>(
-        crc32(crc32(0L, Z_NULL, 0), &png[offset + 4],
-              static_cast<uInt>(length + 4)));
-    assert(readBigEndian32(png, offset + 8 + length) == expectedCrc);
-    if (type == "IHDR") {
-      assert(length == 13);
-      assert(readBigEndian32(png, offset + 8) ==
-             static_cast<uint32_t>(expectedSize));
-      assert(readBigEndian32(png, offset + 12) ==
-             static_cast<uint32_t>(expectedSize));
-      assert(png[offset + 16] == 8 && png[offset + 17] == 6);
-      assert(png[offset + 18] == 0 && png[offset + 19] == 0 &&
-             png[offset + 20] == 0);
-    } else if (type == "IDAT") {
-      assert(length > 0 && length <= 64 * 1024);
-      idatBytes += length;
-    } else {
-      assert(type == "IEND" && length == 0);
-    }
-    types.push_back(type);
-    offset += 12 + length;
-  }
-  assert(offset == png.size());
+  const size_t end = TestSupport::forEachPngChunk(
+      png, [&](const TestSupport::PngChunk &chunk) {
+        const size_t offset = chunk.dataOffset - 8;
+        const size_t length = chunk.size;
+        const std::string &type = chunk.type;
+        const uint32_t expectedCrc = static_cast<uint32_t>(
+            crc32(crc32(0L, Z_NULL, 0), &png[offset + 4],
+                  static_cast<uInt>(length + 4)));
+        assert(readU32(png, offset + 8 + length) == expectedCrc);
+        if (type == "IHDR") {
+          assert(length == 13);
+          assert(readU32(png, offset + 8) ==
+                 static_cast<uint32_t>(expectedSize));
+          assert(readU32(png, offset + 12) ==
+                 static_cast<uint32_t>(expectedSize));
+          assert(png[offset + 16] == 8 && png[offset + 17] == 6);
+          assert(png[offset + 18] == 0 && png[offset + 19] == 0 &&
+                 png[offset + 20] == 0);
+        } else if (type == "IDAT") {
+          assert(length > 0 && length <= 64 * 1024);
+          idatBytes += length;
+        } else {
+          assert(type == "IEND" && length == 0);
+        }
+        types.push_back(type);
+        return true;
+      });
+  assert(end == png.size());
   assert(types.size() >= 3);
   assert(types.front() == "IHDR" && types.back() == "IEND");
   for (size_t index = 1; index + 1 < types.size(); index++) {

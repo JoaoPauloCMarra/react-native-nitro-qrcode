@@ -1,5 +1,6 @@
 #include "BoundedCache.hpp"
 #include "QRCodeGenerator.hpp"
+#include "TestSupport.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -14,9 +15,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-std::vector<uint8_t> decodePngBase64ToRgba(const std::string &encoded,
-                                           int &width, int &height);
 
 namespace {
 

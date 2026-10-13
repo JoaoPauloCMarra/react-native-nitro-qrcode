@@ -15,6 +15,7 @@ import {
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
   getQRCodeMetrics,
+  PRESET_SHAPE_OPTIONS,
   QRCode,
   toPngBase64Async,
   toPngDataUri,
@@ -35,73 +36,13 @@ import {
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { E2eGate } from "../components/e2e-gate";
+import { PRESETS } from "../components/generation-matrix";
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
 const APP_ICON = require("../assets/icon.png");
 const PAYLOAD_INITIAL_SELECTION = { start: 0, end: 0 };
 const CONFIG_TABS = ["looks", "color", "shapes", "logo"] as const;
-const LOOK_PRESETS = [
-  "default",
-  "rounded",
-  "dots",
-  "branded",
-  "classy",
-  "mosaic",
-  "fluid",
-] as const satisfies readonly QRCodePreset[];
-const LOOK_SHAPES: Record<
-  (typeof LOOK_PRESETS)[number],
-  {
-    bodyShape: QRCodeBodyShape;
-    eyeFrameShape: QRCodeEyeFrameShape;
-    eyeballShape: QRCodeEyeBallShape;
-    bodyDensity: QRCodeBodyDensity;
-  }
-> = {
-  default: {
-    bodyShape: "square",
-    eyeFrameShape: "square",
-    eyeballShape: "square",
-    bodyDensity: "dense",
-  },
-  rounded: {
-    bodyShape: "rounded",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  dots: {
-    bodyShape: "circle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    bodyDensity: "dense",
-  },
-  branded: {
-    bodyShape: "rounded",
-    eyeFrameShape: "square",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  classy: {
-    bodyShape: "classy",
-    eyeFrameShape: "rounded",
-    eyeballShape: "rounded",
-    bodyDensity: "dense",
-  },
-  mosaic: {
-    bodyShape: "diamond",
-    eyeFrameShape: "rounded",
-    eyeballShape: "circle",
-    bodyDensity: "balanced",
-  },
-  fluid: {
-    bodyShape: "squircle",
-    eyeFrameShape: "circle",
-    eyeballShape: "circle",
-    bodyDensity: "sparse",
-  },
-};
 const LOGO_PADDING_PRESETS = ["none", "small", "medium", "large"] as const;
 const BODY_DENSITIES = ["sparse", "balanced", "dense"] as const;
 const BODY_SHAPES = [
@@ -162,54 +103,78 @@ const DEFAULT_BACKGROUND_CONFIG: BackgroundConfig = {
   color: "#FFFFFF",
 };
 
-const DEFAULT_STROKE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#111827",
-};
+type LayerColorKey =
+  | "strokeColor"
+  | "eyeColor"
+  | "eyeStrokeColor"
+  | "eyeballColor"
+  | "alignmentColor"
+  | "timingColor"
+  | "finderInnerColor"
+  | "quietZoneColor";
 
-const DEFAULT_EYE_CONFIG: SolidColorConfig = {
-  enabled: true,
-  color: "#1E40AF",
-};
+const LAYER_COLOR_FIELDS: readonly {
+  key: LayerColorKey;
+  label: string;
+  fallback: QRCodeColor;
+  defaults: SolidColorConfig;
+}[] = [
+  {
+    key: "strokeColor",
+    label: "Custom stroke color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#111827" },
+  },
+  {
+    key: "eyeColor",
+    label: "Custom eye color",
+    fallback: "#000000",
+    defaults: { enabled: true, color: "#1E40AF" },
+  },
+  {
+    key: "eyeStrokeColor",
+    label: "Custom eye stroke color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#020617" },
+  },
+  {
+    key: "eyeballColor",
+    label: "Custom eyeball color",
+    fallback: "#000000",
+    defaults: { enabled: true, color: "#0F172A" },
+  },
+  {
+    key: "alignmentColor",
+    label: "Custom alignment color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#B45309" },
+  },
+  {
+    key: "timingColor",
+    label: "Custom timing color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#0F766E" },
+  },
+  {
+    key: "finderInnerColor",
+    label: "Custom finder inner color",
+    fallback: "#FFFFFF",
+    defaults: { enabled: false, color: "#FFF7ED" },
+  },
+  {
+    key: "quietZoneColor",
+    label: "Custom quiet-zone color",
+    fallback: "#FFFFFF",
+    defaults: { enabled: false, color: "#E2E8F0" },
+  },
+];
 
-const DEFAULT_EYE_STROKE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#020617",
-};
+type LayerColorConfigs = Record<LayerColorKey, SolidColorConfig>;
+type LayerColors = Partial<Record<LayerColorKey, QRCodeColor>>;
 
-const DEFAULT_EYEBALL_CONFIG: SolidColorConfig = {
-  enabled: true,
-  color: "#0F172A",
-};
-
-const DEFAULT_ALIGNMENT_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#B45309",
-};
-
-const DEFAULT_TIMING_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#0F766E",
-};
-
-const DEFAULT_QUIET_ZONE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#E2E8F0",
-};
-
-const DEFAULT_FINDER_INNER_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#FFF7ED",
-};
-
-const DEFAULT_SHAPE_OPTIONS: QRCodeShapeOptions = {
-  shape: "square",
-  eyeFrameShape: "square",
-  eyeballShape: "square",
-  bodyDensity: "dense",
-  gap: 0,
-  eyePatternGap: 0,
-};
+const DEFAULT_LAYER_CONFIGS = Object.fromEntries(
+  LAYER_COLOR_FIELDS.map((field) => [field.key, field.defaults]),
+) as LayerColorConfigs;
 
 const LOGO_PADDING_CONFIG: Record<LogoPaddingPreset, number> = {
   none: 0,
@@ -230,28 +195,8 @@ export default function DemoScreen() {
   const [backgroundConfig, setBackgroundConfig] = useState<BackgroundConfig>(
     DEFAULT_BACKGROUND_CONFIG,
   );
-  const [strokeConfig, setStrokeConfig] = useState<SolidColorConfig>(
-    DEFAULT_STROKE_CONFIG,
-  );
-  const [eyeConfig, setEyeConfig] =
-    useState<SolidColorConfig>(DEFAULT_EYE_CONFIG);
-  const [eyeStrokeConfig, setEyeStrokeConfig] = useState<SolidColorConfig>(
-    DEFAULT_EYE_STROKE_CONFIG,
-  );
-  const [eyeballConfig, setEyeballConfig] = useState<SolidColorConfig>(
-    DEFAULT_EYEBALL_CONFIG,
-  );
-  const [alignmentConfig, setAlignmentConfig] = useState<SolidColorConfig>(
-    DEFAULT_ALIGNMENT_CONFIG,
-  );
-  const [timingConfig, setTimingConfig] = useState<SolidColorConfig>(
-    DEFAULT_TIMING_CONFIG,
-  );
-  const [quietZoneConfig, setQuietZoneConfig] = useState<SolidColorConfig>(
-    DEFAULT_QUIET_ZONE_CONFIG,
-  );
-  const [finderInnerConfig, setFinderInnerConfig] = useState<SolidColorConfig>(
-    DEFAULT_FINDER_INNER_CONFIG,
+  const [layerConfigs, setLayerConfigs] = useState<LayerColorConfigs>(
+    DEFAULT_LAYER_CONFIGS,
   );
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("looks");
   const [look, setLook] = useState<QRCodePreset>("classy");
@@ -288,7 +233,8 @@ export default function DemoScreen() {
 
   const shapeOptions = useMemo<QRCodeShapeOptions>(
     () =>
-      resolveShapeOptions({
+      resolveShapeOverrides({
+        look,
         bodyShape,
         eyeFrameShape,
         eyeballShape,
@@ -296,34 +242,22 @@ export default function DemoScreen() {
         alignmentShape,
         timingShape,
       }),
-    [alignmentShape, bodyDensity, bodyShape, eyeFrameShape, eyeballShape, timingShape],
+    [
+      alignmentShape,
+      bodyDensity,
+      bodyShape,
+      eyeFrameShape,
+      eyeballShape,
+      look,
+      timingShape,
+    ],
   );
   const foregroundColor = resolveForegroundColor(foregroundConfig);
   const backgroundColor = resolveBackgroundColor(backgroundConfig);
-  const strokeColor = strokeConfig.enabled
-    ? resolveSolidColor(strokeConfig, "#000000")
-    : undefined;
-  const eyeColor = eyeConfig.enabled
-    ? resolveSolidColor(eyeConfig, "#000000")
-    : undefined;
-  const eyeStrokeColor = eyeStrokeConfig.enabled
-    ? resolveSolidColor(eyeStrokeConfig, "#000000")
-    : undefined;
-  const eyeballColor = eyeballConfig.enabled
-    ? resolveSolidColor(eyeballConfig, "#000000")
-    : undefined;
-  const alignmentColor = alignmentConfig.enabled
-    ? resolveSolidColor(alignmentConfig, "#000000")
-    : undefined;
-  const timingColor = timingConfig.enabled
-    ? resolveSolidColor(timingConfig, "#000000")
-    : undefined;
-  const quietZoneColor = quietZoneConfig.enabled
-    ? resolveSolidColor(quietZoneConfig, "#FFFFFF")
-    : undefined;
-  const finderInnerColor = finderInnerConfig.enabled
-    ? resolveSolidColor(finderInnerConfig, "#FFFFFF")
-    : undefined;
+  const layerColors = useMemo(
+    () => resolveLayerColors(layerConfigs),
+    [layerConfigs],
+  );
   const gradient = useMemo(
     () => resolveGradient(foregroundConfig),
     [foregroundConfig],
@@ -340,35 +274,22 @@ export default function DemoScreen() {
       errorCorrectionLevel: showLogo ? "H" : "M",
       foregroundColor,
       backgroundColor,
-      strokeColor,
-      eyeColor,
-      eyeStrokeColor,
-      eyeballColor,
-      alignmentColor,
-      timingColor,
-      quietZoneColor,
-      finderInnerColor,
+      ...layerColors,
       gradient,
-      shapeOptions,
+      shapeOptions: { ...PRESET_SHAPE_OPTIONS[look], ...shapeOptions },
       logoAreaSize,
       logoAreaBorderRadius,
     }),
     [
-      alignmentColor,
       backgroundColor,
-      eyeballColor,
-      eyeColor,
-      eyeStrokeColor,
-      finderInnerColor,
       foregroundColor,
       gradient,
+      layerColors,
       logoAreaBorderRadius,
       logoAreaSize,
-      quietZoneColor,
+      look,
       shapeOptions,
       showLogo,
-      strokeColor,
-      timingColor,
       value,
     ],
   );
@@ -450,14 +371,7 @@ export default function DemoScreen() {
                     errorCorrectionLevel={showLogo ? "H" : "M"}
                     foregroundColor={foregroundColor}
                     backgroundColor={backgroundColor}
-                    strokeColor={strokeColor}
-                    eyeColor={eyeColor}
-                    eyeStrokeColor={eyeStrokeColor}
-                    eyeballColor={eyeballColor}
-                    alignmentColor={alignmentColor}
-                    timingColor={timingColor}
-                    quietZoneColor={quietZoneColor}
-                    finderInnerColor={finderInnerColor}
+                    {...layerColors}
                     gradient={gradient}
                     shapeOptions={shapeOptions}
                     logoAreaSize={logoAreaSize}
@@ -647,12 +561,12 @@ export default function DemoScreen() {
               <LooksConfigPanel
                 look={look}
                 onLookChange={(nextLook) => {
-                  const next = LOOK_SHAPES[nextLook];
+                  const next = PRESET_SHAPE_OPTIONS[nextLook];
                   setLook(nextLook);
-                  setBodyShape(next.bodyShape);
-                  setEyeFrameShape(next.eyeFrameShape);
-                  setEyeballShape(next.eyeballShape);
-                  setBodyDensity(next.bodyDensity);
+                  setBodyShape(next.shape ?? "square");
+                  setEyeFrameShape(next.eyeFrameShape ?? "square");
+                  setEyeballShape(next.eyeballShape ?? "square");
+                  setBodyDensity(next.bodyDensity ?? "dense");
                 }}
               />
             ) : null}
@@ -660,24 +574,12 @@ export default function DemoScreen() {
               <ColorConfigPanel
                 foregroundConfig={foregroundConfig}
                 backgroundConfig={backgroundConfig}
-                strokeConfig={strokeConfig}
-                eyeConfig={eyeConfig}
-                eyeStrokeConfig={eyeStrokeConfig}
-                eyeballConfig={eyeballConfig}
-                alignmentConfig={alignmentConfig}
-                timingConfig={timingConfig}
-                quietZoneConfig={quietZoneConfig}
-                finderInnerConfig={finderInnerConfig}
+                layerConfigs={layerConfigs}
                 onForegroundChange={setForegroundConfig}
                 onBackgroundChange={setBackgroundConfig}
-                onStrokeChange={setStrokeConfig}
-                onEyeChange={setEyeConfig}
-                onEyeStrokeChange={setEyeStrokeConfig}
-                onEyeballChange={setEyeballConfig}
-                onAlignmentChange={setAlignmentConfig}
-                onTimingChange={setTimingConfig}
-                onQuietZoneChange={setQuietZoneConfig}
-                onFinderInnerChange={setFinderInnerConfig}
+                onLayerChange={(key, config) => {
+                  setLayerConfigs((current) => ({ ...current, [key]: config }));
+                }}
               />
             ) : null}
             {activeConfigTab === "shapes" ? (
@@ -762,45 +664,17 @@ function ConfigTabs({
 function ColorConfigPanel({
   foregroundConfig,
   backgroundConfig,
-  strokeConfig,
-  eyeConfig,
-  eyeStrokeConfig,
-  eyeballConfig,
-  alignmentConfig,
-  timingConfig,
-  quietZoneConfig,
-  finderInnerConfig,
+  layerConfigs,
   onForegroundChange,
   onBackgroundChange,
-  onStrokeChange,
-  onEyeChange,
-  onEyeStrokeChange,
-  onEyeballChange,
-  onAlignmentChange,
-  onTimingChange,
-  onQuietZoneChange,
-  onFinderInnerChange,
+  onLayerChange,
 }: {
   foregroundConfig: ForegroundConfig;
   backgroundConfig: BackgroundConfig;
-  strokeConfig: SolidColorConfig;
-  eyeConfig: SolidColorConfig;
-  eyeStrokeConfig: SolidColorConfig;
-  eyeballConfig: SolidColorConfig;
-  alignmentConfig: SolidColorConfig;
-  timingConfig: SolidColorConfig;
-  quietZoneConfig: SolidColorConfig;
-  finderInnerConfig: SolidColorConfig;
+  layerConfigs: LayerColorConfigs;
   onForegroundChange: (value: ForegroundConfig) => void;
   onBackgroundChange: (value: BackgroundConfig) => void;
-  onStrokeChange: (value: SolidColorConfig) => void;
-  onEyeChange: (value: SolidColorConfig) => void;
-  onEyeStrokeChange: (value: SolidColorConfig) => void;
-  onEyeballChange: (value: SolidColorConfig) => void;
-  onAlignmentChange: (value: SolidColorConfig) => void;
-  onTimingChange: (value: SolidColorConfig) => void;
-  onQuietZoneChange: (value: SolidColorConfig) => void;
-  onFinderInnerChange: (value: SolidColorConfig) => void;
+  onLayerChange: (key: LayerColorKey, value: SolidColorConfig) => void;
 }) {
   return (
     <View style={styles.builderPanel}>
@@ -865,53 +739,16 @@ function ColorConfigPanel({
         )}
       </ColorSection>
 
-      <SolidColorSection
-        config={strokeConfig}
-        label="Custom stroke color"
-        onChange={onStrokeChange}
-      />
-
-      <SolidColorSection
-        config={eyeConfig}
-        label="Custom eye color"
-        onChange={onEyeChange}
-      />
-
-      <SolidColorSection
-        config={eyeStrokeConfig}
-        label="Custom eye stroke color"
-        onChange={onEyeStrokeChange}
-      />
-
-      <SolidColorSection
-        config={eyeballConfig}
-        label="Custom eyeball color"
-        onChange={onEyeballChange}
-      />
-
-      <SolidColorSection
-        config={alignmentConfig}
-        label="Custom alignment color"
-        onChange={onAlignmentChange}
-      />
-
-      <SolidColorSection
-        config={timingConfig}
-        label="Custom timing color"
-        onChange={onTimingChange}
-      />
-
-      <SolidColorSection
-        config={finderInnerConfig}
-        label="Custom finder inner color"
-        onChange={onFinderInnerChange}
-      />
-
-      <SolidColorSection
-        config={quietZoneConfig}
-        label="Custom quiet-zone color"
-        onChange={onQuietZoneChange}
-      />
+      {LAYER_COLOR_FIELDS.map((field) => (
+        <SolidColorSection
+          key={field.key}
+          config={layerConfigs[field.key]}
+          label={field.label}
+          onChange={(config) => {
+            onLayerChange(field.key, config);
+          }}
+        />
+      ))}
 
       <ColorSection
         checked={backgroundConfig.enabled}
@@ -979,7 +816,7 @@ function LooksConfigPanel({
     <View style={styles.builderPanel}>
       <ControlGroup label="Modern looks">
         <View style={styles.shapeGrid}>
-          {LOOK_PRESETS.map((option) => {
+          {PRESETS.map((option) => {
             const selected = option === look;
             return (
               <Pressable
@@ -1439,7 +1276,8 @@ function getDensityLabel(value: QRCodeBodyDensity): string {
   return "Dense";
 }
 
-function resolveShapeOptions({
+function resolveShapeOverrides({
+  look,
   bodyShape,
   eyeFrameShape,
   eyeballShape,
@@ -1447,6 +1285,7 @@ function resolveShapeOptions({
   alignmentShape,
   timingShape,
 }: {
+  look: QRCodePreset;
   bodyShape: QRCodeBodyShape;
   eyeFrameShape: QRCodeEyeFrameShape;
   eyeballShape: QRCodeEyeBallShape;
@@ -1454,21 +1293,18 @@ function resolveShapeOptions({
   alignmentShape: RegionShapeChoice;
   timingShape: RegionShapeChoice;
 }): QRCodeShapeOptions {
+  const preset = PRESET_SHAPE_OPTIONS[look];
   return {
-    shape: bodyShape,
-    eyeFrameShape,
-    eyeballShape,
-    alignmentShape:
-      alignmentShape === "match" ? undefined : alignmentShape,
-    timingShape: timingShape === "match" ? undefined : timingShape,
-    bodyDensity,
-    gap: 0,
-    eyePatternGap: 0,
-    cornerRadius: DEFAULT_SHAPE_OPTIONS.cornerRadius,
-    eyePatternCornerRadius:
-      eyeFrameShape !== "square" || eyeballShape !== "square"
-        ? undefined
-        : DEFAULT_SHAPE_OPTIONS.eyePatternCornerRadius,
+    ...(bodyShape !== (preset.shape ?? "square") ? { shape: bodyShape } : {}),
+    ...(eyeFrameShape !== (preset.eyeFrameShape ?? "square")
+      ? { eyeFrameShape }
+      : {}),
+    ...(eyeballShape !== (preset.eyeballShape ?? "square")
+      ? { eyeballShape }
+      : {}),
+    ...(bodyDensity !== (preset.bodyDensity ?? "dense") ? { bodyDensity } : {}),
+    ...(alignmentShape === "match" ? {} : { alignmentShape }),
+    ...(timingShape === "match" ? {} : { timingShape }),
   };
 }
 
@@ -1484,6 +1320,17 @@ function resolveBackgroundColor(config: BackgroundConfig): QRCodeBackgroundColor
     return "#FFFFFF";
   }
   return resolveHexColor(config.color, "#FFFFFF");
+}
+
+function resolveLayerColors(configs: LayerColorConfigs): LayerColors {
+  const colors: LayerColors = {};
+  for (const field of LAYER_COLOR_FIELDS) {
+    const config = configs[field.key];
+    if (config.enabled) {
+      colors[field.key] = resolveSolidColor(config, field.fallback);
+    }
+  }
+  return colors;
 }
 
 function resolveSolidColor(

@@ -37,15 +37,12 @@ namespace margelo::nitro::NitroQRCode {
   options.eye = ::NitroQRCode::parseColor(eyeColor);
   options.eyeStroke = ::NitroQRCode::parseColor(eyeStrokeColor);
   options.eyeball = ::NitroQRCode::parseColor(eyeballColor);
-  constexpr ::NitroQRCode::Color legacyUnset = {0, 0, 0, 255};
+  const ::NitroQRCode::Color legacyUnset =
+      ::NitroQRCode::parseColor(LegacyUnsetColor);
   options.strokeSet = options.stroke != legacyUnset;
   options.eyeSet = options.eye != legacyUnset;
   options.eyeStrokeSet = options.eyeStroke != legacyUnset;
   options.eyeballSet = options.eyeball != legacyUnset;
-  options.alignmentColor = foregroundColor;
-  options.timingColor = foregroundColor;
-  options.quietZoneColor = backgroundColor;
-  options.finderInnerColor = backgroundColor;
   options.alignment = options.foreground;
   options.timing = options.foreground;
   options.quietZoneFill = options.background;
@@ -83,12 +80,58 @@ namespace margelo::nitro::NitroQRCode {
 }
 
 ::NitroQRCode::GenerateOptions
+makeGenerateOptions(const GenerateOptions &options) {
+  auto resolved = makeGenerateOptions(
+      options.size, options.quietZone, options.errorCorrectionLevel,
+      options.foregroundColor, options.backgroundColor,
+      options.strokeColor.value_or(LegacyUnsetColor),
+      options.eyeColor.value_or(LegacyUnsetColor),
+      options.eyeStrokeColor.value_or(LegacyUnsetColor),
+      options.eyeballColor.value_or(LegacyUnsetColor),
+      options.minVersion, options.maxVersion, options.mask, options.boostEcl,
+      options.moduleShape, options.eyePatternShape, options.eyeballShape,
+      options.gap, options.eyePatternGap, options.bodyDensity,
+      options.cornerRadius, options.eyePatternCornerRadius, options.layout,
+      options.logoAreaSize, options.logoAreaBorderRadius,
+      options.gradientType, options.gradientColors, options.gradientLocations,
+      options.gradientStartX, options.gradientStartY, options.gradientEndX,
+      options.gradientEndY);
+  resolved.strokeSet = options.strokeColor.has_value();
+  resolved.eyeSet = options.eyeColor.has_value();
+  resolved.eyeStrokeSet = options.eyeStrokeColor.has_value();
+  resolved.eyeballSet = options.eyeballColor.has_value();
+  if (options.alignmentColor.has_value()) {
+    resolved.alignmentSet = true;
+    resolved.alignment = ::NitroQRCode::parseColor(*options.alignmentColor);
+  }
+  if (options.timingColor.has_value()) {
+    resolved.timingSet = true;
+    resolved.timing = ::NitroQRCode::parseColor(*options.timingColor);
+  }
+  if (options.quietZoneColor.has_value()) {
+    resolved.quietZoneFill =
+        ::NitroQRCode::parseColor(*options.quietZoneColor);
+  }
+  if (options.finderInnerColor.has_value()) {
+    resolved.finderInner =
+        ::NitroQRCode::parseColor(*options.finderInnerColor);
+  }
+  if (options.alignmentShape.has_value()) {
+    resolved.alignmentShape = *options.alignmentShape;
+  }
+  if (options.timingShape.has_value()) {
+    resolved.timingShape = *options.timingShape;
+  }
+  return resolved;
+}
+
+::NitroQRCode::GenerateOptions
 makeMatrixOptions(const std::string &errorCorrectionLevel, double minVersion,
                   double maxVersion, double mask, bool boostEcl) {
   return makeGenerateOptions(512, 4, errorCorrectionLevel, "#000000",
-                             "#FFFFFF", "#000000", "#000000", "#000000",
-                             "#000000", minVersion, maxVersion, mask,
-                             boostEcl);
+                             "#FFFFFF", LegacyUnsetColor, LegacyUnsetColor,
+                             LegacyUnsetColor, LegacyUnsetColor, minVersion,
+                             maxVersion, mask, boostEcl);
 }
 
 int toBridgeInt(double value, const char *name) {

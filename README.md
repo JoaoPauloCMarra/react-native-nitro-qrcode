@@ -63,7 +63,7 @@ Supports React Native 0.77 or newer and Expo SDK 53 or newer (the
 Expo SDK 57.
 
 The current example and package gate use React Native `0.86.3` and Expo SDK 57
-(`expo@~57.0.26`).
+(`expo@~57.0.28`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
 Strict TypeScript compatibility. Expo SDK 57 selects React Native `0.86.3`; do
 not override that version in the example. The baseline uses React `19.2.3` and
@@ -350,6 +350,8 @@ Generation input bounds:
 
 Undefined component props do not erase preset defaults. Explicit values, including zero radii, override the preset. Native gradients use the first or last stop color outside the declared stop range.
 
+`PRESET_SHAPE_OPTIONS` exports the read-only shape table behind each `preset` name (a frozen `Record<QRCodePreset, QRCodeShapeOptions>`). Use it to seed a builder UI or to spread a preset into `shapeOptions` for the imperative helpers, which take no `preset` option: `shapeOptions: { ...PRESET_SHAPE_OPTIONS.dots, gap: 0 }`.
+
 Option loss and platform differences:
 
 - **SVG output** encodes the matrix with quiet zone, background, foreground,
@@ -372,6 +374,13 @@ Option loss and platform differences:
   `foregroundColor`. `strokeColor` and `eyeStrokeColor` draw a stroke only
   when set to a color other than `#000000`; unset or `#000000` means no
   stroke.
+- **Translucent colors**: a foreground, gradient stop, or layer color with
+  alpha (for example `eyeColor: "#FF000080"`) is composited over the QR
+  background color on both platforms, so the PNG pixel is the blended color
+  (opaque over an opaque background, translucent over a translucent or
+  `"transparent"` one). It does not keep the module's own alpha on an opaque
+  background, and it does not blend with another layer drawn beneath it (body
+  stroke, eye stroke, finder inner color). A fully transparent layer color shows the background.
 - **Colors** are normalized on the JavaScript side (`#RGB` and `#RGBA`
   shorthand expand to full hex before the native bridge). The native ABI
   itself accepts full `#RRGGBB`/`#RRGGBBAA` hex or `"transparent"` for the
@@ -420,7 +429,8 @@ The `logo` prop is a React node layered above the generated PNG. Only
 `logoPadding` and `logoBackgroundColor` style the overlay but do not reserve
 additional modules. When `logo` is present and `logoAreaSize` is omitted, the
 component reserves 28% of `size`. Keep the logo area near or below 30% for
-reliable scanning.
+reliable scanning. When `errorCorrectionLevel` is omitted and a logo area is
+reserved, error correction defaults to `H`; an explicit level is always honored.
 
 With `scanSafe`, quiet zones smaller than four modules are raised to four. When
 `scanSafe` is enabled with a non-zero logo area, error correction is raised to
@@ -478,9 +488,9 @@ warnings.
 | ------------------- | ------- | -------------------------------------------------------------------- |
 | `invalid`           | Error   | An option is out of range, malformed, or the payload does not fit.   |
 | `too-small-size`    | Warning | The rendered size is too small for the module count to scan reliably. |
-| `bad-quiet-zone`    | Warning | The quiet zone is narrower than four modules.                        |
+| `bad-quiet-zone`    | Warning | The quiet zone is narrower than two modules or wider than twelve.   |
 | `logo-too-large`    | Warning | The logo area covers too much of the symbol.                         |
-| `low-ecl-for-logo`  | Warning | A logo area is reserved without error correction level `H`.          |
+| `low-ecl-for-logo`  | Warning | The logo area exceeds what the error correction level recovers: more than 15% of `size` for `L`, 20% for `M`, 25% for `Q`. |
 | `low-contrast`      | Warning | The foreground or a pattern color has low contrast against an opaque background. |
  With `scanSafe: "strict"`, scanability warnings are also returned as
 errors so forms and design tooling can block risky output before rendering.
@@ -605,6 +615,21 @@ react-native-web). Plain Node without that alias cannot load it. Native iOS and 
 platform-specific entry and never bundle it; web bundlers include it only for
 web targets. Consumers do not need `react-native-svg`, Skia, canvas packages,
 or another QR package.
+
+## Recommended Settings For Reliable Scanning
+
+Host tests decode the rendered PNG and SVG with an independent decoder, but
+real cameras, lighting, and screens cannot be tested in CI. Start from these
+values and test the final output on target devices.
+
+| Setting          | Recommendation                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `quietZone`      | Keep the default of 4 modules (ISO/IEC 18004). Do not go below 2; `scanSafe` raises smaller values to 4.             |
+| Contrast         | Dark foreground on a light, opaque background, with a ratio of at least 2.5. Avoid inverted (light on dark) codes.   |
+| Transparency     | Translucent colors are composited over the background. A transparent background shows the surface behind the PNG; use a light surface. |
+| Logo area        | `logoAreaSize` of at most 15% of `size` with `L`, 20% with `M`, 25% with `Q`, and 30% with `H`. Prefer `H` with a logo. |
+| `size`           | At least 120, and enough for about 4 pixels per module on the device.                                                |
+| PNG and SVG      | Both encode the same matrix and quiet zone. SVG does not clear a logo area; reserve that space in the consuming UI.   |
 
 ## Troubleshooting
 

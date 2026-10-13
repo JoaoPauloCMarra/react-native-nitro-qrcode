@@ -1,52 +1,8 @@
 import * as Web from "../index.web";
 import { createRenderPlan } from "../render-plan";
 import { normalizeOptions, validateOptions } from "../validation";
-
-type FillCall = { op: string; args: number[]; fill: unknown };
-
-function installRecordingCanvas(): FillCall[] {
-  const calls: FillCall[] = [];
-  const context: Record<string, unknown> = {
-    fillStyle: "",
-    globalCompositeOperation: "source-over",
-  };
-  const record = (op: string) =>
-    jest.fn((...args: number[]) => {
-      calls.push({ op, args, fill: context.fillStyle });
-    });
-  const gradient = () => ({ kind: "gradient", addColorStop: jest.fn() });
-  Object.assign(context, {
-    arc: jest.fn(),
-    beginPath: jest.fn(),
-    clearRect: record("clearRect"),
-    closePath: jest.fn(),
-    createLinearGradient: jest.fn(gradient),
-    createRadialGradient: jest.fn(gradient),
-    ellipse: jest.fn(),
-    fill: record("fill"),
-    fillRect: record("fillRect"),
-    lineTo: jest.fn(),
-    moveTo: record("moveTo"),
-    quadraticCurveTo: jest.fn(),
-    restore: jest.fn(),
-    save: jest.fn(),
-  });
-  const canvas = {
-    width: 0,
-    height: 0,
-    getContext: jest.fn(() => context),
-    toDataURL: jest.fn(() => "data:image/png;base64,recorded"),
-  };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: { createElement: jest.fn(() => canvas) },
-  });
-  return calls;
-}
-
-function allDarkModel(size = 21) {
-  return { modules: { size, data: new Array(size * size).fill(true) } };
-}
+import { installRecordingCanvas, type RecordedCall } from "./helpers/canvas";
+import { allDarkModel } from "./helpers/matrix";
 
 afterEach(() => {
   Web.clearQRCodeCache();
@@ -97,7 +53,7 @@ describe("layer color defaults", () => {
 
   it("never paints default finders black when the foreground is red", () => {
     for (const logoAreaSize of [0, 16]) {
-      const calls = installRecordingCanvas();
+      const { calls } = installRecordingCanvas();
       Web.toPngDataUri({
         value: "red-web",
         size: 64,
@@ -114,7 +70,7 @@ describe("layer color defaults", () => {
   });
 
   it("paints default finders with the gradient fill", () => {
-    const calls = installRecordingCanvas();
+    const { calls } = installRecordingCanvas();
     Web.toPngDataUri({
       value: "gradient-web",
       size: 64,
@@ -131,7 +87,7 @@ describe("layer color defaults", () => {
 });
 
 describe("reviewer probes on web", () => {
-  function fills(calls: FillCall[]): unknown[] {
+  function fills(calls: RecordedCall[]): unknown[] {
     return calls
       .filter((call) => call.op === "fill" || call.op === "fillRect")
       .map((call) => call.fill);
@@ -146,7 +102,7 @@ describe("reviewer probes on web", () => {
   ] as const)(
     "draws no black rings for the example defaults with %s",
     (_label, strokes) => {
-      const calls = installRecordingCanvas();
+      const { calls } = installRecordingCanvas();
       Web.toPngDataUri({
         value: "https://example.com/nitro",
         size: 128,
@@ -164,7 +120,7 @@ describe("reviewer probes on web", () => {
   );
 
   it("paints explicit black finders solid under a gradient", () => {
-    const calls = installRecordingCanvas();
+    const { calls } = installRecordingCanvas();
     Web.toPngDataUri({
       value: "https://example.com/nitro",
       size: 128,
@@ -304,14 +260,14 @@ describe("native pixel geometry parity", () => {
   });
 
   it("clears the logo hole on whole pixels", () => {
-    const calls = installRecordingCanvas();
+    const { calls } = installRecordingCanvas();
     Web.toPngDataUri({ value: "hole", size: 65, logoAreaSize: 20 });
     const hole = calls.filter((call) => call.op === "moveTo").at(-1);
     expect(hole?.args).toEqual([Math.floor((65 - 20) / 2), Math.floor((65 - 20) / 2)]);
   });
 
   it("paints the quiet zone and inner background on floor edges", () => {
-    const calls = installRecordingCanvas();
+    const { calls } = installRecordingCanvas();
     Web.toPngDataUri({
       value: "Hello",
       size: 64,
@@ -332,7 +288,7 @@ describe("native pixel geometry parity", () => {
   });
 
   it("clears a transparent inner background inside the quiet zone", () => {
-    const calls = installRecordingCanvas();
+    const { calls } = installRecordingCanvas();
     Web.toPngDataUri({
       value: "Hello",
       size: 64,

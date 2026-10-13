@@ -61,6 +61,8 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
 
   generatePngDataUriAsyncObject(options: GenerateOptions): Promise<string>;
 
+  generateSvgStringObject(options: GenerateOptions): string;
+
   /** @deprecated Use generatePngBase64Object instead. */
   generatePngBase64(
     value: string,
@@ -205,6 +207,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): Promise<string>;
 
+  /** @deprecated Use generateSvgStringObject instead. */
   generateSvgString(
     value: string,
     quietZone: number,

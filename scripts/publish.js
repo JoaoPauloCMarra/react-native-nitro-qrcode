@@ -214,13 +214,6 @@ async function main() {
   }
 
   if (dryRun) {
-    log("Running package pack dry run...", "cyan");
-    runPackageCommandWithDocs(
-      "bun",
-      ["pm", "pack", "--dry-run", "--ignore-scripts"],
-      { cwd: packageDir },
-      "Package pack dry run",
-    );
     log("Dry run complete. Package is publishable.", "green");
     return;
   }

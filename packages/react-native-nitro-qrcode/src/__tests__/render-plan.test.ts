@@ -1,15 +1,7 @@
 import { createRenderPlan } from "../render-plan";
 import type { QRCodeBackgroundColor } from "../colors";
 import { normalizeOptions } from "../validation";
-
-function model() {
-  return {
-    modules: {
-      size: 21,
-      data: new Array(21 * 21).fill(true),
-    },
-  };
-}
+import { allDarkModel } from "./helpers/matrix";
 
 describe("render plan color identity", () => {
   it("treats equivalent opaque spellings as the default stroke and finder colors", () => {
@@ -22,7 +14,7 @@ describe("render plan color identity", () => {
         eyeballColor: "#000000FF",
         shapeOptions: { shape: "rounded" },
       }),
-      model(),
+      allDarkModel(),
       128,
     );
 
@@ -42,7 +34,7 @@ describe("render plan color identity", () => {
         eyeballColor: "#00000080",
         shapeOptions: { shape: "rounded" },
       }),
-      model(),
+      allDarkModel(),
       128,
     );
 
@@ -55,7 +47,7 @@ describe("render plan color identity", () => {
   it("canonicalizes equivalent opaque background spellings in the plan", () => {
     const sixDigit = createRenderPlan(
       normalizeOptions({ value: "plan-background", backgroundColor: "#FFFFFF" }),
-      model(),
+      allDarkModel(),
       128,
     );
     const eightDigit = createRenderPlan(
@@ -63,7 +55,7 @@ describe("render plan color identity", () => {
         value: "plan-background",
         backgroundColor: "#FFFFFFFF",
       }),
-      model(),
+      allDarkModel(),
       128,
     );
 
@@ -77,7 +69,7 @@ describe("render plan color identity", () => {
     (backgroundColor) => {
       const plan = createRenderPlan(
         normalizeOptions({ value: `transparent-${backgroundColor}`, backgroundColor }),
-        model(),
+        allDarkModel(),
         128,
       );
 
@@ -85,15 +77,6 @@ describe("render plan color identity", () => {
     },
   );
 });
-
-function filledModel(size: number) {
-  return {
-    modules: {
-      size,
-      data: new Array(size * size).fill(true),
-    },
-  };
-}
 
 describe("render plan region tokens", () => {
   it("styles alignment and timing independently from body modules", () => {
@@ -108,7 +91,7 @@ describe("render plan region tokens", () => {
           timingShape: "circle",
         },
       }),
-      filledModel(25),
+      allDarkModel(25),
       200,
     );
     const modules = plan.rows.flatMap((row) => row.modules);
@@ -137,7 +120,7 @@ describe("render plan region tokens", () => {
         value: "version-1-regions",
         shapeOptions: { alignmentShape: "diamond" },
       }),
-      filledModel(21),
+      allDarkModel(21),
       128,
     );
     const modules = plan.rows.flatMap((row) => row.modules);
@@ -153,7 +136,7 @@ describe("render plan region tokens", () => {
         backgroundColor: "#FFFFFF",
         quietZoneColor: "#E2E8F0",
       }),
-      filledModel(21),
+      allDarkModel(21),
       128,
     );
 

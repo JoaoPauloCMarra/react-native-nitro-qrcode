@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../core/QRCodeGenerator.hpp"
+#include "GenerateOptions.hpp"
 
 #include <string>
 #include <vector>
 
 namespace margelo::nitro::NitroQRCode {
+
+inline constexpr const char *LegacyUnsetColor = "#000000";
 
 ::NitroQRCode::GenerateOptions makeGenerateOptions(
     double size, double quietZone, const std::string &errorCorrectionLevel,
@@ -25,6 +28,9 @@ namespace margelo::nitro::NitroQRCode {
     const std::vector<double> &gradientLocations = {},
     double gradientStartX = 0, double gradientStartY = 0,
     double gradientEndX = 1, double gradientEndY = 1);
+
+::NitroQRCode::GenerateOptions
+makeGenerateOptions(const GenerateOptions &options);
 
 ::NitroQRCode::GenerateOptions
 makeMatrixOptions(const std::string &errorCorrectionLevel, double minVersion,

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeSourceSha256": "fdeb7fe20bba7dd2953e1285228ec7dcc5ff5f69c1152fdf9b97f6a5572e90ce",
+  "runtimeSourceSha256": "c187e08de04f49109fb01df72de7a35cbc174abc50ffef6c4083570a7af91d47",
   "runtimeSourceFiles": [
     "apps/example/app.config.js",
     "apps/example/app/_layout.tsx",
@@ -18,9 +18,11 @@
     "apps/example/components/e2e-gate.tsx",
     "apps/example/components/e2e-lab.tsx",
     "apps/example/components/generation-matrix.ts",
+    "apps/example/components/ready-wall.ts",
     "apps/example/components/scan-decode.ts",
     "apps/example/metro.config.js",
     "apps/example/package.json",
+    "apps/example/plugins/with-fast-gradle-properties.js",
     "apps/example/plugins/with-gradle-assignment-syntax.js",
     "apps/example/tsconfig.json",
     "bun.lock",
@@ -77,7 +79,7 @@
     "packages/react-native-nitro-qrcode/src/use-qrcode-generation.ts",
     "packages/react-native-nitro-qrcode/src/validation.ts"
   ],
-  "replayInputsSha256": "4e49e12138ef14096e604dc3b4ca01fc4a9f56c360992e66664f694b224fec65",
+  "replayInputsSha256": "68a0f7de3356b1f12eaf04b2a390321bfac2f9a27a64b480c5ab9cc45ad7329c",
   "replayInputs": [
     "e2e/qa-combo.ad",
     "e2e/qa-deeplink.ad",

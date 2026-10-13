@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { inside } = require("./check-example-replay-freshness.js");
+const { inside, validateSuite } = require("./check-example-replay-freshness.js");
 
 const projectRoot = path.resolve(__dirname, "..");
 const coveragePath = path.join(
@@ -139,30 +139,7 @@ function readSuites(manifestFile = coveragePath, selectedFlowIds = []) {
   const ids = new Set();
   const paths = new Set();
   const suites = manifest.suites.map((suite) => {
-    if (
-      !suite ||
-      typeof suite.id !== "string" ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(suite.id) ||
-      ids.has(suite.id) ||
-      typeof suite.path !== "string" ||
-      !suite.path.startsWith("e2e/") ||
-      suite.path.includes("..") ||
-      suite.path.includes("\\") ||
-      !suite.path.endsWith(".ad") ||
-      paths.has(suite.path) ||
-      typeof suite.purpose !== "string" ||
-      suite.purpose.trim() === ""
-    ) {
-      throw new Error(
-        "QRCode replay manifest contains an invalid or duplicate flow",
-      );
-    }
-    ids.add(suite.id);
-    paths.add(suite.path);
-    const suiteFile = inside(root, suite.path);
-    if (!fs.existsSync(suiteFile) || !fs.lstatSync(suiteFile).isFile()) {
-      throw new Error(`Replay flow is missing: ${suite.path}`);
-    }
+    validateSuite(root, suite, ids, paths);
     return suite;
   });
   const unknownFlow = selectedFlowIds.find((id) => !ids.has(id));

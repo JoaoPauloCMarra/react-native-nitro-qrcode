@@ -26,6 +26,18 @@ assert.equal(
   "${{ always() && needs.validate.result == 'success' && github.event_name == 'release' }}",
   "registry verification must require a validated release event",
 );
+assert.deepEqual(
+  Object.keys(workflow.jobs.validate.outputs).sort(),
+  [
+    "already_published",
+    "dist_tag",
+    "package_name",
+    "package_version",
+    "release_commit",
+    "release_tag",
+  ],
+  "validate must expose only outputs that other jobs read",
+);
 assert.notEqual(workflow.permissions, "write-all");
 assert.notEqual(workflow.permissions?.["id-token"], "write");
 assert.equal(workflow.jobs.publish.permissions?.["id-token"], "write");

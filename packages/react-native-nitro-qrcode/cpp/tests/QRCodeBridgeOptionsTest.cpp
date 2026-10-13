@@ -4,6 +4,7 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 
 namespace {
@@ -64,16 +65,53 @@ void testBridgeDerivedLayerDefaults() {
   const auto options = margelo::nitro::NitroQRCode::makeGenerateOptions(
       256, 3, "M", "#FF0000", "#000000", "#FF0000", "#FF0000", "#FF0000",
       "#FF0000", 1, 40, -1, true, "circle");
-  assert(options.alignmentColor == "#FF0000");
-  assert(options.timingColor == "#FF0000");
-  assert(options.quietZoneColor == "#000000");
-  assert(options.finderInnerColor == "#000000");
   assert(options.alignment == options.foreground);
   assert(options.timing == options.foreground);
   assert(options.quietZoneFill == options.background);
   assert(options.finderInner == options.background);
   assert(options.alignmentShape == "circle");
   assert(options.timingShape == "circle");
+}
+
+void testBridgeObjectMapping() {
+  using margelo::nitro::NitroQRCode::GenerateOptions;
+  GenerateOptions plain(
+      "object", 200, 3, "M", "#112233", "#FFFFFF", std::nullopt, std::nullopt,
+      std::nullopt, std::nullopt, 1, 40, -1, true, "circle", "square",
+      "square", 0, 0, "dense", -1, -1, "matrix", 0, 0, "none", {}, {}, 0, 0, 1,
+      1, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt);
+  auto resolved = margelo::nitro::NitroQRCode::makeGenerateOptions(plain);
+  assert(resolved.size == 200);
+  assert(!resolved.strokeSet && !resolved.eyeSet && !resolved.eyeStrokeSet &&
+         !resolved.eyeballSet);
+  assert(!resolved.alignmentSet && !resolved.timingSet);
+  assert(resolved.alignment == resolved.foreground);
+  assert(resolved.quietZoneFill == resolved.background);
+  assert(resolved.alignmentShape == "circle");
+
+  GenerateOptions styled = plain;
+  styled.eyeColor = "#FF0000";
+  styled.alignmentColor = "#00FF00";
+  styled.timingColor = "#0000FF";
+  styled.quietZoneColor = "#EEEEEE";
+  styled.finderInnerColor = "#FFFF00";
+  styled.alignmentShape = "diamond";
+  styled.timingShape = "rounded";
+  resolved = margelo::nitro::NitroQRCode::makeGenerateOptions(styled);
+  assert(resolved.eyeSet);
+  assert(resolved.alignmentSet && resolved.timingSet);
+  assert(resolved.alignment == ::NitroQRCode::parseColor("#00FF00"));
+  assert(resolved.timing == ::NitroQRCode::parseColor("#0000FF"));
+  assert(resolved.quietZoneFill == ::NitroQRCode::parseColor("#EEEEEE"));
+  assert(resolved.finderInner == ::NitroQRCode::parseColor("#FFFF00"));
+  assert(resolved.alignmentShape == "diamond");
+  assert(resolved.timingShape == "rounded");
+
+  GenerateOptions explicitBlack = plain;
+  explicitBlack.strokeColor = margelo::nitro::NitroQRCode::LegacyUnsetColor;
+  resolved = margelo::nitro::NitroQRCode::makeGenerateOptions(explicitBlack);
+  assert(resolved.strokeSet);
 }
 
 void testBridgeMatrixDefaults() {
@@ -116,6 +154,7 @@ void testBridgeIntegerValidation() {
 void runQRCodeBridgeOptionsTests() {
   testBridgeOptionMapping();
   testBridgeDerivedLayerDefaults();
+  testBridgeObjectMapping();
   testBridgeMatrixDefaults();
   testBridgeIntegerValidation();
 }

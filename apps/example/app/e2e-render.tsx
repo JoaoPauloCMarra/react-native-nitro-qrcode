@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { QRCode, type QRCodePreset } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 
 type Specimen = {
   id: string;
@@ -34,25 +35,12 @@ const SPECIMENS: readonly Specimen[] = [
 export default function QrcodeE2eRenderScreen() {
   const insets = useSafeAreaInsets();
   const [generation, setGeneration] = useState(0);
-  const [readyIds, setReadyIds] = useState<string[]>([]);
-  const readyIdsRef = useRef(new Set<string>());
-  const [elapsed, setElapsed] = useState("(idle)");
-  const [startedAt, setStartedAt] = useState(
-    () => globalThis.performance?.now?.() ?? Date.now(),
+  const wall = useReadyWall(SPECIMENS.length);
+  const status = formatReadyWall(
+    wall,
+    SPECIMENS.length,
+    (done) => `:ms=${(done.elapsedMs ?? 0).toFixed(1)}`,
   );
-
-  const markReady = useCallback((id: string) => {
-    if (readyIdsRef.current.has(id)) {
-      return;
-    }
-    readyIdsRef.current.add(id);
-    const next = [...readyIdsRef.current];
-    setReadyIds(next);
-    if (next.length === SPECIMENS.length) {
-      const ms = (globalThis.performance?.now?.() ?? Date.now()) - startedAt;
-      setElapsed(`ok:ready=${next.length}/${SPECIMENS.length}:ms=${ms.toFixed(1)}`);
-    }
-  }, [startedAt]);
 
   return (
     <ScrollView
@@ -76,19 +64,14 @@ export default function QrcodeE2eRenderScreen() {
         payloads.
       </Text>
       <Text testID="e2e-render-ready-count" style={styles.metric}>
-        {elapsed === "(idle)"
-          ? `ready=${readyIds.length}/${SPECIMENS.length}`
-          : elapsed}
+        {status}
       </Text>
       <Pressable
         testID="e2e-render-remount"
         accessibilityRole="button"
         accessibilityLabel="Remount specimens"
         onPress={() => {
-          setStartedAt(globalThis.performance?.now?.() ?? Date.now());
-          readyIdsRef.current.clear();
-          setReadyIds([]);
-          setElapsed("(idle)");
+          wall.reset();
           setGeneration((value) => value + 1);
         }}
         style={styles.button}
@@ -112,7 +95,10 @@ export default function QrcodeE2eRenderScreen() {
                 specimen.shape ? { shape: specimen.shape } : undefined
               }
               onReady={() => {
-                markReady(specimen.id);
+                wall.markReady(specimen.id);
+              }}
+              onError={() => {
+                wall.markReady(specimen.id, true);
               }}
             />
             <Text style={styles.cellLabel}>{specimen.label}</Text>

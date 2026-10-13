@@ -9,6 +9,10 @@ import {
 } from "./metrics";
 import {
   areRgbaColorsEqual,
+  compositeOver,
+  formatRgbaColor,
+  parseRgbaColor,
+  type ParsedRgbaColor,
   rgbaColorBytes,
   toSvgColor,
 } from "./colors";
@@ -28,10 +32,10 @@ import {
   type NitroQRCodeApi,
   type NormalizedGradient,
   type NormalizedOptions,
+  type NormalizedShapeOptions,
   type QRCodeMatrix,
   type QRCodeOptions,
   type QRCodeShape,
-  type QRCodeShapeOptions,
 } from "./validation";
 import { createQRCodeComponent } from "./qrcode-component";
 import type { QRCodeProps, QRCodeRef } from "./qrcode-component";
@@ -69,6 +73,7 @@ export type {
 } from "./colors";
 export type { QRCodeScanabilityWarning } from "./scan-policy";
 export type { QRCodePreset } from "./defaults";
+export { PRESET_SHAPE_OPTIONS } from "./defaults";
 export type { QRCodeProps, QRCodeRef } from "./qrcode-component";
 export {
   validateOptions,
@@ -145,51 +150,15 @@ export function toPngBase64(options: QRCodeOptions): string {
 }
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  const request = cacheRequest(normalized, "png");
-  const key = hashCachePart(request);
-  const cached = webCache.get(key, request);
-  recordCacheLookup(cached !== undefined);
-  if (cached !== undefined) {
-    return cached;
+  const lookup = lookupPng(normalized);
+  if (lookup.cached !== undefined) {
+    return lookup.cached;
   }
 
   return measuredSync(() => {
-    const model = createModel(normalized);
-    const pixelSize = renderPixelSize(normalized, model);
-    const canvas = createCanvas(pixelSize);
-    const context = canvas.getContext("2d");
-    if (context === null) {
-      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
-    }
-
-    const plan = createRenderPlan(normalized, model, pixelSize);
-    const { foregroundFill, useLayerColors } = preparePngCanvas(
-      context,
-      plan,
-      normalized,
-    );
-    if (
-      canDrawSquareRuns(normalized.shapeOptions) &&
-      !useLayerColors &&
-      normalized.logoAreaSize === 0
-    ) {
-      drawSquareRuns(
-        context,
-        model,
-        normalized.quietZone,
-        plan.totalModules,
-        plan.pixelSize,
-        0,
-        model.modules.size,
-      );
-    } else {
-      drawPlanRows(context, plan, normalized, foregroundFill, 0, plan.matrixSize);
-    }
-    finishPng(context, plan, normalized, foregroundFill);
-
-    const output = canvas.toDataURL("image/png");
-    webCache.set(key, request, output);
-    return output;
+    const session = createPngRenderSession(normalized, lookup);
+    session.drawRows(0, session.rowCount);
+    return session.finish();
   });
 }
 
@@ -204,36 +173,71 @@ export async function toPngDataUriAsync(
   options: QRCodeOptions,
 ): Promise<string> {
   const normalized = normalizeOptions(options);
+  const lookup = lookupPng(normalized);
+  if (lookup.cached !== undefined) {
+    return lookup.cached;
+  }
+
+  return measuredAsync(async () => {
+    const session = createPngRenderSession(normalized, lookup);
+    for (
+      let startRow = 0;
+      startRow < session.rowCount;
+      startRow += ASYNC_BAND_ROWS
+    ) {
+      session.drawRows(
+        startRow,
+        Math.min(startRow + ASYNC_BAND_ROWS, session.rowCount),
+      );
+      await yieldToMainThread();
+    }
+    return session.finish();
+  });
+}
+
+type PngLookup = {
+  key: string;
+  request: string;
+  cached: string | undefined;
+};
+
+function lookupPng(normalized: NormalizedOptions): PngLookup {
   const request = cacheRequest(normalized, "png");
   const key = hashCachePart(request);
   const cached = webCache.get(key, request);
   recordCacheLookup(cached !== undefined);
-  if (cached !== undefined) {
-    return cached;
+  return { key, request, cached };
+}
+
+function createPngRenderSession(
+  normalized: NormalizedOptions,
+  lookup: PngLookup,
+): {
+  rowCount: number;
+  drawRows: (startRow: number, endRow: number) => void;
+  finish: () => string;
+} {
+  const model = createModel(normalized);
+  const pixelSize = renderPixelSize(normalized, model);
+  const canvas = createCanvas(pixelSize);
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Unable to create 2D canvas context for QRCode rendering.");
   }
 
-  return measuredAsync(async () => {
-    const model = createModel(normalized);
-    const pixelSize = renderPixelSize(normalized, model);
-    const canvas = createCanvas(pixelSize);
-    const context = canvas.getContext("2d");
-    if (context === null) {
-      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
-    }
-
-    const plan = createRenderPlan(normalized, model, pixelSize);
-    const { foregroundFill, useLayerColors } = preparePngCanvas(
-      context,
-      plan,
-      normalized,
-    );
-    const moduleCount = model.modules.size;
-    const useSquareRuns =
-      canDrawSquareRuns(normalized.shapeOptions) &&
-      !useLayerColors &&
-      normalized.logoAreaSize === 0;
-    for (let startRow = 0; startRow < moduleCount; startRow += ASYNC_BAND_ROWS) {
-      const endRow = Math.min(startRow + ASYNC_BAND_ROWS, moduleCount);
+  const plan = createRenderPlan(normalized, model, pixelSize);
+  const { foregroundFill, useLayerColors } = preparePngCanvas(
+    context,
+    plan,
+    normalized,
+  );
+  const useSquareRuns =
+    canDrawSquareRuns(normalized.shapeOptions) &&
+    !useLayerColors &&
+    normalized.logoAreaSize === 0;
+  return {
+    rowCount: model.modules.size,
+    drawRows(startRow, endRow) {
       if (useSquareRuns) {
         drawSquareRuns(
           context,
@@ -247,14 +251,14 @@ export async function toPngDataUriAsync(
       } else {
         drawPlanRows(context, plan, normalized, foregroundFill, startRow, endRow);
       }
-      await yieldToMainThread();
-    }
-    finishPng(context, plan, normalized, foregroundFill);
-
-    const output = canvas.toDataURL("image/png");
-    webCache.set(key, request, output);
-    return output;
-  });
+    },
+    finish() {
+      finishPng(context, plan, normalized, foregroundFill);
+      const output = canvas.toDataURL("image/png");
+      webCache.set(lookup.key, lookup.request, output);
+      return output;
+    },
+  };
 }
 
 export function toSvgString(options: QRCodeOptions): string {
@@ -432,13 +436,13 @@ function drawPlanRows(
   startRow: number,
   endRow: number,
 ): void {
+  const backdrop = createBackdrop(options);
   for (const row of plan.rows) {
     if (row.moduleY < startRow || row.moduleY >= endRow) {
       continue;
     }
     for (const module of row.modules) {
-      if (module.stroke !== undefined && module.strokeGap !== undefined) {
-        context.fillStyle = toSvgColor(options.strokeColor);
+      const drawAt = (gap: number) => {
         drawModule(
           context,
           module.x0,
@@ -446,43 +450,33 @@ function drawPlanRows(
           module.x1,
           module.y1,
           module.shape,
-          module.gap,
+          gap,
           module.cornerRadius,
           module.neighbors,
         );
-        context.fillStyle = resolvePlanFill(
-          options,
-          foregroundFill,
-          module.layer,
-        );
-        drawModule(
+      };
+      const strokeGap = module.strokeGap;
+      if (module.stroke !== undefined && strokeGap !== undefined) {
+        paintOrErase(context, toSvgColor(options.strokeColor), backdrop, () => {
+          drawAt(module.gap);
+        });
+        paintOrErase(
           context,
-          module.x0,
-          module.y0,
-          module.x1,
-          module.y1,
-          module.shape,
-          module.strokeGap,
-          module.cornerRadius,
-          module.neighbors,
+          resolvePlanFill(options, foregroundFill, module.layer),
+          backdrop,
+          () => {
+            drawAt(strokeGap);
+          },
         );
         continue;
       }
-      context.fillStyle = resolvePlanFill(
-        options,
-        foregroundFill,
-        module.layer,
-      );
-      drawModule(
+      paintOrErase(
         context,
-        module.x0,
-        module.y0,
-        module.x1,
-        module.y1,
-        module.shape,
-        module.gap,
-        module.cornerRadius,
-        module.neighbors,
+        resolvePlanFill(options, foregroundFill, module.layer),
+        backdrop,
+        () => {
+          drawAt(module.gap);
+        },
       );
     }
   }
@@ -652,11 +646,10 @@ function modulePixel(
   return Math.floor((moduleIndex * pixelSize) / totalModules);
 }
 
-function canDrawSquareRuns(options: Required<QRCodeShapeOptions>): boolean {
+function canDrawSquareRuns(options: NormalizedShapeOptions): boolean {
   return (
     options.shape === "square" &&
     options.eyeFrameShape === "square" &&
-    options.eyePatternShape === "square" &&
     options.eyeballShape === "square" &&
     options.alignmentShape === "square" &&
     options.timingShape === "square" &&
@@ -711,6 +704,7 @@ function drawGroupedFinders(
     [matrixSize - 7, 0],
     [0, matrixSize - 7],
   ] as const;
+  const backdrop = createBackdrop(options);
   for (const [moduleX, moduleY] of origins) {
     drawGroupedFinder(
       context,
@@ -721,6 +715,7 @@ function drawGroupedFinders(
       pixelSize,
       options,
       foregroundFill,
+      backdrop,
     );
   }
 }
@@ -734,15 +729,16 @@ function drawGroupedFinder(
   pixelSize: number,
   options: NormalizedOptions,
   foregroundFill: CanvasFill,
+  backdrop: Backdrop,
 ): void {
   const rect = (offset: number, span: number) => {
-    const x = Math.round(
+    const x = Math.floor(
       ((moduleX + quietZone + offset) * pixelSize) / totalModules,
     );
-    const y = Math.round(
+    const y = Math.floor(
       ((moduleY + quietZone + offset) * pixelSize) / totalModules,
     );
-    const end = Math.round(
+    const end = Math.floor(
       ((moduleX + quietZone + offset + span) * pixelSize) / totalModules,
     );
     return { x, y, size: end - x };
@@ -761,6 +757,7 @@ function drawGroupedFinder(
     rect(0, 7),
     frameShape,
     hasEyeStroke ? toSvgColor(options.eyeStrokeColor) : eyeFill,
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
   if (hasEyeStroke) {
@@ -769,6 +766,7 @@ function drawGroupedFinder(
       rect(strokeInset, 7 - strokeInset * 2),
       frameShape,
       eyeFill,
+      backdrop,
       options.shapeOptions.eyePatternCornerRadius,
     );
   }
@@ -777,6 +775,7 @@ function drawGroupedFinder(
     rect(1, 5),
     frameShape,
     toSvgColor(options.finderInnerColor),
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
   const useCircleFrameSquareEyeball =
@@ -802,6 +801,7 @@ function drawGroupedFinder(
       options.explicitColors.eyeball,
       options.eyeballColor,
     ),
+    backdrop,
     options.shapeOptions.eyePatternCornerRadius,
   );
 }
@@ -811,9 +811,76 @@ function drawFinderShape(
   rect: { x: number; y: number; size: number },
   shape: QRCodeShape,
   fill: CanvasFill,
+  backdrop: Backdrop,
   cornerRadius: number,
 ): void {
-  context.fillStyle = fill;
+  paintOrErase(context, fill, backdrop, () =>
+    drawFinderPath(context, rect, shape, cornerRadius),
+  );
+}
+
+type Backdrop = {
+  css: string;
+  color: ParsedRgbaColor;
+  paints: Map<string, { color: ParsedRgbaColor; blended: string }>;
+};
+
+function createBackdrop(options: NormalizedOptions): Backdrop {
+  const css = toSvgColor(options.backgroundColor);
+  return { css, color: parseRgbaColor(css), paints: new Map() };
+}
+
+function paintOrErase(
+  context: CanvasRenderingContext2D,
+  fill: CanvasFill,
+  backdrop: Backdrop,
+  draw: () => void,
+): void {
+  if (typeof fill !== "string") {
+    context.fillStyle = fill;
+    draw();
+    return;
+  }
+  let paint = backdrop.paints.get(fill);
+  if (paint === undefined) {
+    const color = parseRgbaColor(fill);
+    paint = {
+      color,
+      blended: formatRgbaColor(compositeOver(color, backdrop.color)),
+    };
+    backdrop.paints.set(fill, paint);
+  }
+  if (paint.color.alpha === 255) {
+    context.fillStyle = fill;
+    draw();
+    return;
+  }
+  if (backdrop.color.alpha === 255) {
+    context.fillStyle = paint.blended;
+    draw();
+    return;
+  }
+  context.save();
+  context.globalCompositeOperation = "destination-out";
+  context.fillStyle = "#000000";
+  draw();
+  context.restore();
+  if (backdrop.color.alpha > 0) {
+    context.fillStyle = backdrop.css;
+    draw();
+  }
+  if (paint.color.alpha > 0 && fill !== backdrop.css) {
+    context.fillStyle = fill;
+    draw();
+  }
+}
+
+function drawFinderPath(
+  context: CanvasRenderingContext2D,
+  rect: { x: number; y: number; size: number },
+  shape: QRCodeShape,
+  cornerRadius: number,
+): void {
   if (shape === "circle") {
     context.beginPath();
     context.arc(

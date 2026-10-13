@@ -173,7 +173,7 @@
       "source": "apps/example/app/e2e-render.tsx",
       "statusId": "e2e-render-ready-count",
       "expectedText": "ok:ready=15/15:ms=",
-      "assertion": "next.length === SPECIMENS.length",
+      "assertion": "useReadyWall(SPECIMENS.length)",
       "trigger": "screen-load",
       "claimLimit": "Generation completion does not prove every native Image decoded or that its code is scannable."
     },
@@ -408,7 +408,7 @@
       "source": "apps/example/app/e2e-combo.tsx",
       "statusId": "e2e-combo-visuals",
       "expectedText": "ok:ready=",
-      "assertion": "onError={() => markReady(specimen.id, true)}",
+      "assertion": "onError={() => wall.markReady(specimen.id, true)}",
       "trigger": "screen-load",
       "claimLimit": "Every combo visual specimen completed generation without onError. Looks are not compared to references or decoded."
     },
@@ -424,6 +424,32 @@
       "assertion": "id: \"regions\"",
       "trigger": "screen-load",
       "claimLimit": "Fifteen specimens, including custom alignment, timing, quiet-zone and finder colors and shapes, complete generation before and after remount. Region colors and shapes are not compared to references or decoded."
+    },
+    {
+      "id": "visuals.decode-transparent-rounded",
+      "coverage": "replay-asserted",
+      "kind": "test-adapter",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-visuals.ad",
+      "source": "apps/example/app/e2e-visuals.tsx",
+      "statusId": "e2e-visuals-decode",
+      "expectedText": "decode:transparent-rounded=ok;",
+      "assertion": "decodePngBase64(base64, value, LIGHT_BACKDROP)",
+      "trigger": "screen-load",
+      "claimLimit": "same-process decoder on the generated PNG of a transparent-background rounded-preset code composited over white; not camera, distance or lighting evidence"
+    },
+    {
+      "id": "visuals.decode-translucent",
+      "coverage": "replay-asserted",
+      "kind": "test-adapter",
+      "transport": "Installed public native API; web uses the same entry contracts when the route is run manually.",
+      "suite": "e2e/qa-visuals.ad",
+      "source": "apps/example/app/e2e-visuals.tsx",
+      "statusId": "e2e-visuals-decode",
+      "expectedText": "decode:translucent=ok;",
+      "assertion": "decodePngBase64(base64, value, LIGHT_BACKDROP)",
+      "trigger": "screen-load",
+      "claimLimit": "same-process decoder on the generated PNG of a translucent foreground and finder-color code composited over white; not camera, distance or lighting evidence"
     },
     {
       "id": "visuals.remount",

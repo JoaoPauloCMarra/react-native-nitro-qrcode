@@ -118,3 +118,13 @@ for (const [name, releaseCommit, checkedOutCommit, expectedStatus] of [
     }
   });
 }
+
+test("rejects an unused validate output", () => {
+  const fixture = workflow.replace(
+    "      dist_tag: ${{ steps.metadata.outputs.dist_tag }}",
+    "      dist_tag: ${{ steps.metadata.outputs.dist_tag }}\n      expected_name: ${{ steps.metadata.outputs.package_name }}",
+  );
+  assert.notEqual(fixture, workflow);
+  const result = checkFixture(fixture);
+  assert.equal(result.status, 1, result.stdout);
+});

@@ -74,8 +74,8 @@ Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
 | --- | --- | --- |
 | Nayuki `QR-Code-generator` (already vendored) | Correct mixed-mode matrix; `quirc` decoded it | Keep |
 | Current 1-bit indexed zlib PNG | 0.19 ms / 1949 B for a 1024 px flat QR | Keep |
-| Current zlib RGBA (`Z_BEST_SPEED`) | 3.56 ms / 48.9 KB flat, 4.90 ms / 185 KB gradient | Replaced for RGBA |
-| `fpng` two-pass (`FPNG_ENCODE_SLOWER`) | 1.68 ms / 49.7 KB flat (SSE4.1 unavailable) | Keep for RGBA |
+| Current zlib RGBA (`Z_BEST_SPEED`) | 3.56 ms / 48.9 KB flat, 4.90 ms / 185 KB gradient | Replaced by `fpng` up to 1024 px; still the encoder for gradients above 1024 px (streamed, row by row) |
+| `fpng` two-pass (`FPNG_ENCODE_SLOWER`) | 1.68 ms / 49.7 KB flat (SSE4.1 unavailable) | Keep for RGBA gradients of 1024 px or smaller |
 | `fpng` one-pass | 1.64 ms but 102 KB flat | Reject (size) |
 | Apple zlib `Z_RLE` / `Z_HUFFMAN_ONLY` | 11–19 ms and much larger | Reject |
 | `zlib-ng` `Z_BEST_SPEED` | 2.50 ms but 374 KB | Reject (size + vendor weight) |
@@ -87,8 +87,16 @@ Libraries tried on a 1024×1024 QR-like RGBA buffer, then kept or rejected:
 | `quirc` | Decoded a real Nayuki matrix (`found=1 matched=1`) | Keep as host C++ scan-back only |
 
 Do not treat the bake-off table as an iPhone 17e result. Re-run
-`bun run benchmark:cpp` on the same machine after PNG encoder changes. The
-`rgba-gradient-png-cold` and `preview-styled-png-cold` rows are the `fpng`
-gradient path; `palette-logo-png-cold` is the 4-bit palette zlib writer used
-for layered colors and logo areas without a gradient; `indexed-png-*` rows
-stay on the 1-bit zlib writer.
+`bun run benchmark:cpp` on the same machine after PNG encoder changes. Native
+PNG output uses three encoders:
+
+| Output | Encoder | Benchmark rows |
+| --- | --- | --- |
+| Flat two-color code | 1-bit indexed zlib writer | `indexed-png-*` |
+| Layered colors or logo area, no gradient | 4-bit palette zlib writer | `palette-logo-png-cold` |
+| Gradient, 1024 px or smaller | `fpng` RGBA | `rgba-gradient-png-cold`, `preview-styled-png-cold` |
+| Gradient, larger than 1024 px | Streaming zlib RGBA writer | `rgba-gradient-streamed-png-cold` |
+
+The benchmark renders at 384 px and 488 px, so `rgba-gradient-streamed-png-cold`
+builds its generator with a 256 px streaming threshold to time the streamed
+writer at the same size as `rgba-gradient-png-cold`.

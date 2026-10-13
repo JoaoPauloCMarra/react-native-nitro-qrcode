@@ -20,6 +20,11 @@
 namespace NitroQRCode {
 namespace {
 
+constexpr uint8_t BodyLayer = 1;
+constexpr uint8_t StrokeLayer = 2;
+constexpr uint8_t EyeFrameLayer = 3;
+constexpr uint8_t EyeStrokeLayer = 4;
+constexpr uint8_t EyeballLayer = 5;
 constexpr uint8_t TransparentLayer = 6;
 constexpr uint8_t AlignmentLayer = 7;
 constexpr uint8_t TimingLayer = 8;
@@ -227,16 +232,36 @@ Color layerFillAt(bool isSet, const Color &color,
   return isSet ? color : foregroundFillAt(options, imageSize, x, y);
 }
 
-Color colorForLayer(uint8_t layer, const GenerateOptions &options,
-                    int imageSize, int x, int y) {
+Color compositeOver(const Color &source, const Color &backdrop) {
+  if (source.a == 255) {
+    return source;
+  }
+  const int sourceAlpha = source.a;
+  const int backdropWeight = backdrop.a * (255 - sourceAlpha);
+  const int outAlpha = sourceAlpha * 255 + backdropWeight;
+  if (outAlpha == 0) {
+    return {0, 0, 0, 0};
+  }
+  const auto channel = [&](int top, int bottom) {
+    return static_cast<uint8_t>(
+        (top * sourceAlpha * 255 + bottom * backdropWeight + outAlpha / 2) /
+        outAlpha);
+  };
+  return {channel(source.r, backdrop.r), channel(source.g, backdrop.g),
+          channel(source.b, backdrop.b),
+          static_cast<uint8_t>((outAlpha + 127) / 255)};
+}
+
+Color rawColorForLayer(uint8_t layer, const GenerateOptions &options,
+                       int imageSize, int x, int y) {
   switch (layer) {
-  case 2:
+  case StrokeLayer:
     return options.stroke;
-  case 3:
+  case EyeFrameLayer:
     return layerFillAt(options.eyeSet, options.eye, options, imageSize, x, y);
-  case 4:
+  case EyeStrokeLayer:
     return options.eyeStroke;
-  case 5:
+  case EyeballLayer:
     return layerFillAt(options.eyeballSet, options.eyeball, options, imageSize,
                        x, y);
   case AlignmentLayer:
@@ -249,13 +274,22 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
     return options.finderInner;
   case QuietZoneLayer:
     return options.quietZoneFill;
-  case 1:
+  case BodyLayer:
     return foregroundFillAt(options, imageSize, x, y);
   case TransparentLayer:
     return {0, 0, 0, 0};
   default:
     return options.background;
   }
+}
+
+Color colorForLayer(uint8_t layer, const GenerateOptions &options,
+                    int imageSize, int x, int y) {
+  const Color color = rawColorForLayer(layer, options, imageSize, x, y);
+  if (layer == 0 || layer == QuietZoneLayer || layer == TransparentLayer) {
+    return color;
+  }
+  return compositeOver(color, options.background);
 }
 
 void writeLayeredRow(const std::vector<uint8_t> &indices, int imageSize, int y,
@@ -671,7 +705,7 @@ void fillClassy(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
 
 void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
                 int x1, int y1, ModuleShape shape, int gap, int cornerRadius,
-                uint8_t value = 1, ModuleNeighbors neighbors = {}) {
+                uint8_t value = BodyLayer, ModuleNeighbors neighbors = {}) {
   const int maxGap = std::max(0, (std::min(x1 - x0, y1 - y0) - 1) / 2);
   const int inset = std::min(gap, maxGap);
   x0 += inset;
@@ -756,7 +790,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
   const auto modulePosition = [imageSize, quietZone,
                                totalModules](int module, double offset) {
     return static_cast<int>(
-        std::round(((static_cast<double>(module + quietZone) + offset) *
+        std::floor(((static_cast<double>(module + quietZone) + offset) *
                     static_cast<double>(imageSize)) /
                    static_cast<double>(totalModules)));
   };
@@ -771,9 +805,11 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
 
   const double strokeInset =
       frameShape == ModuleShape::Square ? 0.3 : 0.65;
-  drawShape(0.0, 7.0, frameShape, useEyeStrokeLayer ? 4 : 3);
+  drawShape(0.0, 7.0, frameShape,
+            useEyeStrokeLayer ? EyeStrokeLayer : EyeFrameLayer);
   if (useEyeStrokeLayer) {
-    drawShape(strokeInset, 7.0 - strokeInset * 2.0, frameShape, 3);
+    drawShape(strokeInset, 7.0 - strokeInset * 2.0, frameShape,
+              EyeFrameLayer);
   }
   drawShape(1.0, 5.0, frameShape, holeLayer);
   const bool useCircleFrameSquareEyeball =
@@ -786,7 +822,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
       eyeballShape == ModuleShape::Circle ? 3.5
       : useCircleFrameSquareEyeball  ? 2.5
                                       : 3.0;
-  drawShape(eyeballOffset, eyeballSpan, eyeballShape, 5);
+  drawShape(eyeballOffset, eyeballSpan, eyeballShape, EyeballLayer);
 }
 
 void drawGroupedFinders(std::vector<uint8_t> &indices, int imageSize,
@@ -1101,6 +1137,168 @@ std::vector<Color> layerPalette(const GenerateOptions &options) {
   return palette;
 }
 
+struct ModuleShapes {
+  ModuleShape body;
+  ModuleShape eyePattern;
+  ModuleShape eyeball;
+  ModuleShape alignment;
+  ModuleShape timing;
+};
+
+struct ModuleStyle {
+  ModuleShape shape;
+  int gap;
+  int radius;
+  uint8_t layer;
+};
+
+ModuleStyle classifyModule(int moduleX, int moduleY, int matrixSize,
+                           const std::vector<int> &alignmentPositions,
+                           const ModuleShapes &shapes,
+                           const GenerateOptions &options, int pixelWidth,
+                           int pixelHeight) {
+  const bool eyeModule = isEyeModule(moduleX, moduleY, matrixSize);
+  const bool eyeballModule = isEyeBallModule(moduleX, moduleY, matrixSize);
+  const bool alignmentModule =
+      isAlignmentModule(moduleX, moduleY, matrixSize, alignmentPositions);
+  const bool timingModule =
+      isTimingModule(moduleX, moduleY, matrixSize, alignmentPositions);
+  ModuleStyle style;
+  style.shape = eyeballModule ? shapes.eyeball
+                : eyeModule   ? shapes.eyePattern
+                : alignmentModule ? shapes.alignment
+                : timingModule    ? shapes.timing
+                                  : shapes.body;
+  style.gap = eyeModule ? options.eyePatternGap
+              : alignmentModule || timingModule
+                  ? 0
+                  : resolveBodyGap(options, pixelWidth, pixelHeight);
+  style.radius =
+      eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
+  style.layer = BodyLayer;
+  if (eyeModule) {
+    style.layer = eyeballModule ? EyeballLayer : EyeFrameLayer;
+  } else if (alignmentModule) {
+    style.layer = AlignmentLayer;
+  } else if (timingModule) {
+    style.layer = TimingLayer;
+  }
+  return style;
+}
+
+std::vector<uint8_t> rasterizeLayers(const Matrix &matrix,
+                                     const GenerateOptions &options,
+                                     int imageSize) {
+  const int totalModules = matrix.size + options.quietZone * 2;
+  std::vector<uint8_t> indices(static_cast<size_t>(imageSize) *
+                               static_cast<size_t>(imageSize));
+  const auto isDark = [&matrix](int x, int y) {
+    if (x < 0 || y < 0 || x >= matrix.size || y >= matrix.size) {
+      return false;
+    }
+    return matrix.modules[static_cast<size_t>(y) *
+                              static_cast<size_t>(matrix.size) +
+                          static_cast<size_t>(x)] == 1;
+  };
+
+  const ModuleShapes shapes{
+      parseShape(options.moduleShape, "shape"),
+      parseEyePatternShape(options.eyePatternShape),
+      parseEyeballShape(options.eyeballShape),
+      parseShape(options.alignmentShape, "alignmentShape"),
+      parseShape(options.timingShape, "timingShape")};
+  const std::vector<int> alignmentPositions =
+      alignmentPatternPositions(matrix.size);
+  const bool useCustomFinderColors = hasCustomFinderColors(options);
+  const bool drawGroupedFinderEyes =
+      shapes.eyePattern != ModuleShape::Square ||
+      shapes.eyeball != ModuleShape::Square || useCustomFinderColors;
+  if (options.quietZoneFill != options.background) {
+    std::fill(indices.begin(), indices.end(), QuietZoneLayer);
+    const int inner0 = (options.quietZone * imageSize) / totalModules;
+    const int inner1 =
+        ((matrix.size + options.quietZone) * imageSize) / totalModules;
+    fillRect(indices, imageSize, inner0, inner0, inner1, inner1, 0);
+  }
+
+  for (int moduleY = 0; moduleY < matrix.size; moduleY++) {
+    const int y0 = ((moduleY + options.quietZone) * imageSize) / totalModules;
+    const int y1 =
+        ((moduleY + options.quietZone + 1) * imageSize) / totalModules;
+    for (int moduleX = 0; moduleX < matrix.size; moduleX++) {
+      const bool dark = matrix.modules[static_cast<size_t>(moduleY) *
+                                           static_cast<size_t>(matrix.size) +
+                                       static_cast<size_t>(moduleX)] == 1;
+      if (!dark) {
+        continue;
+      }
+      const bool eyeModule = isEyeModule(moduleX, moduleY, matrix.size);
+      if (drawGroupedFinderEyes && eyeModule) {
+        continue;
+      }
+
+      const int x0 = ((moduleX + options.quietZone) * imageSize) / totalModules;
+      const int x1 =
+          ((moduleX + options.quietZone + 1) * imageSize) / totalModules;
+      if (intersectsLogoArea(x0, y0, x1, y1, imageSize,
+                             options.logoAreaSize)) {
+        continue;
+      }
+      const ModuleStyle style =
+          classifyModule(moduleX, moduleY, matrix.size, alignmentPositions,
+                         shapes, options, x1 - x0, y1 - y0);
+      const ModuleNeighbors neighbors{
+          isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
+          isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
+      if (style.layer == BodyLayer && drawsBodyStroke(options)) {
+        drawModule(indices, imageSize, x0, y0, x1, y1, style.shape, style.gap,
+                   style.radius, StrokeLayer, neighbors);
+        const int strokeInset = std::max(1, (x1 - x0) / 5);
+        drawModule(indices, imageSize, x0, y0, x1, y1, style.shape,
+                   style.gap + strokeInset, style.radius, BodyLayer, neighbors);
+        continue;
+      }
+      drawModule(indices, imageSize, x0, y0, x1, y1, style.shape, style.gap,
+                 style.radius, style.layer, neighbors);
+    }
+  }
+  if (drawGroupedFinderEyes) {
+    drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
+                       totalModules, shapes.eyePattern, shapes.eyeball,
+                       options.eyePatternCornerRadius,
+                       drawsEyeStroke(options),
+                       options.finderInner == options.background
+                           ? 0
+                           : FinderInnerLayer);
+  }
+  clearLogoArea(indices, imageSize, options.logoAreaSize,
+                options.logoAreaBorderRadius);
+
+  return indices;
+}
+
+std::vector<uint8_t> encodeLayeredPng(std::vector<uint8_t> indices,
+                                      int imageSize,
+                                      const GenerateOptions &options,
+                                      int streamedRgbaMinSize) {
+  if (hasGradient(options) && imageSize > streamedRgbaMinSize) {
+    return encodePngRgbaStreamed(indices, imageSize, options);
+  }
+  if (hasGradient(options)) {
+    const std::vector<uint8_t> rgba =
+        renderLayeredRgba(indices, imageSize, options);
+    std::vector<uint8_t>().swap(indices);
+    return encodePngRgba(imageSize, imageSize, rgba);
+  }
+  if (hasCustomLayerColors(options) || options.logoAreaSize > 0) {
+    return encodePngPalette(imageSize, imageSize, std::move(indices),
+                            layerPalette(options));
+  }
+  return encodePngIndexed1(imageSize, imageSize, std::move(indices),
+                           compositeOver(options.foreground, options.background),
+                           options.background);
+}
+
 } // namespace
 
 QRCodeGenerator::QRCodeGenerator(CacheKeyHasher cacheKeyHasher,
@@ -1208,131 +1406,11 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   }
 
   const Matrix matrix = createMatrix(value, options);
-  const int totalModules = matrix.size + options.quietZone * 2;
-  const int imageSize = std::max(options.size, totalModules);
-  std::vector<uint8_t> indices(static_cast<size_t>(imageSize) *
-                               static_cast<size_t>(imageSize));
-  const auto isDark = [&matrix](int x, int y) {
-    if (x < 0 || y < 0 || x >= matrix.size || y >= matrix.size) {
-      return false;
-    }
-    return matrix.modules[static_cast<size_t>(y) *
-                              static_cast<size_t>(matrix.size) +
-                          static_cast<size_t>(x)] == 1;
-  };
-
-  const ModuleShape moduleShape = parseShape(options.moduleShape, "shape");
-  const ModuleShape eyePatternShape =
-      parseEyePatternShape(options.eyePatternShape);
-  const ModuleShape eyeballShape = parseEyeballShape(options.eyeballShape);
-  const ModuleShape alignmentShape =
-      parseShape(options.alignmentShape, "alignmentShape");
-  const ModuleShape timingShape =
-      parseShape(options.timingShape, "timingShape");
-  const std::vector<int> alignmentPositions =
-      alignmentPatternPositions(matrix.size);
-  const bool useCustomFinderColors = hasCustomFinderColors(options);
-  const bool drawGroupedFinderEyes =
-      eyePatternShape != ModuleShape::Square ||
-      eyeballShape != ModuleShape::Square || useCustomFinderColors;
-  if (options.quietZoneFill != options.background) {
-    std::fill(indices.begin(), indices.end(), QuietZoneLayer);
-    const int inner0 = (options.quietZone * imageSize) / totalModules;
-    const int inner1 =
-        ((matrix.size + options.quietZone) * imageSize) / totalModules;
-    fillRect(indices, imageSize, inner0, inner0, inner1, inner1, 0);
-  }
-
-  for (int moduleY = 0; moduleY < matrix.size; moduleY++) {
-    const int y0 = ((moduleY + options.quietZone) * imageSize) / totalModules;
-    const int y1 =
-        ((moduleY + options.quietZone + 1) * imageSize) / totalModules;
-    for (int moduleX = 0; moduleX < matrix.size; moduleX++) {
-      const bool dark = matrix.modules[static_cast<size_t>(moduleY) *
-                                           static_cast<size_t>(matrix.size) +
-                                       static_cast<size_t>(moduleX)] == 1;
-      if (!dark) {
-        continue;
-      }
-      const bool eyeModule = isEyeModule(moduleX, moduleY, matrix.size);
-      if (drawGroupedFinderEyes && eyeModule) {
-        continue;
-      }
-
-      const int x0 = ((moduleX + options.quietZone) * imageSize) / totalModules;
-      const int x1 =
-          ((moduleX + options.quietZone + 1) * imageSize) / totalModules;
-      if (intersectsLogoArea(x0, y0, x1, y1, imageSize,
-                             options.logoAreaSize)) {
-        continue;
-      }
-      const bool eyeballModule = isEyeBallModule(moduleX, moduleY, matrix.size);
-      const bool alignmentModule =
-          isAlignmentModule(moduleX, moduleY, matrix.size, alignmentPositions);
-      const bool timingModule =
-          isTimingModule(moduleX, moduleY, matrix.size, alignmentPositions);
-      const ModuleShape shape =
-          eyeballModule ? eyeballShape
-          : eyeModule   ? eyePatternShape
-          : alignmentModule ? alignmentShape
-          : timingModule    ? timingShape
-                            : moduleShape;
-      const int gap = eyeModule ? options.eyePatternGap
-                      : alignmentModule || timingModule
-                          ? 0
-                          : resolveBodyGap(options, x1 - x0, y1 - y0);
-      const int radius =
-          eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
-      uint8_t layer = 1;
-      if (eyeModule) {
-        layer = eyeballModule ? 5 : 3;
-      } else if (alignmentModule) {
-        layer = AlignmentLayer;
-      } else if (timingModule) {
-        layer = TimingLayer;
-      }
-      const ModuleNeighbors neighbors{
-          isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
-          isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
-      if (layer == 1 && drawsBodyStroke(options)) {
-        drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, 2,
-                   neighbors);
-        const int strokeInset = std::max(1, (x1 - x0) / 5);
-        drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap + strokeInset,
-                   radius, 1, neighbors);
-        continue;
-      }
-      drawModule(indices, imageSize, x0, y0, x1, y1, shape, gap, radius, layer,
-                 neighbors);
-    }
-  }
-  if (drawGroupedFinderEyes) {
-    drawGroupedFinders(indices, imageSize, matrix.size, options.quietZone,
-                       totalModules, eyePatternShape, eyeballShape,
-                       options.eyePatternCornerRadius,
-                       drawsEyeStroke(options),
-                       options.finderInner == options.background
-                           ? 0
-                           : FinderInnerLayer);
-  }
-  clearLogoArea(indices, imageSize, options.logoAreaSize,
-                options.logoAreaBorderRadius);
-
-  std::vector<uint8_t> png;
-  if (hasGradient(options) && imageSize > streamedRgbaMinSize_) {
-    png = encodePngRgbaStreamed(indices, imageSize, options);
-  } else if (hasGradient(options)) {
-    const std::vector<uint8_t> rgba =
-        renderLayeredRgba(indices, imageSize, options);
-    std::vector<uint8_t>().swap(indices);
-    png = encodePngRgba(imageSize, imageSize, rgba);
-  } else if (hasCustomLayerColors(options) || options.logoAreaSize > 0) {
-    png = encodePngPalette(imageSize, imageSize, std::move(indices),
-                           layerPalette(options));
-  } else {
-    png = encodePngIndexed1(imageSize, imageSize, std::move(indices),
-                            options.foreground, options.background);
-  }
+  const int imageSize =
+      std::max(options.size, matrix.size + options.quietZone * 2);
+  std::vector<uint8_t> png = encodeLayeredPng(
+      rasterizeLayers(matrix, options, imageSize), imageSize, options,
+      streamedRgbaMinSize_);
   storeCacheEntry(key, request,
                   std::string(png.begin(), png.end()));
   return png;
@@ -1358,6 +1436,7 @@ QRCodeGenerator::renderPngDataUri(const std::string &value,
 std::string QRCodeGenerator::generateSvgString(const std::string &value,
                                                const GenerateOptions &options) {
   rejectOversizedValue(value, options);
+  validateOptions(value, options);
   const std::string request = cacheRequest(value, options, "svg");
   const std::string key = cacheKey(request);
   if (const auto cached = getCacheEntry(key, request)) {
@@ -1471,16 +1550,31 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
     return request;
   }
 
-  appendCacheNumber(request, options.size);
-  appendCacheNumber(request, options.quietZone);
+  const auto appendGradient = [&request, &options]() {
+    appendCachePart(request, options.gradient.type);
+    for (const auto &color : options.gradient.colors) {
+      appendCacheNumber(request, color.r);
+      appendCacheNumber(request, color.g);
+      appendCacheNumber(request, color.b);
+      appendCacheNumber(request, color.a);
+    }
+    for (double location : options.gradient.locations) {
+      appendCachePart(request, cacheDouble(location));
+    }
+    appendCachePart(request, cacheDouble(options.gradient.startX));
+    appendCachePart(request, cacheDouble(options.gradient.startY));
+    appendCachePart(request, cacheDouble(options.gradient.endX));
+    appendCachePart(request, cacheDouble(options.gradient.endY));
+  };
   if (output == "svg") {
+    appendCacheNumber(request, options.quietZone);
     appendCachePart(request, options.foregroundColor);
     appendCachePart(request, options.backgroundColor);
-    appendCachePart(request, options.strokeColor);
-    appendCachePart(request, options.eyeColor);
-    appendCachePart(request, options.eyeStrokeColor);
-    appendCachePart(request, options.eyeballColor);
+    appendGradient();
+    return request;
   }
+  appendCacheNumber(request, options.size);
+  appendCacheNumber(request, options.quietZone);
   const auto appendColor = [&request](const Color &color) {
     appendCacheNumber(request, color.r);
     appendCacheNumber(request, color.g);
@@ -1510,20 +1604,7 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendCachePart(request, options.layout);
   appendCacheNumber(request, options.logoAreaSize);
   appendCacheNumber(request, options.logoAreaBorderRadius);
-  appendCachePart(request, options.gradient.type);
-  for (const auto &color : options.gradient.colors) {
-    appendCacheNumber(request, color.r);
-    appendCacheNumber(request, color.g);
-    appendCacheNumber(request, color.b);
-    appendCacheNumber(request, color.a);
-  }
-  for (double location : options.gradient.locations) {
-    appendCachePart(request, cacheDouble(location));
-  }
-  appendCachePart(request, cacheDouble(options.gradient.startX));
-  appendCachePart(request, cacheDouble(options.gradient.startY));
-  appendCachePart(request, cacheDouble(options.gradient.endX));
-  appendCachePart(request, cacheDouble(options.gradient.endY));
+  appendGradient();
   appendCacheNumber(request, (options.strokeSet ? 1 : 0) |
                                  (options.eyeSet ? 2 : 0) |
                                  (options.eyeStrokeSet ? 4 : 0) |

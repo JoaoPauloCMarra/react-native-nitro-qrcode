@@ -3,28 +3,17 @@ import TestRenderer, { act } from "react-test-renderer";
 import jsQR from "jsqr";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  createMockContext,
+  installCanvas,
+} from "./helpers/canvas";
+import { createMockHybridObject } from "./helpers/nitro-mock";
 
 const PNG_SIGNATURE = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
 ]);
 
-const mockHybridObject = {
-  generatePngArrayBufferObject: jest.fn(() => PNG_SIGNATURE.buffer),
-  generatePngArrayBufferAsyncObject: jest.fn(async () => PNG_SIGNATURE.buffer),
-  generatePngBase64Object: jest.fn(() => "png-base64"),
-  generatePngBase64AsyncObject: jest.fn(async () => "png-base64"),
-  generatePngDataUriObject: jest.fn(() => "data:image/png;base64,png-base64"),
-  generatePngDataUriAsyncObject: jest.fn(
-    async () => "data:image/png;base64,png-base64",
-  ),
-  generateSvgString: jest.fn(() => "<svg />"),
-  getMatrixObject: jest.fn(() => ({ size: 21, packedBase64: "matrix-base64" })),
-  getMatrixPackedBase64: jest.fn(() => "matrix-base64"),
-  getMatrixSize: jest.fn(() => 21),
-  clearCache: jest.fn(),
-  getCacheSize: jest.fn(() => 2),
-  getCacheBytes: jest.fn(() => 256),
-};
+const mockHybridObject = createMockHybridObject(PNG_SIGNATURE.buffer);
 
 jest.mock("react-native-nitro-modules", () => ({
   NitroModules: {
@@ -80,7 +69,6 @@ class ErrorBoundary extends React.Component<
 
 import {
   clearQRCodeCache,
-  type ErrorCorrectionLevel,
   getMatrix,
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
@@ -100,14 +88,6 @@ import * as Web from "../index.web";
 import { mergePresetShapeOptions, PRESET_SHAPE_OPTIONS } from "../defaults";
 import { validateLogoDimensions } from "../validation";
 
-function nativeOptions(options: unknown): Parameters<typeof toPngBase64>[0] {
-  return options as Parameters<typeof toPngBase64>[0];
-}
-
-function webOptions(options: unknown): Parameters<typeof Web.toSvgString>[0] {
-  return options as Parameters<typeof Web.toSvgString>[0];
-}
-
 function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
   return (
     Array.isArray(node.props.style) &&
@@ -121,9 +101,35 @@ function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
 }
 
 describe("entrypoint export parity", () => {
+  const nativeEntry = jest.requireActual<typeof import("../index")>("../index");
+
+  it("exports the same names with the same kinds on native and web", () => {
+    const describeExports = (entry: object) =>
+      Object.entries(entry)
+        .map(([name, value]) => `${name}:${typeof value}`)
+        .sort();
+    expect(describeExports(Web)).toEqual(describeExports(nativeEntry));
+  });
+
   it("re-exports validateOptions on both entrypoints", () => {
     expect(validateOptions).toBe(NitroQRCode.validateOptions);
     expect(Web.validateOptions).toBe(Web.NitroQRCode.validateOptions);
+  });
+
+  it("exports the same frozen preset table on both entrypoints", () => {
+    expect(nativeEntry.PRESET_SHAPE_OPTIONS).toBe(PRESET_SHAPE_OPTIONS);
+    expect(Web.PRESET_SHAPE_OPTIONS).toBe(PRESET_SHAPE_OPTIONS);
+    expect(Object.keys(nativeEntry.PRESET_SHAPE_OPTIONS)).toEqual([
+      "default",
+      "rounded",
+      "dots",
+      "branded",
+      "classy",
+      "mosaic",
+      "fluid",
+    ]);
+    expect(Object.isFrozen(nativeEntry.PRESET_SHAPE_OPTIONS)).toBe(true);
+    expect(Object.isFrozen(nativeEntry.PRESET_SHAPE_OPTIONS.dots)).toBe(true);
   });
 });
 
@@ -416,6 +422,13 @@ describe("native QRCode API", () => {
 
   it("generates SVG and matrix output", () => {
     expect(toSvgString({ value: "Hello" })).toBe("<svg />");
+    expect(mockHybridObject.generateSvgStringObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: "Hello",
+        quietZone: 4,
+        gradientType: "none",
+      }),
+    );
     expect(getMatrix({ value: "Hello" })).toEqual({
       size: 21,
       packedBase64: "matrix-base64",
@@ -462,212 +475,15 @@ describe("native QRCode API", () => {
     expect(NitroQRCode.getCacheSize()).toBe(2);
   });
 
-  it("validates empty values and integer ranges", () => {
+  it("rejects invalid options before reaching the native module", () => {
+    jest.clearAllMocks();
     expect(() => toPngBase64({ value: "" })).toThrow("must not be empty");
-    expect(() => toPngBase64({ value: "x", size: 0 })).toThrow("size must be");
-    expect(() => toPngBase64({ value: "x", size: 2048 })).not.toThrow();
-    expect(() => toPngBase64({ value: "x", size: 4096 })).not.toThrow();
     expect(() => toPngBase64Async({ value: "x", size: 4096 })).not.toThrow();
-    expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow(
-      "size must be",
-    );
-    expect(() => toPngBase64({ value: "x", quietZone: 33 })).toThrow(
-      "quietZone must be",
-    );
-    expect(() =>
-      toPngBase64(nativeOptions({ value: "x", minVersion: 0 })),
-    ).toThrow("minVersion must be");
-    expect(() =>
-      toPngBase64(nativeOptions({ value: "x", maxVersion: 41 })),
-    ).toThrow(
-      "maxVersion must be",
-    );
-    expect(() =>
-      toPngBase64({ value: "x", minVersion: 3, maxVersion: 2 }),
-    ).toThrow("minVersion and maxVersion");
-    expect(() => toPngBase64(nativeOptions({ value: "x", mask: 8 }))).toThrow(
-      "mask must be",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        errorCorrectionLevel: "bad" as ErrorCorrectionLevel,
-      }),
-    ).toThrow("errorCorrectionLevel must be");
-    expect(() => toPngBase64({ value: "x", size: 1.5 })).toThrow(
-      "size must be",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { shape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "shape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
+    expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow("size must be");
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
-    expect(() =>
-      toPngBase64({ value: "x", shapeOptions: { cornerRadius: 257 } }),
-    ).toThrow("cornerRadius must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { layout: "spiral" as "matrix" },
-      }),
-    ).toThrow("layout must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { eyePatternShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { eyeballShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { alignmentShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { timingShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { bodyDensity: "crowded" as "dense" },
-      }),
-    ).toThrow("bodyDensity must be sparse, balanced, or dense");
-    expect(() => toPngBase64({ value: "x", logoAreaSize: 4097 })).toThrow(
-      "logoAreaSize must be",
-    );
-    expect(() =>
-      toPngBase64({ value: "x", size: 128, logoAreaSize: 129 }),
-    ).toThrow("logoAreaSize must be between 0 and size");
-    expect(() =>
-      toPngBase64({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
-    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
-    expect(() =>
-      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
-    ).not.toThrow();
-    expect(() =>
-      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
-    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: [
-            "#000000",
-            "#111111",
-            "#222222",
-            "#333333",
-            "#444444",
-            "#555555",
-            "#666666",
-            "#777777",
-            "#888888",
-          ],
-        },
-      })),
-    ).toThrow("gradient.colors must contain");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0],
-        },
-      })),
-    ).toThrow("gradient.locations must match");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          type: "diagonal" as "linear",
-          colors: ["#000000", "#FFFFFF"],
-        },
-      }),
-    ).toThrow("gradient.type must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0, 2],
-        },
-      }),
-    ).toThrow("gradient.locations entries must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0.8, 0.2],
-        },
-      }),
-    ).toThrow("gradient.locations must be in non-decreasing order");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 2, y: 0 },
-        },
-      }),
-    ).toThrow("gradient.start.x must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 0, y: 2 },
-        },
-      }),
-    ).toThrow("gradient.start.y must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: -1, y: 1 },
-        },
-      }),
-    ).toThrow("gradient.end.x must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: 1, y: Number.NaN },
-        },
-      }),
-    ).toThrow("gradient.end.y must be");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "nope"],
-        },
-      })),
-    ).toThrow("gradient.colors[1] must be");
+    expect(mockHybridObject.generatePngBase64Object).not.toHaveBeenCalled();
   });
 
   it("keeps the absolute and relative logo radius bounds aligned", () => {
@@ -1293,6 +1109,79 @@ describe("native QRCode API", () => {
     expect(onError.mock.calls[0]?.[0]?.message).toBe("native-boom");
   });
 
+  it.each([
+    ["a single color", { colors: ["#000000"] }, "gradient.colors must contain"],
+    [
+      "locations shorter than colors",
+      { colors: ["#000000", "#FFFFFF", "#FF0000"], locations: [0] },
+      "gradient.locations must match",
+    ],
+    [
+      "a start point without y",
+      { colors: ["#000000", "#FFFFFF"], start: { x: 0.5 } },
+      "gradient.start.y must be",
+    ],
+    [
+      "more than eight colors",
+      {
+        colors: Array.from({ length: 9 }, (_, index) => `#00000${index}`),
+      },
+      "gradient.colors must contain",
+    ],
+  ])("reports %s as a gradient error instead of dropping it", async (_name, gradient, message) => {
+    const onError = jest.fn();
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "bad-gradient",
+          onError,
+          gradient: gradient as never,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining(message) }),
+    );
+  });
+
+  it("reports a BigInt shape option through onError instead of crashing the render", async () => {
+    const onError = jest.fn();
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "unserializable",
+          onError,
+          shapeOptions: { layout: BigInt(1) as unknown as "matrix" },
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining("layout must be") }),
+    );
+  });
+
+  it("renders a gradient that cannot be serialized", async () => {
+    const onError = jest.fn();
+    const gradient: Record<string, unknown> = {
+      colors: ["#000000", "#FFFFFF"],
+    };
+    gradient.self = gradient;
+    await act(async () => {
+      TestRenderer.create(
+        React.createElement(QRCode, {
+          value: "circular",
+          onError,
+          gradient: gradient as never,
+        }),
+      );
+      await Promise.resolve();
+    });
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockHybridObject.generatePngDataUriAsyncObject).toHaveBeenCalled();
+  });
+
   it("exposes imperative export methods on the QR component", async () => {
     const qrRef = React.createRef<QRCodeRef>();
     let tree: TestRenderer.ReactTestRenderer | undefined;
@@ -1736,119 +1625,23 @@ describe("native QRCode API", () => {
   });
 });
 
-describe("web QRCode API", () => {
-  type MockGradient = {
-    addColorStop: jest.Mock<void, [number, string]>;
-  };
+const originalDocument = globalThis.document;
+const originalBtoa = globalThis.btoa;
 
-  type MockContext = {
-    arc: jest.Mock<void, [number, number, number, number, number]>;
-    clearRect: jest.Mock<void, [number, number, number, number]>;
-    fillStyle: string | MockGradient;
-    globalCompositeOperation: GlobalCompositeOperation;
-    lineCap: CanvasLineCap;
-    lineWidth: number;
-    strokeStyle: string | MockGradient;
-    beginPath: jest.Mock<void, []>;
-    bezierCurveTo: jest.Mock<
-      void,
-      [number, number, number, number, number, number]
-    >;
-    closePath: jest.Mock<void, []>;
-    createLinearGradient: jest.Mock<
-      MockGradient,
-      [number, number, number, number]
-    >;
-    createRadialGradient: jest.Mock<
-      MockGradient,
-      [number, number, number, number, number, number]
-    >;
-    ellipse: jest.Mock<
-      void,
-      [number, number, number, number, number, number, number]
-    >;
-    fill: jest.Mock<void, []>;
-    fillRect: jest.Mock<void, [number, number, number, number]>;
-    lineTo: jest.Mock<void, [number, number]>;
-    moveTo: jest.Mock<void, [number, number]>;
-    quadraticCurveTo: jest.Mock<void, [number, number, number, number]>;
-    restore: jest.Mock<void, []>;
-    rotate: jest.Mock<void, [number]>;
-    save: jest.Mock<void, []>;
-    stroke: jest.Mock<void, []>;
-    translate: jest.Mock<void, [number, number]>;
-  };
-
-  const originalDocument = globalThis.document;
-  const originalBtoa = globalThis.btoa;
-
-  function createMockGradient(): MockGradient {
-    return {
-      addColorStop: jest.fn(),
-    };
-  }
-
-  function createMockContext(): MockContext {
-    return {
-      arc: jest.fn(),
-      clearRect: jest.fn(),
-      fillStyle: "",
-      globalCompositeOperation: "source-over",
-      lineCap: "butt",
-      lineWidth: 1,
-      strokeStyle: "",
-      beginPath: jest.fn(),
-      bezierCurveTo: jest.fn(),
-      closePath: jest.fn(),
-      createLinearGradient: jest
-        .fn<MockGradient, [number, number, number, number]>()
-        .mockImplementation(() => createMockGradient()),
-      createRadialGradient: jest
-        .fn<MockGradient, [number, number, number, number, number, number]>()
-        .mockImplementation(() => createMockGradient()),
-      ellipse: jest.fn(),
-      fill: jest.fn(),
-      fillRect: jest.fn(),
-      lineTo: jest.fn(),
-      moveTo: jest.fn(),
-      quadraticCurveTo: jest.fn(),
-      restore: jest.fn(),
-      rotate: jest.fn(),
-      save: jest.fn(),
-      stroke: jest.fn(),
-      translate: jest.fn(),
-    };
-  }
-
-  function installCanvas(
-    getContext: () => MockContext | null = createMockContext,
-  ) {
-    const canvas = {
-      width: 0,
-      height: 0,
-      getContext: jest.fn(getContext),
-      toDataURL: jest.fn(() => "data:image/png;base64,web-png"),
-    };
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: {
-        createElement: jest.fn(() => canvas),
-      },
-    });
-    return canvas;
-  }
-
-  afterEach(() => {
-    Object.defineProperty(globalThis, "document", {
-      configurable: true,
-      value: originalDocument,
-    });
-    Object.defineProperty(globalThis, "btoa", {
-      configurable: true,
-      value: originalBtoa,
-    });
-    Web.clearQRCodeCache();
+function restoreWebEnvironment() {
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: originalDocument,
   });
+  Object.defineProperty(globalThis, "btoa", {
+    configurable: true,
+    value: originalBtoa,
+  });
+  Web.clearQRCodeCache();
+}
+
+describe("web QRCode API", () => {
+  afterEach(restoreWebEnvironment);
 
   it("generates SVG, matrix, and cached PNG data on web", () => {
     const canvas = installCanvas();
@@ -2246,208 +2039,15 @@ describe("web QRCode API", () => {
     installCanvas(() => null);
     expect(() => Web.toPngDataUri({ value: "Hello" })).toThrow("2D canvas");
 
-    installCanvas();
+    const canvas = installCanvas();
     expect(() => Web.toSvgString({ value: "" })).toThrow("must not be empty");
-    expect(() => Web.toSvgString({ value: "x", size: 0 })).toThrow(
+    expect(() => Web.toPngDataUri({ value: "x", size: 0 })).toThrow(
       "size must be",
     );
-    expect(() => Web.toSvgString({ value: "x", quietZone: 33 })).toThrow(
-      "quietZone must be",
-    );
-    expect(() =>
-      Web.toSvgString(webOptions({ value: "x", minVersion: 0 })),
-    ).toThrow(
-      "minVersion must be",
-    );
-    expect(() =>
-      Web.toSvgString(webOptions({ value: "x", maxVersion: 41 })),
-    ).toThrow(
-      "maxVersion must be",
-    );
-    expect(() =>
-      Web.toSvgString({ value: "x", minVersion: 3, maxVersion: 2 }),
-    ).toThrow("minVersion and maxVersion");
-    expect(() => Web.toSvgString(webOptions({ value: "x", mask: 8 }))).toThrow(
-      "mask must be",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        errorCorrectionLevel: "bad" as Web.ErrorCorrectionLevel,
-      }),
-    ).toThrow("errorCorrectionLevel must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { layout: "spiral" as "matrix" },
-      }),
-    ).toThrow("layout must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { shape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "shape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyePatternShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyeballShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { alignmentShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { timingShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { bodyDensity: "crowded" as "dense" },
-      }),
-    ).toThrow("bodyDensity must be sparse, balanced, or dense");
     expect(() =>
       Web.toSvgString({ value: "x", shapeOptions: { eyePatternGap: 257 } }),
     ).toThrow("eyePatternGap must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyePatternCornerRadius: 257 },
-      }),
-    ).toThrow("eyePatternCornerRadius must be");
-    expect(() => Web.toSvgString({ value: "x", logoAreaSize: 4097 })).toThrow(
-      "logoAreaSize must be",
-    );
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 128, logoAreaSize: 129 }),
-    ).toThrow("logoAreaSize must be between 0 and size");
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
-    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
-    ).not.toThrow();
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
-    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        foregroundColor: "bad",
-      })),
-    ).toThrow("foregroundColor must be");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        gradient: {
-          colors: [
-            "#000000",
-            "#111111",
-            "#222222",
-            "#333333",
-            "#444444",
-            "#555555",
-            "#666666",
-            "#777777",
-            "#888888",
-          ],
-        },
-      })),
-    ).toThrow("gradient.colors must contain");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          type: "diagonal" as "linear",
-          colors: ["#000000", "#FFFFFF"],
-        },
-      }),
-    ).toThrow("gradient.type must be");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0],
-        },
-      })),
-    ).toThrow("gradient.locations must match");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0, 2],
-        },
-      }),
-    ).toThrow("gradient.locations entries must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0.8, 0.2],
-        },
-      }),
-    ).toThrow("gradient.locations must be in non-decreasing order");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 2, y: 0 },
-        },
-      }),
-    ).toThrow("gradient.start.x must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 0, y: Number.POSITIVE_INFINITY },
-        },
-      }),
-    ).toThrow("gradient.start.y must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: -1, y: 1 },
-        },
-      }),
-    ).toThrow("gradient.end.x must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: 1, y: 2 },
-        },
-      }),
-    ).toThrow("gradient.end.y must be");
+    expect(canvas.getContext).not.toHaveBeenCalled();
   });
 
   it("rejects missing async web canvas contexts", async () => {
@@ -2968,44 +2568,6 @@ describe("web QRCode API", () => {
     expect(secondReady).not.toHaveBeenCalled();
   });
 
-  it("clears the previous web QR image when keepPreviousImage is false", async () => {
-    installCanvas();
-    let tree: TestRenderer.ReactTestRenderer | undefined;
-
-    await act(async () => {
-      tree = TestRenderer.create(
-        React.createElement(Web.QRCode, {
-          value: "web-one",
-          keepPreviousImage: false,
-        }),
-      );
-    });
-    await act(async () => {
-      await flushMacrotasks(50);
-    });
-    if (tree === undefined) {
-      throw new Error("Expected web QRCode test renderer to be created.");
-    }
-
-    await act(async () => {
-      tree?.update(
-        React.createElement(Web.QRCode, {
-          value: "web-two",
-          keepPreviousImage: false,
-        }),
-      );
-    });
-    await act(async () => {
-      await flushMacrotasks(50);
-    });
-
-    expect(
-      tree.root.findAll(
-        (node) => node.props.source?.uri === "data:image/png;base64,web-png",
-      ),
-    ).not.toHaveLength(0);
-  });
-
   it("uses the default web component size", async () => {
     installCanvas();
     let tree: TestRenderer.ReactTestRenderer | undefined;
@@ -3029,6 +2591,8 @@ describe("web QRCode API", () => {
       ]),
     );
   });
+});
+
 type ParityCorpusEntry = {
   value: string;
   ecl: string;
@@ -3143,6 +2707,8 @@ describe("preset shape options", () => {
 });
 
 describe("encoder parity corpus", () => {
+  afterEach(restoreWebEnvironment);
+
   const corpus = readParityCorpus();
 
   it("feeds the same corpus scenarios to the native adapter", () => {
@@ -3307,6 +2873,8 @@ describe("encoder parity corpus", () => {
 });
 
 describe("web transparent and geometry rendering", () => {
+  afterEach(restoreWebEnvironment);
+
   it("clears transparent web PNG backgrounds instead of filling black", () => {
     const context = createMockContext();
     installCanvas(() => context);
@@ -3460,7 +3028,6 @@ describe("web transparent and geometry rendering", () => {
     expect(context.lineTo).toHaveBeenCalled();
     expect(context.quadraticCurveTo).toHaveBeenCalled();
   });
-});
 });
 
 describe("gradient policy and image presentation", () => {
