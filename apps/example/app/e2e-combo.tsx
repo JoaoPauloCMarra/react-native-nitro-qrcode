@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   QRCode,
@@ -12,6 +12,7 @@ import {
   runComboSweep,
   type ComboReport,
 } from "../components/generation-matrix";
+import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 
 const VISUALS = buildVisualSpecimens();
 
@@ -50,53 +51,38 @@ export default function ComboScreen() {
   const [showVisuals, setShowVisuals] = useState(false);
   const [rerenderTicks, setRerenderTicks] = useState(0);
   const [rerenderResult, setRerenderResult] = useState("(idle)");
-  const readyIdsRef = useRef(new Set<string>());
-  const failedIdsRef = useRef(new Set<string>());
-  const [visualStatus, setVisualStatus] = useState(
-    `ready=0/${VISUALS.length}`,
-  );
+  const [visualsGeneration, setVisualsGeneration] = useState(0);
+  const wall = useReadyWall(VISUALS.length);
+  const visualStatus = formatReadyWall(wall, VISUALS.length);
 
-  const markReady = useCallback((id: string, failed = false) => {
-    if (readyIdsRef.current.has(id)) {
-      return;
-    }
-    readyIdsRef.current.add(id);
-    if (failed) {
-      failedIdsRef.current.add(id);
-    }
-    const next = [...readyIdsRef.current];
-    const errors = failedIdsRef.current.size;
-    if (next.length === VISUALS.length && errors > 0) {
-      setVisualStatus(`fail:ready=${next.length}/${VISUALS.length}:errors=${errors}`);
-    } else if (next.length === VISUALS.length) {
-      setVisualStatus(`ok:ready=${next.length}/${VISUALS.length}`);
-    } else {
-      setVisualStatus(`ready=${next.length}/${VISUALS.length}`);
-    }
-  }, []);
+  const startSweep = useCallback(
+    (isCancelled: () => boolean = () => false) => {
+      void runComboSweep((done, total) => {
+        if (!isCancelled()) {
+          setProgress(`running ${done}/${total}`);
+        }
+      }).then((report) => {
+        if (isCancelled()) {
+          return;
+        }
+        setProgress(report.failed === 0 ? "e2e-combo-done" : "e2e-combo-failed");
+        setReportText(formatReport(report));
+        (
+          globalThis as { __comboReport?: ComboReport }
+        ).__comboReport = report;
+        setShowProbe(true);
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    void runComboSweep((done, total) => {
-      if (!cancelled) {
-        setProgress(`running ${done}/${total}`);
-      }
-    }).then((report) => {
-      if (cancelled) {
-        return;
-      }
-      const text = formatReport(report);
-      setProgress(report.failed === 0 ? "e2e-combo-done" : "e2e-combo-failed");
-      setReportText(text);
-      (
-        globalThis as { __comboReport?: ComboReport }
-      ).__comboReport = report;
-      setShowProbe(true);
-    });
+    startSweep(() => cancelled);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [startSweep]);
 
   useEffect(() => {
     if (!showProbe) {
@@ -162,7 +148,7 @@ export default function ComboScreen() {
       <View style={styles.grid}>
         {showVisuals
           ? VISUALS.map((specimen) => (
-          <View key={specimen.id} style={styles.card} testID={`e2e-combo-${specimen.id}`}>
+          <View key={`${specimen.id}-${visualsGeneration}`} style={styles.card} testID={`e2e-combo-${specimen.id}`}>
             <QRCode
               {...specimen.options}
               preset={specimen.preset}
@@ -175,8 +161,8 @@ export default function ComboScreen() {
                   </View>
                 ) : undefined
               }
-              onReady={() => markReady(specimen.id)}
-              onError={() => markReady(specimen.id, true)}
+              onReady={() => wall.markReady(specimen.id)}
+              onError={() => wall.markReady(specimen.id, true)}
             />
             <Text style={styles.label}>{specimen.label}</Text>
           </View>
@@ -190,15 +176,9 @@ export default function ComboScreen() {
         onPress={() => {
           setProgress("starting");
           setReportText("(idle)");
-          void runComboSweep((done, total) => {
-            setProgress(`running ${done}/${total}`);
-          }).then((report) => {
-            setProgress(report.failed === 0 ? "e2e-combo-done" : "e2e-combo-failed");
-            setReportText(formatReport(report));
-            (
-              globalThis as { __comboReport?: ComboReport }
-            ).__comboReport = report;
-          });
+          wall.reset();
+          setVisualsGeneration((value) => value + 1);
+          startSweep();
         }}
       >
         <Text style={styles.buttonText}>Re-run sweep</Text>

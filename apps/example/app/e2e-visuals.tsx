@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   QRCode,
@@ -8,6 +8,7 @@ import {
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
 import { PRESETS } from "../components/generation-matrix";
+import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Specimen = {
@@ -44,34 +45,17 @@ const SPECIMENS: readonly Specimen[] = [
 
 const APP_ICON = require("../assets/icon.png");
 
+const lastGenerationMs = () => getQRCodeMetrics().lastGenerationMs ?? 0;
+
 export default function QrcodeE2eVisualsScreen() {
   const insets = useSafeAreaInsets();
   const [generation, setGeneration] = useState(0);
-  const [readyIds, setReadyIds] = useState<string[]>([]);
-  const readyIdsRef = useRef(new Set<string>());
-  const [elapsed, setElapsed] = useState("(idle)");
-  const [startedAt, setStartedAt] = useState(
-    () => globalThis.performance?.now?.() ?? Date.now(),
-  );
-
-  const markReady = useCallback(
-    (id: string) => {
-      if (readyIdsRef.current.has(id)) {
-        return;
-      }
-      readyIdsRef.current.add(id);
-      const next = [...readyIdsRef.current];
-      setReadyIds(next);
-      if (next.length === SPECIMENS.length) {
-        const ms =
-          (globalThis.performance?.now?.() ?? Date.now()) - startedAt;
-        const last = getQRCodeMetrics().lastGenerationMs ?? 0;
-        setElapsed(
-          `ok:ready=${next.length}/${SPECIMENS.length}:ms=${ms.toFixed(1)}:last=${last.toFixed(1)}`,
-        );
-      }
-    },
-    [startedAt],
+  const wall = useReadyWall(SPECIMENS.length, lastGenerationMs);
+  const status = formatReadyWall(
+    wall,
+    SPECIMENS.length,
+    (done) =>
+      `:ms=${(done.elapsedMs ?? 0).toFixed(1)}:last=${(done.extra ?? 0).toFixed(1)}`,
   );
 
   return (
@@ -97,19 +81,14 @@ export default function QrcodeE2eVisualsScreen() {
         {`generation=${generation};`}
       </Text>
       <Text testID="e2e-visuals-ready-count" style={styles.metric}>
-        {elapsed === "(idle)"
-          ? `ready=${readyIds.length}/${SPECIMENS.length}`
-          : elapsed}
+        {status}
       </Text>
       <Pressable
         testID="e2e-visuals-remount"
         accessibilityRole="button"
         accessibilityLabel="Remount visual specimens"
         onPress={() => {
-          setStartedAt(globalThis.performance?.now?.() ?? Date.now());
-          readyIdsRef.current.clear();
-          setReadyIds([]);
-          setElapsed("(idle)");
+          wall.reset();
           setGeneration((value) => value + 1);
         }}
         style={styles.button}
@@ -156,7 +135,10 @@ export default function QrcodeE2eVisualsScreen() {
                 ) : undefined
               }
               onReady={() => {
-                markReady(specimen.id);
+                wall.markReady(specimen.id);
+              }}
+              onError={() => {
+                wall.markReady(specimen.id, true);
               }}
             />
             <Text style={styles.cellLabel}>{specimen.label}</Text>
