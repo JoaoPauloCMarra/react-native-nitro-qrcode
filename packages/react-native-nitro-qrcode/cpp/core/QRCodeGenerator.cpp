@@ -20,6 +20,11 @@
 namespace NitroQRCode {
 namespace {
 
+constexpr uint8_t BodyLayer = 1;
+constexpr uint8_t StrokeLayer = 2;
+constexpr uint8_t EyeFrameLayer = 3;
+constexpr uint8_t EyeStrokeLayer = 4;
+constexpr uint8_t EyeballLayer = 5;
 constexpr uint8_t TransparentLayer = 6;
 constexpr uint8_t AlignmentLayer = 7;
 constexpr uint8_t TimingLayer = 8;
@@ -250,13 +255,13 @@ Color compositeOver(const Color &source, const Color &backdrop) {
 Color rawColorForLayer(uint8_t layer, const GenerateOptions &options,
                        int imageSize, int x, int y) {
   switch (layer) {
-  case 2:
+  case StrokeLayer:
     return options.stroke;
-  case 3:
+  case EyeFrameLayer:
     return layerFillAt(options.eyeSet, options.eye, options, imageSize, x, y);
-  case 4:
+  case EyeStrokeLayer:
     return options.eyeStroke;
-  case 5:
+  case EyeballLayer:
     return layerFillAt(options.eyeballSet, options.eyeball, options, imageSize,
                        x, y);
   case AlignmentLayer:
@@ -269,7 +274,7 @@ Color rawColorForLayer(uint8_t layer, const GenerateOptions &options,
     return options.finderInner;
   case QuietZoneLayer:
     return options.quietZoneFill;
-  case 1:
+  case BodyLayer:
     return foregroundFillAt(options, imageSize, x, y);
   case TransparentLayer:
     return {0, 0, 0, 0};
@@ -700,7 +705,7 @@ void fillClassy(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
 
 void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
                 int x1, int y1, ModuleShape shape, int gap, int cornerRadius,
-                uint8_t value = 1, ModuleNeighbors neighbors = {}) {
+                uint8_t value = BodyLayer, ModuleNeighbors neighbors = {}) {
   const int maxGap = std::max(0, (std::min(x1 - x0, y1 - y0) - 1) / 2);
   const int inset = std::min(gap, maxGap);
   x0 += inset;
@@ -800,9 +805,11 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
 
   const double strokeInset =
       frameShape == ModuleShape::Square ? 0.3 : 0.65;
-  drawShape(0.0, 7.0, frameShape, useEyeStrokeLayer ? 4 : 3);
+  drawShape(0.0, 7.0, frameShape,
+            useEyeStrokeLayer ? EyeStrokeLayer : EyeFrameLayer);
   if (useEyeStrokeLayer) {
-    drawShape(strokeInset, 7.0 - strokeInset * 2.0, frameShape, 3);
+    drawShape(strokeInset, 7.0 - strokeInset * 2.0, frameShape,
+              EyeFrameLayer);
   }
   drawShape(1.0, 5.0, frameShape, holeLayer);
   const bool useCircleFrameSquareEyeball =
@@ -815,7 +822,7 @@ void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
       eyeballShape == ModuleShape::Circle ? 3.5
       : useCircleFrameSquareEyeball  ? 2.5
                                       : 3.0;
-  drawShape(eyeballOffset, eyeballSpan, eyeballShape, 5);
+  drawShape(eyeballOffset, eyeballSpan, eyeballShape, EyeballLayer);
 }
 
 void drawGroupedFinders(std::vector<uint8_t> &indices, int imageSize,
@@ -1168,9 +1175,9 @@ ModuleStyle classifyModule(int moduleX, int moduleY, int matrixSize,
                   : resolveBodyGap(options, pixelWidth, pixelHeight);
   style.radius =
       eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
-  style.layer = 1;
+  style.layer = BodyLayer;
   if (eyeModule) {
-    style.layer = eyeballModule ? 5 : 3;
+    style.layer = eyeballModule ? EyeballLayer : EyeFrameLayer;
   } else if (alignmentModule) {
     style.layer = AlignmentLayer;
   } else if (timingModule) {
@@ -1243,12 +1250,12 @@ std::vector<uint8_t> rasterizeLayers(const Matrix &matrix,
       const ModuleNeighbors neighbors{
           isDark(moduleX, moduleY - 1), isDark(moduleX + 1, moduleY),
           isDark(moduleX, moduleY + 1), isDark(moduleX - 1, moduleY)};
-      if (style.layer == 1 && drawsBodyStroke(options)) {
+      if (style.layer == BodyLayer && drawsBodyStroke(options)) {
         drawModule(indices, imageSize, x0, y0, x1, y1, style.shape, style.gap,
-                   style.radius, 2, neighbors);
+                   style.radius, StrokeLayer, neighbors);
         const int strokeInset = std::max(1, (x1 - x0) / 5);
         drawModule(indices, imageSize, x0, y0, x1, y1, style.shape,
-                   style.gap + strokeInset, style.radius, 1, neighbors);
+                   style.gap + strokeInset, style.radius, BodyLayer, neighbors);
         continue;
       }
       drawModule(indices, imageSize, x0, y0, x1, y1, style.shape, style.gap,
