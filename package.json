@@ -26,7 +26,7 @@
     "typecheck:rn087": "bun scripts/verify-rn087-types.ts",
     "test:types": "bun run --cwd packages/react-native-nitro-qrcode test:types",
     "test": "bun run --cwd packages/react-native-nitro-qrcode test",
-    "test:lifecycle": "node scripts/package-doc-lifecycle.test.js && node --test ./scripts/assert-example-smoke.test.js && bun scripts/assert-publish-workflow.js && bun scripts/assert-security-policy.js && bun test ./scripts/assert-publish-workflow.test.js && bun test ./scripts/assert-security-policy.test.js && bun test ./scripts/llvm-tools.test.ts && bun test ./scripts/check-codegen.test.ts",
+    "test:lifecycle": "node scripts/package-doc-lifecycle.test.js && node --test ./scripts/assert-example-smoke.test.js && bun scripts/assert-publish-workflow.js && bun scripts/assert-security-policy.js && bun test ./scripts/assert-publish-workflow.test.js && bun test ./scripts/assert-security-policy.test.js && bun test ./scripts/llvm-tools.test.ts && bun test ./scripts/check-codegen.test.ts && bun test ./scripts/cpp-includes.test.js",
     "test:unit": "bun run --cwd packages/react-native-nitro-qrcode test",
     "test:coverage": "bun run --cwd packages/react-native-nitro-qrcode test:coverage",
     "test:cpp": "bun run --cwd packages/react-native-nitro-qrcode test:cpp",

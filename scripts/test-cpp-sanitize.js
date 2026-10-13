@@ -2,6 +2,7 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { resolveLlvmTool } = require("./llvm-tools.js");
+const { prepareNitroHeaders, sharedIncludeArgs } = require("./cpp-includes.js");
 
 const packageDir = path.join(
   __dirname,
@@ -38,6 +39,7 @@ const sanitizers = [
 
 fs.rmSync(buildDir, { recursive: true, force: true });
 fs.mkdirSync(buildDir, { recursive: true });
+const includeRoot = prepareNitroHeaders(path.join(__dirname, ".."), buildDir);
 
 for (const { label, flag, suffix } of sanitizers) {
   const outputFile = path.join(buildDir, `qrcode_generator_test_${suffix}`);
@@ -72,11 +74,8 @@ for (const { label, flag, suffix } of sanitizers) {
     "-fno-omit-frame-pointer",
     `-fsanitize=${flag}`,
     "-fno-sanitize-recover=all",
-    `-I${path.join(cppDir, "bindings")}`,
-    `-I${path.join(cppDir, "core")}`,
-    `-I${path.join(cppDir, "qrcodegen")}`,
-    `-I${path.join(cppDir, "vendor", "fpng")}`,
-    `-I${quircDir}`,
+    `-I${includeRoot}`,
+    ...sharedIncludeArgs(path.join(__dirname, "..")),
     ...sources,
     ...quircObjects,
     "-o",
