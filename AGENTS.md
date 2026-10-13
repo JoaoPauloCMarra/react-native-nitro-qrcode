@@ -40,3 +40,7 @@ React Native Nitro QRCode — native C++ QR code generation (PNG export, gradien
 - Review assertions and pending prerequisites before `bun run example:replay:refresh`; then require `example:replay:check` and `example:replay:test` in device-free checks. A refreshed lock is not runtime evidence.
 - Use `example:replay -- --platform <ios|android>` with an exact `--udid` or `--serial`. Physical iPhones use `example:e2e:ios-device -- <udid> [manifest-flow-id]`, which preserves the CoreDevice deep-link route.
 - Keep real decoder, scanner, frame, accessibility, web and performance acceptance separate from generation callbacks. Record artifacts in OS temp. `agent-device test` closes each attempt session itself; the runner does not close sessions.
+
+## PR And Release Descriptions
+
+- PR and GitHub release descriptions follow the workspace `AGENTS.md` section "PR And Release Descriptions": the same short text for both, with the full detail kept in `CHANGELOG.md`.
