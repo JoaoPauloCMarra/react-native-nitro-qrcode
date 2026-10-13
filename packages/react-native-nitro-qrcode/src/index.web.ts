@@ -147,51 +147,15 @@ export function toPngBase64(options: QRCodeOptions): string {
 }
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
-  const request = cacheRequest(normalized, "png");
-  const key = hashCachePart(request);
-  const cached = webCache.get(key, request);
-  recordCacheLookup(cached !== undefined);
-  if (cached !== undefined) {
-    return cached;
+  const lookup = lookupPng(normalized);
+  if (lookup.cached !== undefined) {
+    return lookup.cached;
   }
 
   return measuredSync(() => {
-    const model = createModel(normalized);
-    const pixelSize = renderPixelSize(normalized, model);
-    const canvas = createCanvas(pixelSize);
-    const context = canvas.getContext("2d");
-    if (context === null) {
-      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
-    }
-
-    const plan = createRenderPlan(normalized, model, pixelSize);
-    const { foregroundFill, useLayerColors } = preparePngCanvas(
-      context,
-      plan,
-      normalized,
-    );
-    if (
-      canDrawSquareRuns(normalized.shapeOptions) &&
-      !useLayerColors &&
-      normalized.logoAreaSize === 0
-    ) {
-      drawSquareRuns(
-        context,
-        model,
-        normalized.quietZone,
-        plan.totalModules,
-        plan.pixelSize,
-        0,
-        model.modules.size,
-      );
-    } else {
-      drawPlanRows(context, plan, normalized, foregroundFill, 0, plan.matrixSize);
-    }
-    finishPng(context, plan, normalized, foregroundFill);
-
-    const output = canvas.toDataURL("image/png");
-    webCache.set(key, request, output);
-    return output;
+    const session = createPngRenderSession(normalized, lookup);
+    session.drawRows(0, session.rowCount);
+    return session.finish();
   });
 }
 
@@ -206,36 +170,71 @@ export async function toPngDataUriAsync(
   options: QRCodeOptions,
 ): Promise<string> {
   const normalized = normalizeOptions(options);
+  const lookup = lookupPng(normalized);
+  if (lookup.cached !== undefined) {
+    return lookup.cached;
+  }
+
+  return measuredAsync(async () => {
+    const session = createPngRenderSession(normalized, lookup);
+    for (
+      let startRow = 0;
+      startRow < session.rowCount;
+      startRow += ASYNC_BAND_ROWS
+    ) {
+      session.drawRows(
+        startRow,
+        Math.min(startRow + ASYNC_BAND_ROWS, session.rowCount),
+      );
+      await yieldToMainThread();
+    }
+    return session.finish();
+  });
+}
+
+type PngLookup = {
+  key: string;
+  request: string;
+  cached: string | undefined;
+};
+
+function lookupPng(normalized: NormalizedOptions): PngLookup {
   const request = cacheRequest(normalized, "png");
   const key = hashCachePart(request);
   const cached = webCache.get(key, request);
   recordCacheLookup(cached !== undefined);
-  if (cached !== undefined) {
-    return cached;
+  return { key, request, cached };
+}
+
+function createPngRenderSession(
+  normalized: NormalizedOptions,
+  lookup: PngLookup,
+): {
+  rowCount: number;
+  drawRows: (startRow: number, endRow: number) => void;
+  finish: () => string;
+} {
+  const model = createModel(normalized);
+  const pixelSize = renderPixelSize(normalized, model);
+  const canvas = createCanvas(pixelSize);
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Unable to create 2D canvas context for QRCode rendering.");
   }
 
-  return measuredAsync(async () => {
-    const model = createModel(normalized);
-    const pixelSize = renderPixelSize(normalized, model);
-    const canvas = createCanvas(pixelSize);
-    const context = canvas.getContext("2d");
-    if (context === null) {
-      throw new Error("Unable to create 2D canvas context for QRCode rendering.");
-    }
-
-    const plan = createRenderPlan(normalized, model, pixelSize);
-    const { foregroundFill, useLayerColors } = preparePngCanvas(
-      context,
-      plan,
-      normalized,
-    );
-    const moduleCount = model.modules.size;
-    const useSquareRuns =
-      canDrawSquareRuns(normalized.shapeOptions) &&
-      !useLayerColors &&
-      normalized.logoAreaSize === 0;
-    for (let startRow = 0; startRow < moduleCount; startRow += ASYNC_BAND_ROWS) {
-      const endRow = Math.min(startRow + ASYNC_BAND_ROWS, moduleCount);
+  const plan = createRenderPlan(normalized, model, pixelSize);
+  const { foregroundFill, useLayerColors } = preparePngCanvas(
+    context,
+    plan,
+    normalized,
+  );
+  const useSquareRuns =
+    canDrawSquareRuns(normalized.shapeOptions) &&
+    !useLayerColors &&
+    normalized.logoAreaSize === 0;
+  return {
+    rowCount: model.modules.size,
+    drawRows(startRow, endRow) {
       if (useSquareRuns) {
         drawSquareRuns(
           context,
@@ -249,14 +248,14 @@ export async function toPngDataUriAsync(
       } else {
         drawPlanRows(context, plan, normalized, foregroundFill, startRow, endRow);
       }
-      await yieldToMainThread();
-    }
-    finishPng(context, plan, normalized, foregroundFill);
-
-    const output = canvas.toDataURL("image/png");
-    webCache.set(key, request, output);
-    return output;
-  });
+    },
+    finish() {
+      finishPng(context, plan, normalized, foregroundFill);
+      const output = canvas.toDataURL("image/png");
+      webCache.set(lookup.key, lookup.request, output);
+      return output;
+    },
+  };
 }
 
 export function toSvgString(options: QRCodeOptions): string {
