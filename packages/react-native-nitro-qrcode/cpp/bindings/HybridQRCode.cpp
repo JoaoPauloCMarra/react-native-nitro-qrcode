@@ -3,56 +3,6 @@
 
 namespace margelo::nitro::NitroQRCode {
 
-namespace {
-constexpr const char *LegacyUnsetColor = "#000000";
-}
-
-::NitroQRCode::GenerateOptions makeGenerateOptions(
-    const GenerateOptions &options) {
-  auto resolved = makeGenerateOptions(
-      options.size, options.quietZone, options.errorCorrectionLevel,
-      options.foregroundColor, options.backgroundColor,
-      options.strokeColor.value_or(LegacyUnsetColor),
-      options.eyeColor.value_or(LegacyUnsetColor),
-      options.eyeStrokeColor.value_or(LegacyUnsetColor),
-      options.eyeballColor.value_or(LegacyUnsetColor),
-      options.minVersion, options.maxVersion, options.mask, options.boostEcl,
-      options.moduleShape, options.eyePatternShape, options.eyeballShape,
-      options.gap, options.eyePatternGap, options.bodyDensity,
-      options.cornerRadius, options.eyePatternCornerRadius, options.layout,
-      options.logoAreaSize, options.logoAreaBorderRadius,
-      options.gradientType, options.gradientColors, options.gradientLocations,
-      options.gradientStartX, options.gradientStartY, options.gradientEndX,
-      options.gradientEndY);
-  resolved.strokeSet = options.strokeColor.has_value();
-  resolved.eyeSet = options.eyeColor.has_value();
-  resolved.eyeStrokeSet = options.eyeStrokeColor.has_value();
-  resolved.eyeballSet = options.eyeballColor.has_value();
-  if (options.alignmentColor.has_value()) {
-    resolved.alignmentSet = true;
-    resolved.alignment = ::NitroQRCode::parseColor(*options.alignmentColor);
-  }
-  if (options.timingColor.has_value()) {
-    resolved.timingSet = true;
-    resolved.timing = ::NitroQRCode::parseColor(*options.timingColor);
-  }
-  if (options.quietZoneColor.has_value()) {
-    resolved.quietZoneFill =
-        ::NitroQRCode::parseColor(*options.quietZoneColor);
-  }
-  if (options.finderInnerColor.has_value()) {
-    resolved.finderInner =
-        ::NitroQRCode::parseColor(*options.finderInnerColor);
-  }
-  if (options.alignmentShape.has_value()) {
-    resolved.alignmentShape = *options.alignmentShape;
-  }
-  if (options.timingShape.has_value()) {
-    resolved.timingShape = *options.timingShape;
-  }
-  return resolved;
-}
-
 HybridQRCode::HybridQRCode() : HybridObject(TAG), HybridQRCodeSpec() {}
 
 std::shared_ptr<ArrayBuffer> HybridQRCode::generatePngArrayBufferObject(
@@ -235,8 +185,9 @@ std::string HybridQRCode::generateSvgString(
   return generator_.generateSvgString(
       value,
       makeGenerateOptions(512, quietZone, errorCorrectionLevel,
-                          foregroundColor, backgroundColor, "#000000",
-                          "#000000", "#000000", "#000000", minVersion,
+                          foregroundColor, backgroundColor, LegacyUnsetColor,
+                          LegacyUnsetColor, LegacyUnsetColor,
+                          LegacyUnsetColor, minVersion,
                           maxVersion, mask, boostEcl, "square", "square",
                           "square", 0, 0, "dense", -1, -1, "matrix", 0, 0,
                           gradientType, gradientColors, gradientLocations,
