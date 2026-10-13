@@ -2,6 +2,7 @@
 #include "parity-corpus.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -1103,6 +1104,75 @@ void testGroupedFinderEdgesUseFloorBoundaries() {
   }
 }
 
+void testTranslucentLayersCompositeOverBackground() {
+  QRCodeGenerator generator;
+  const auto pixelAt = [](const std::vector<uint8_t> &rgba, int width, int x,
+                          int y) {
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) +
+         static_cast<size_t>(x)) *
+        4;
+    return std::array<int, 4>{rgba[offset], rgba[offset + 1],
+                              rgba[offset + 2], rgba[offset + 3]};
+  };
+  const auto near = [](const std::array<int, 4> &actual,
+                       const std::array<int, 4> &expected) {
+    for (size_t index = 0; index < 4; index++) {
+      if (std::abs(actual[index] - expected[index]) > 1) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const int size = 200;
+  const int edge = (4 * size) / 37;
+  const int mid = (edge + (11 * size) / 37) / 2;
+
+  GenerateOptions eye;
+  eye.size = size;
+  setExplicitFinderColors(eye, "#FF000080", "#FF000080");
+  int width = 0;
+  int height = 0;
+  auto rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", eye), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 127, 127, 255}));
+
+  GenerateOptions flat;
+  flat.size = size;
+  setForeground(flat, "#00000080");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", flat), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {127, 127, 127, 255}));
+
+  GenerateOptions overTransparent = flat;
+  overTransparent.backgroundColor = "transparent";
+  overTransparent.background = parseColor("transparent");
+  overTransparent.quietZoneColor = "transparent";
+  overTransparent.quietZoneFill = overTransparent.background;
+  overTransparent.finderInnerColor = "transparent";
+  overTransparent.finderInner = overTransparent.background;
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                overTransparent),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {0, 0, 0, 128}));
+
+  setExplicitFinderColors(overTransparent, "#00000000", "#00000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent",
+                                overTransparent),
+      width, height);
+  assert(near(pixelAt(rgba, width, edge, mid), {0, 0, 0, 0}));
+
+  setExplicitFinderColors(eye, "#00000000", "#00000000");
+  rgba = decodeRgbaPng(
+      generator.renderPngBase64("https://example.com/translucent", eye), width,
+      height);
+  assert(near(pixelAt(rgba, width, edge, mid), {255, 255, 255, 255}));
+}
+
 void testTransparentBackgroundPng() {
   QRCodeGenerator generator;
   GenerateOptions options;
@@ -1640,11 +1710,13 @@ void testGradientStopBounds() {
           const double ny = static_cast<double>(y) / (height - 1);
           const double t = type == "linear" ? nx : std::hypot(nx - 0.5, ny - 0.5) / 0.5;
           const double progress = std::clamp((t - 0.3) / 0.5, 0.0, 1.0);
-          const auto expected = static_cast<uint8_t>(std::lround(255 * progress));
-          assert(rgba[offset] == expected);
-          assert(rgba[offset + 1] == expected);
-          assert(rgba[offset + 2] == expected);
-          assert(rgba[offset + 3] == (alpha ? static_cast<uint8_t>(std::lround(64 + 128 * progress)) : 255));
+          const double stopAlpha = alpha ? (64 + 128 * progress) / 255.0 : 1.0;
+          const double expected =
+              255 * progress * stopAlpha + 255 * (1.0 - stopAlpha);
+          for (size_t channel = 0; channel < 3; ++channel) {
+            assert(std::abs(rgba[offset + channel] - expected) <= 2.0);
+          }
+          assert(rgba[offset + 3] == 255);
           if (t <= 0.3) ++before;
           else if (t >= 0.8) ++after;
           else ++interior;
@@ -1714,6 +1786,7 @@ int main() {
   testExplicitBlackStrokeMeansNoStroke();
   testOutputMatchesPreviousRelease();
   testGroupedFinderEdgesUseFloorBoundaries();
+  testTranslucentLayersCompositeOverBackground();
   testTransparentBackgroundPng();
   testParityCorpus();
   testShapeLimits();

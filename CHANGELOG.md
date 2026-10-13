@@ -15,6 +15,7 @@ Breaking changes are always listed first in each release section.
 ### Changed
 
 - Output change: styled finder patterns (custom `eyeColor`, `eyeballColor`, `eyeStrokeColor`, `finderInnerColor`, or any non-square eye shape) now start and end on the same `floor(index * pixelSize / totalModules)` pixel boundaries as the module grid and quiet zone, on native and web. Native previously rounded these edges, which could shift a finder by 1 px and leave a seam against a coloured quiet zone. Native PNG bytes for those options differ from 0.10.0 by up to 1 px along the finder edges.
+- Output change: native PNG output now composites a translucent `foregroundColor`, gradient stop, or layer color (`eyeColor`, `eyeballColor`, `strokeColor`, and so on) over the QR background color, matching the web canvas. Previously native stored the raw RGBA value, so `eyeColor: "#FF000080"` on a white background produced a translucent red pixel on native and an opaque pink pixel on web. Over an opaque background the native pixel is now opaque pink. Migration: none needed for opaque colors; if you relied on a translucent module alpha showing the surface behind the PNG, give the code a `"transparent"` background.
 
 ## [0.10.0] - 2026-10-03
 

@@ -82,3 +82,43 @@ describe("grouped finder edges on web", () => {
     expect(canvas.pixelAt(edge, edge + 12)).toEqual([255, 0, 0, 255]);
   });
 });
+
+describe("translucent layer colors on web", () => {
+  const near = (actual: number[], expected: number[]) =>
+    actual.every((value, index) => Math.abs(value - (expected[index] ?? 0)) <= 1);
+
+  it("composites a translucent layer color over the background", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      backgroundColor: "#FFFFFF",
+      eyeColor: "#FF000080",
+    });
+    expect(near(canvas.pixelAt(41, 70), [255, 127, 127, 255])).toBe(true);
+  });
+
+  it("composites a translucent foreground over the background", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      foregroundColor: "#00000080",
+    });
+    expect(near(canvas.pixelAt(41, 70), [127, 127, 127, 255])).toBe(true);
+  });
+
+  it("keeps the layer alpha over a transparent background", () => {
+    const canvas = installRasterCanvas();
+    Web.toPngDataUri({
+      value: "hello",
+      size: 290,
+      quietZone: 4,
+      backgroundColor: "transparent",
+      foregroundColor: "#00000080",
+    });
+    expect(near(canvas.pixelAt(41, 70), [0, 0, 0, 128])).toBe(true);
+  });
+});

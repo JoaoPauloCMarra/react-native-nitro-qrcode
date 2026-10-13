@@ -227,8 +227,28 @@ Color layerFillAt(bool isSet, const Color &color,
   return isSet ? color : foregroundFillAt(options, imageSize, x, y);
 }
 
-Color colorForLayer(uint8_t layer, const GenerateOptions &options,
-                    int imageSize, int x, int y) {
+Color compositeOver(const Color &source, const Color &backdrop) {
+  if (source.a == 255) {
+    return source;
+  }
+  const int sourceAlpha = source.a;
+  const int backdropWeight = backdrop.a * (255 - sourceAlpha);
+  const int outAlpha = sourceAlpha * 255 + backdropWeight;
+  if (outAlpha == 0) {
+    return {0, 0, 0, 0};
+  }
+  const auto channel = [&](int top, int bottom) {
+    return static_cast<uint8_t>(
+        (top * sourceAlpha * 255 + bottom * backdropWeight + outAlpha / 2) /
+        outAlpha);
+  };
+  return {channel(source.r, backdrop.r), channel(source.g, backdrop.g),
+          channel(source.b, backdrop.b),
+          static_cast<uint8_t>((outAlpha + 127) / 255)};
+}
+
+Color rawColorForLayer(uint8_t layer, const GenerateOptions &options,
+                       int imageSize, int x, int y) {
   switch (layer) {
   case 2:
     return options.stroke;
@@ -256,6 +276,15 @@ Color colorForLayer(uint8_t layer, const GenerateOptions &options,
   default:
     return options.background;
   }
+}
+
+Color colorForLayer(uint8_t layer, const GenerateOptions &options,
+                    int imageSize, int x, int y) {
+  const Color color = rawColorForLayer(layer, options, imageSize, x, y);
+  if (layer == 0 || layer == QuietZoneLayer || layer == TransparentLayer) {
+    return color;
+  }
+  return compositeOver(color, options.background);
 }
 
 void writeLayeredRow(const std::vector<uint8_t> &indices, int imageSize, int y,
@@ -1259,7 +1288,8 @@ std::vector<uint8_t> encodeLayeredPng(std::vector<uint8_t> indices,
                             layerPalette(options));
   }
   return encodePngIndexed1(imageSize, imageSize, std::move(indices),
-                           options.foreground, options.background);
+                           compositeOver(options.foreground, options.background),
+                           options.background);
 }
 
 } // namespace
