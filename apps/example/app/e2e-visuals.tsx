@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   QRCode,
+  PRESET_SHAPE_OPTIONS,
   getQRCodeMetrics,
+  toPngBase64Async,
   type QRCodeBodyShape,
   type QRCodeColor,
+  type QRCodeOptions,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
+import { decodePngBase64, type Backdrop } from "../components/scan-decode";
 import { PRESETS } from "../components/generation-matrix";
 import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,11 +49,64 @@ const SPECIMENS: readonly Specimen[] = [
 
 const APP_ICON = require("../assets/icon.png");
 
+const LIGHT_BACKDROP: Backdrop = [255, 255, 255];
+
+const DECODE_PROBES: readonly { id: string; options: QRCodeOptions }[] = [
+  {
+    id: "transparent-rounded",
+    options: {
+      value: "https://nitro.dev/decode/transparent",
+      size: 240,
+      backgroundColor: "transparent",
+      shapeOptions: PRESET_SHAPE_OPTIONS.rounded,
+    },
+  },
+  {
+    id: "translucent",
+    options: {
+      value: "https://nitro.dev/decode/translucent",
+      size: 240,
+      foregroundColor: "#000000C0",
+      eyeColor: "#1E40AFB0",
+      eyeballColor: "#0F172AB0",
+    },
+  },
+];
+
+function useDecodeProbes(): string {
+  const [outcomes, setOutcomes] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      DECODE_PROBES.map(async ({ id, options }) => {
+        try {
+          const base64 = await toPngBase64Async(options);
+          const value = options.value;
+          return [id, decodePngBase64(base64, value, LIGHT_BACKDROP)] as const;
+        } catch {
+          return [id, "error"] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (!cancelled) {
+        setOutcomes(Object.fromEntries(entries));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return DECODE_PROBES.map(
+    ({ id }) => `decode:${id}=${outcomes[id] ?? "pending"};`,
+  ).join(" ");
+}
+
 const lastGenerationMs = () => getQRCodeMetrics().lastGenerationMs ?? 0;
 
 export default function QrcodeE2eVisualsScreen() {
   const insets = useSafeAreaInsets();
   const [generation, setGeneration] = useState(0);
+  const decodeProbes = useDecodeProbes();
   const wall = useReadyWall(SPECIMENS.length, lastGenerationMs);
   const status = formatReadyWall(
     wall,
@@ -83,6 +140,12 @@ export default function QrcodeE2eVisualsScreen() {
       <Text testID="e2e-visuals-ready-count" style={styles.metric}>
         {status}
       </Text>
+      <View
+        testID="e2e-visuals-decode"
+        accessible
+        accessibilityLabel={decodeProbes}
+        style={styles.decodeProbe}
+      />
       <Pressable
         testID="e2e-visuals-remount"
         accessibilityRole="button"
@@ -150,6 +213,7 @@ export default function QrcodeE2eVisualsScreen() {
 }
 
 const styles = StyleSheet.create({
+  decodeProbe: { width: "100%", height: 1 },
   screen: {
     flex: 1,
     backgroundColor: "#101112",
