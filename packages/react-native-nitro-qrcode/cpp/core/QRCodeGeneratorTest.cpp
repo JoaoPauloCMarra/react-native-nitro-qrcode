@@ -903,8 +903,8 @@ void setColor(std::string &name, Color &color, const std::string &value) {
 
 void setForeground(GenerateOptions &options, const std::string &foreground) {
   setColor(options.foregroundColor, options.foreground, foreground);
-  setColor(options.alignmentColor, options.alignment, foreground);
-  setColor(options.timingColor, options.timing, foreground);
+  options.alignment = parseColor(foreground);
+  options.timing = parseColor(foreground);
 }
 
 void setExplicitFinderColors(GenerateOptions &options, const std::string &eye,
@@ -1049,12 +1049,12 @@ void testOutputMatchesPreviousRelease() {
   setColor(layered.foregroundColor, layered.foreground, "#DC2626");
   setColor(layered.backgroundColor, layered.background, "#FFFFFF80");
   setExplicitFinderColors(layered, "#1E40AF", "#0F172A");
-  setColor(layered.alignmentColor, layered.alignment, "#00AA00");
-  setColor(layered.timingColor, layered.timing, "#AA00AA");
+  layered.alignment = parseColor("#00AA00");
+  layered.timing = parseColor("#AA00AA");
   layered.alignmentSet = true;
   layered.timingSet = true;
-  setColor(layered.quietZoneColor, layered.quietZoneFill, "#EEEEEE");
-  setColor(layered.finderInnerColor, layered.finderInner, "#FFFF00");
+  layered.quietZoneFill = parseColor("#EEEEEE");
+  layered.finderInner = parseColor("#FFFF00");
   assert(readPngHeader(generator.renderPngBase64(value, layered)).colorType == 3);
   assert(pixelHash(layered) == 10701135780977932667ULL);
 
@@ -1075,7 +1075,7 @@ void testGroupedFinderEdgesUseFloorBoundaries() {
     GenerateOptions options;
     options.size = size;
     options.quietZone = 4;
-    setColor(options.quietZoneColor, options.quietZoneFill, "#00FF00");
+    options.quietZoneFill = parseColor("#00FF00");
     setExplicitFinderColors(options, "#FF0000", "#FF0000");
     int width = 0;
     int height = 0;
@@ -1149,9 +1149,7 @@ void testTranslucentLayersCompositeOverBackground() {
   GenerateOptions overTransparent = flat;
   overTransparent.backgroundColor = "transparent";
   overTransparent.background = parseColor("transparent");
-  overTransparent.quietZoneColor = "transparent";
   overTransparent.quietZoneFill = overTransparent.background;
-  overTransparent.finderInnerColor = "transparent";
   overTransparent.finderInner = overTransparent.background;
   rgba = decodeRgbaPng(
       generator.renderPngBase64("https://example.com/translucent",
@@ -1180,9 +1178,7 @@ void testTransparentBackgroundPng() {
   options.quietZone = 4;
   options.backgroundColor = "transparent";
   options.background = parseColor("transparent");
-  options.quietZoneColor = "transparent";
   options.quietZoneFill = options.background;
-  options.finderInnerColor = "transparent";
   options.finderInner = options.background;
   const std::string encoded =
       generator.renderPngBase64("https://example.com/transparent", options);
@@ -1376,14 +1372,10 @@ void testRegionTokens() {
   const std::vector<uint8_t> baseline =
       generator.renderPngBytes("https://example.com/regions", options);
 
-  options.alignmentColor = "#CC0000";
-  options.alignment = parseColor(options.alignmentColor);
-  options.timingColor = "#00AA00";
-  options.timing = parseColor(options.timingColor);
-  options.quietZoneColor = "#E2E8F0";
-  options.quietZoneFill = parseColor(options.quietZoneColor);
-  options.finderInnerColor = "#FFF7ED";
-  options.finderInner = parseColor(options.finderInnerColor);
+  options.alignment = parseColor("#CC0000");
+  options.timing = parseColor("#00AA00");
+  options.quietZoneFill = parseColor("#E2E8F0");
+  options.finderInner = parseColor("#FFF7ED");
   options.alignmentShape = "diamond";
   options.timingShape = "circle";
   const std::vector<uint8_t> styled =

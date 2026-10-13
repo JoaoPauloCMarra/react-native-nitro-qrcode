@@ -53,10 +53,6 @@ struct GenerateOptions {
   bool eyeballSet = false;
   bool alignmentSet = false;
   bool timingSet = false;
-  std::string alignmentColor = "#000000";
-  std::string timingColor = "#000000";
-  std::string quietZoneColor = "#FFFFFF";
-  std::string finderInnerColor = "#FFFFFF";
   Color alignment = {0, 0, 0, 255};
   Color timing = {0, 0, 0, 255};
   Color quietZoneFill = {255, 255, 255, 255};

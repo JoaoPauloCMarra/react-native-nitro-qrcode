@@ -64,10 +64,6 @@ void testBridgeDerivedLayerDefaults() {
   const auto options = margelo::nitro::NitroQRCode::makeGenerateOptions(
       256, 3, "M", "#FF0000", "#000000", "#FF0000", "#FF0000", "#FF0000",
       "#FF0000", 1, 40, -1, true, "circle");
-  assert(options.alignmentColor == "#FF0000");
-  assert(options.timingColor == "#FF0000");
-  assert(options.quietZoneColor == "#000000");
-  assert(options.finderInnerColor == "#000000");
   assert(options.alignment == options.foreground);
   assert(options.timing == options.foreground);
   assert(options.quietZoneFill == options.background);

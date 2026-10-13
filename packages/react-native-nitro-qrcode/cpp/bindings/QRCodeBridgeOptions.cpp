@@ -42,10 +42,6 @@ namespace margelo::nitro::NitroQRCode {
   options.eyeSet = options.eye != legacyUnset;
   options.eyeStrokeSet = options.eyeStroke != legacyUnset;
   options.eyeballSet = options.eyeball != legacyUnset;
-  options.alignmentColor = foregroundColor;
-  options.timingColor = foregroundColor;
-  options.quietZoneColor = backgroundColor;
-  options.finderInnerColor = backgroundColor;
   options.alignment = options.foreground;
   options.timing = options.foreground;
   options.quietZoneFill = options.background;

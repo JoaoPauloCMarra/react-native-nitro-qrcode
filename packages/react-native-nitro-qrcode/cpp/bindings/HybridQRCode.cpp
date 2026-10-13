@@ -30,21 +30,19 @@ constexpr const char *LegacyUnsetColor = "#000000";
   resolved.eyeballSet = options.eyeballColor.has_value();
   if (options.alignmentColor.has_value()) {
     resolved.alignmentSet = true;
-    resolved.alignmentColor = *options.alignmentColor;
-    resolved.alignment = ::NitroQRCode::parseColor(resolved.alignmentColor);
+    resolved.alignment = ::NitroQRCode::parseColor(*options.alignmentColor);
   }
   if (options.timingColor.has_value()) {
     resolved.timingSet = true;
-    resolved.timingColor = *options.timingColor;
-    resolved.timing = ::NitroQRCode::parseColor(resolved.timingColor);
+    resolved.timing = ::NitroQRCode::parseColor(*options.timingColor);
   }
   if (options.quietZoneColor.has_value()) {
-    resolved.quietZoneColor = *options.quietZoneColor;
-    resolved.quietZoneFill = ::NitroQRCode::parseColor(resolved.quietZoneColor);
+    resolved.quietZoneFill =
+        ::NitroQRCode::parseColor(*options.quietZoneColor);
   }
   if (options.finderInnerColor.has_value()) {
-    resolved.finderInnerColor = *options.finderInnerColor;
-    resolved.finderInner = ::NitroQRCode::parseColor(resolved.finderInnerColor);
+    resolved.finderInner =
+        ::NitroQRCode::parseColor(*options.finderInnerColor);
   }
   if (options.alignmentShape.has_value()) {
     resolved.alignmentShape = *options.alignmentShape;
