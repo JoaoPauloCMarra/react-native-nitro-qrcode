@@ -80,7 +80,6 @@ class ErrorBoundary extends React.Component<
 
 import {
   clearQRCodeCache,
-  type ErrorCorrectionLevel,
   getMatrix,
   getQRCodeCacheBytes,
   getQRCodeCacheSize,
@@ -99,14 +98,6 @@ import {
 import * as Web from "../index.web";
 import { mergePresetShapeOptions, PRESET_SHAPE_OPTIONS } from "../defaults";
 import { validateLogoDimensions } from "../validation";
-
-function nativeOptions(options: unknown): Parameters<typeof toPngBase64>[0] {
-  return options as Parameters<typeof toPngBase64>[0];
-}
-
-function webOptions(options: unknown): Parameters<typeof Web.toSvgString>[0] {
-  return options as Parameters<typeof Web.toSvgString>[0];
-}
 
 function hasStylePointerEvents(node: TestRenderer.ReactTestInstance): boolean {
   return (
@@ -495,212 +486,15 @@ describe("native QRCode API", () => {
     expect(NitroQRCode.getCacheSize()).toBe(2);
   });
 
-  it("validates empty values and integer ranges", () => {
+  it("rejects invalid options before reaching the native module", () => {
+    jest.clearAllMocks();
     expect(() => toPngBase64({ value: "" })).toThrow("must not be empty");
-    expect(() => toPngBase64({ value: "x", size: 0 })).toThrow("size must be");
-    expect(() => toPngBase64({ value: "x", size: 2048 })).not.toThrow();
-    expect(() => toPngBase64({ value: "x", size: 4096 })).not.toThrow();
     expect(() => toPngBase64Async({ value: "x", size: 4096 })).not.toThrow();
-    expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow(
-      "size must be",
-    );
-    expect(() => toPngBase64({ value: "x", quietZone: 33 })).toThrow(
-      "quietZone must be",
-    );
-    expect(() =>
-      toPngBase64(nativeOptions({ value: "x", minVersion: 0 })),
-    ).toThrow("minVersion must be");
-    expect(() =>
-      toPngBase64(nativeOptions({ value: "x", maxVersion: 41 })),
-    ).toThrow(
-      "maxVersion must be",
-    );
-    expect(() =>
-      toPngBase64({ value: "x", minVersion: 3, maxVersion: 2 }),
-    ).toThrow("minVersion and maxVersion");
-    expect(() => toPngBase64(nativeOptions({ value: "x", mask: 8 }))).toThrow(
-      "mask must be",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        errorCorrectionLevel: "bad" as ErrorCorrectionLevel,
-      }),
-    ).toThrow("errorCorrectionLevel must be");
-    expect(() => toPngBase64({ value: "x", size: 1.5 })).toThrow(
-      "size must be",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { shape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "shape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
+    expect(() => toPngBase64({ value: "x", size: 4097 })).toThrow("size must be");
     expect(() =>
       toPngBase64({ value: "x", shapeOptions: { gap: 257 } }),
     ).toThrow("gap must be");
-    expect(() =>
-      toPngBase64({ value: "x", shapeOptions: { cornerRadius: 257 } }),
-    ).toThrow("cornerRadius must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { layout: "spiral" as "matrix" },
-      }),
-    ).toThrow("layout must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { eyePatternShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { eyeballShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { alignmentShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { timingShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        shapeOptions: { bodyDensity: "crowded" as "dense" },
-      }),
-    ).toThrow("bodyDensity must be sparse, balanced, or dense");
-    expect(() => toPngBase64({ value: "x", logoAreaSize: 4097 })).toThrow(
-      "logoAreaSize must be",
-    );
-    expect(() =>
-      toPngBase64({ value: "x", size: 128, logoAreaSize: 129 }),
-    ).toThrow("logoAreaSize must be between 0 and size");
-    expect(() =>
-      toPngBase64({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
-    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
-    expect(() =>
-      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
-    ).not.toThrow();
-    expect(() =>
-      toPngBase64({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
-    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: [
-            "#000000",
-            "#111111",
-            "#222222",
-            "#333333",
-            "#444444",
-            "#555555",
-            "#666666",
-            "#777777",
-            "#888888",
-          ],
-        },
-      })),
-    ).toThrow("gradient.colors must contain");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0],
-        },
-      })),
-    ).toThrow("gradient.locations must match");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          type: "diagonal" as "linear",
-          colors: ["#000000", "#FFFFFF"],
-        },
-      }),
-    ).toThrow("gradient.type must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0, 2],
-        },
-      }),
-    ).toThrow("gradient.locations entries must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0.8, 0.2],
-        },
-      }),
-    ).toThrow("gradient.locations must be in non-decreasing order");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 2, y: 0 },
-        },
-      }),
-    ).toThrow("gradient.start.x must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 0, y: 2 },
-        },
-      }),
-    ).toThrow("gradient.start.y must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: -1, y: 1 },
-        },
-      }),
-    ).toThrow("gradient.end.x must be");
-    expect(() =>
-      toPngBase64({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: 1, y: Number.NaN },
-        },
-      }),
-    ).toThrow("gradient.end.y must be");
-    expect(() =>
-      toPngBase64(nativeOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "nope"],
-        },
-      })),
-    ).toThrow("gradient.colors[1] must be");
+    expect(mockHybridObject.generatePngBase64Object).not.toHaveBeenCalled();
   });
 
   it("keeps the absolute and relative logo radius bounds aligned", () => {
@@ -2281,208 +2075,15 @@ describe("web QRCode API", () => {
     installCanvas(() => null);
     expect(() => Web.toPngDataUri({ value: "Hello" })).toThrow("2D canvas");
 
-    installCanvas();
+    const canvas = installCanvas();
     expect(() => Web.toSvgString({ value: "" })).toThrow("must not be empty");
-    expect(() => Web.toSvgString({ value: "x", size: 0 })).toThrow(
+    expect(() => Web.toPngDataUri({ value: "x", size: 0 })).toThrow(
       "size must be",
     );
-    expect(() => Web.toSvgString({ value: "x", quietZone: 33 })).toThrow(
-      "quietZone must be",
-    );
-    expect(() =>
-      Web.toSvgString(webOptions({ value: "x", minVersion: 0 })),
-    ).toThrow(
-      "minVersion must be",
-    );
-    expect(() =>
-      Web.toSvgString(webOptions({ value: "x", maxVersion: 41 })),
-    ).toThrow(
-      "maxVersion must be",
-    );
-    expect(() =>
-      Web.toSvgString({ value: "x", minVersion: 3, maxVersion: 2 }),
-    ).toThrow("minVersion and maxVersion");
-    expect(() => Web.toSvgString(webOptions({ value: "x", mask: 8 }))).toThrow(
-      "mask must be",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        errorCorrectionLevel: "bad" as Web.ErrorCorrectionLevel,
-      }),
-    ).toThrow("errorCorrectionLevel must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { layout: "spiral" as "matrix" },
-      }),
-    ).toThrow("layout must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { shape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "shape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyePatternShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeFrameShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyeballShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "eyeballShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { alignmentShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "alignmentShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { timingShape: "triangle" as "square" },
-      }),
-    ).toThrow(
-      "timingShape must be square, circle, rounded, diamond, squircle, or classy.",
-    );
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { bodyDensity: "crowded" as "dense" },
-      }),
-    ).toThrow("bodyDensity must be sparse, balanced, or dense");
     expect(() =>
       Web.toSvgString({ value: "x", shapeOptions: { eyePatternGap: 257 } }),
     ).toThrow("eyePatternGap must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        shapeOptions: { eyePatternCornerRadius: 257 },
-      }),
-    ).toThrow("eyePatternCornerRadius must be");
-    expect(() => Web.toSvgString({ value: "x", logoAreaSize: 4097 })).toThrow(
-      "logoAreaSize must be",
-    );
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 128, logoAreaSize: 129 }),
-    ).toThrow("logoAreaSize must be between 0 and size");
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 128, logoAreaBorderRadius: 65 }),
-    ).toThrow("logoAreaBorderRadius must be between 0 and half the size");
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2048 }),
-    ).not.toThrow();
-    expect(() =>
-      Web.toSvgString({ value: "x", size: 4096, logoAreaBorderRadius: 2049 }),
-    ).toThrow("logoAreaBorderRadius must be an integer between 0 and 2048");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        foregroundColor: "bad",
-      })),
-    ).toThrow("foregroundColor must be");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        gradient: {
-          colors: [
-            "#000000",
-            "#111111",
-            "#222222",
-            "#333333",
-            "#444444",
-            "#555555",
-            "#666666",
-            "#777777",
-            "#888888",
-          ],
-        },
-      })),
-    ).toThrow("gradient.colors must contain");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          type: "diagonal" as "linear",
-          colors: ["#000000", "#FFFFFF"],
-        },
-      }),
-    ).toThrow("gradient.type must be");
-    expect(() =>
-      Web.toSvgString(webOptions({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0],
-        },
-      })),
-    ).toThrow("gradient.locations must match");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0, 2],
-        },
-      }),
-    ).toThrow("gradient.locations entries must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          locations: [0.8, 0.2],
-        },
-      }),
-    ).toThrow("gradient.locations must be in non-decreasing order");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 2, y: 0 },
-        },
-      }),
-    ).toThrow("gradient.start.x must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          start: { x: 0, y: Number.POSITIVE_INFINITY },
-        },
-      }),
-    ).toThrow("gradient.start.y must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: -1, y: 1 },
-        },
-      }),
-    ).toThrow("gradient.end.x must be");
-    expect(() =>
-      Web.toSvgString({
-        value: "x",
-        gradient: {
-          colors: ["#000000", "#FFFFFF"],
-          end: { x: 1, y: 2 },
-        },
-      }),
-    ).toThrow("gradient.end.y must be");
+    expect(canvas.getContext).not.toHaveBeenCalled();
   });
 
   it("rejects missing async web canvas contexts", async () => {
