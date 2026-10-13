@@ -2,14 +2,14 @@
 
 ## Supported Versions
 
-Security updates are provided for the latest release of the `0.10.x` line.
-Older `0.x` lines are not supported; upgrade to the latest release to receive
-security fixes.
+Only the latest `0.x` minor line receives security updates, and only its
+latest release. Earlier `0.x` lines are not supported; upgrade to the latest
+release to receive security fixes.
 
 | Version | Supported |
 | --- | --- |
 | `0.10.x` (latest) | Yes |
-| `0.8.x` and earlier | No |
+| All earlier `0.x` lines | No |
 
 ## Vendored And Runtime Dependencies
 
@@ -18,10 +18,13 @@ security fixes.
   `packages/react-native-nitro-qrcode/cpp/qrcodegen/README.nayuki.markdown`
   for the exact commit, checksums, and synchronization policy. Upstream
   security fixes are adopted by bumping the pinned commit through that policy.
-- Native RGBA gradient PNG export vendors `fpng` (Unlicense) at a pinned
-  commit. See `packages/react-native-nitro-qrcode/cpp/vendor/fpng/README.md`.
-  Indexed two-color and palette PNGs use zlib. Host C++ scan-back tests vendor `quirc`
-  (ISC-style) under `cpp/tests/quirc` and do not ship in the native libraries.
+- Native RGBA gradient PNG export of 1024 px or smaller vendors `fpng`
+  (Unlicense) at a pinned commit. See
+  `packages/react-native-nitro-qrcode/cpp/vendor/fpng/README.md`. Gradients
+  larger than 1024 px use a first-party streaming zlib RGBA writer in
+  `cpp/core`. Indexed two-color and palette PNGs use zlib. Host C++ scan-back
+  tests vendor `quirc` (ISC-style) under `cpp/tests/quirc` and do not ship in
+  the native libraries.
 - The web entry depends on the `qrcode` npm package, which is bundled only for
   web targets. Keep it current through normal dependency updates.
 - The package itself renders user-provided QR payloads. Payloads are not
