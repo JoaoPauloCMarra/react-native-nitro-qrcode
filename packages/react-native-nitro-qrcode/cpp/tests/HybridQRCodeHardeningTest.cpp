@@ -1,4 +1,5 @@
 #include "HybridQRCode.hpp"
+#include "TestSupport.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -14,19 +15,9 @@
 
 using margelo::nitro::NitroQRCode::GenerateOptions;
 using margelo::nitro::NitroQRCode::HybridQRCode;
+using TestSupport::expectThrow;
 
 namespace {
-
-template <typename Exception>
-std::string expectThrow(const std::function<void()> &callback) {
-  try {
-    callback();
-  } catch (const Exception &error) {
-    return error.what();
-  }
-  assert(false && "expected exception was not thrown");
-  return {};
-}
 
 GenerateOptions makeOptions(const std::string &value = "hybrid-hardening") {
   return GenerateOptions(

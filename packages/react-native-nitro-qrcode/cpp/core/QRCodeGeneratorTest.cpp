@@ -1,5 +1,6 @@
 #include "QRCodeGenerator.hpp"
 #include "parity-corpus.hpp"
+#include "../tests/TestSupport.hpp"
 
 #include <algorithm>
 #include <array>
@@ -23,6 +24,9 @@ using NitroQRCode::GenerateOptions;
 using NitroQRCode::parityCorpus;
 using NitroQRCode::parseColor;
 using NitroQRCode::QRCodeGenerator;
+using TestSupport::base64Decode;
+using TestSupport::forEachPngChunk;
+using TestSupport::readU32;
 
 void runQRCodeBridgeOptionsTests();
 void runQRCodeScanTests();
@@ -41,63 +45,16 @@ void assertPngHeader(const std::string &encoded) {
   assert(encoded.rfind("iVBORw0KGgo", 0) == 0);
 }
 
-std::vector<uint8_t> base64Decode(const std::string &encoded) {
-  std::vector<int> values(256, -1);
-  const std::string alphabet =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  for (size_t index = 0; index < alphabet.size(); index++) {
-    values[static_cast<unsigned char>(alphabet[index])] =
-        static_cast<int>(index);
-  }
-
-  std::vector<uint8_t> output;
-  int accumulator = 0;
-  int bits = -8;
-  for (unsigned char character : encoded) {
-    if (character == '=') {
-      break;
-    }
-    const int value = values[character];
-    if (value < 0) {
-      continue;
-    }
-    accumulator = (accumulator << 6) | value;
-    bits += 6;
-    if (bits >= 0) {
-      output.push_back(static_cast<uint8_t>((accumulator >> bits) & 0xFF));
-      bits -= 8;
-    }
-  }
-  return output;
-}
-
-uint32_t readU32(const std::vector<uint8_t> &bytes, size_t offset) {
-  return (static_cast<uint32_t>(bytes[offset]) << 24) |
-         (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
-         static_cast<uint32_t>(bytes[offset + 3]);
-}
-
 void assertPngCrcs(const std::string &encoded) {
   const std::vector<uint8_t> png = base64Decode(encoded);
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const size_t crcOffset = dataOffset + chunkSize;
-    assert(crcOffset + 4 <= png.size());
-
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const size_t typeOffset = chunk.dataOffset - 4;
     uLong crc = ::crc32(0L, Z_NULL, 0);
-    crc = ::crc32(crc, &png[typeOffset], 4 + chunkSize);
-    assert(static_cast<uint32_t>(crc) == readU32(png, crcOffset));
-
-    offset = crcOffset + 4;
-    if (std::string(reinterpret_cast<const char *>(&png[typeOffset]), 4) ==
-        "IEND") {
-      break;
-    }
-  }
+    crc = ::crc32(crc, &png[typeOffset], 4 + chunk.size);
+    assert(static_cast<uint32_t>(crc) ==
+           readU32(png, chunk.dataOffset + chunk.size));
+    return chunk.type != "IEND";
+  });
 }
 
 void appendLegacyCachePart(std::string &request, const std::string &part) {
@@ -219,35 +176,32 @@ std::vector<uint8_t> decodeRgbaPng(const std::string &encoded, int &width,
   std::vector<uint8_t> trns;
   int bitDepth = 8;
   int colorType = 6;
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
-    assert(dataOffset + chunkSize + 4 <= png.size());
-    if (type == "IHDR") {
-      width = static_cast<int>(readU32(png, dataOffset));
-      height = static_cast<int>(readU32(png, dataOffset + 4));
-      bitDepth = png[dataOffset + 8];
-      colorType = png[dataOffset + 9];
-      assert((colorType == 6 && bitDepth == 8) ||
-             (colorType == 3 && (bitDepth == 1 || bitDepth == 2 ||
-                                 bitDepth == 4 || bitDepth == 8)));
-    } else if (type == "PLTE") {
-      palette.assign(png.begin() + dataOffset,
-                     png.begin() + dataOffset + chunkSize);
-    } else if (type == "tRNS") {
-      trns.assign(png.begin() + dataOffset,
-                  png.begin() + dataOffset + chunkSize);
-    } else if (type == "IDAT") {
-      compressed.insert(compressed.end(), png.begin() + dataOffset,
-                        png.begin() + dataOffset + chunkSize);
-    } else if (type == "IEND") {
-      break;
-    }
-    offset = dataOffset + chunkSize + 4;
-  }
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const uint32_t chunkSize = chunk.size;
+    const size_t dataOffset = chunk.dataOffset;
+    const std::string &type = chunk.type;
+      if (type == "IHDR") {
+        width = static_cast<int>(readU32(png, dataOffset));
+        height = static_cast<int>(readU32(png, dataOffset + 4));
+        bitDepth = png[dataOffset + 8];
+        colorType = png[dataOffset + 9];
+        assert((colorType == 6 && bitDepth == 8) ||
+               (colorType == 3 && (bitDepth == 1 || bitDepth == 2 ||
+                                   bitDepth == 4 || bitDepth == 8)));
+      } else if (type == "PLTE") {
+        palette.assign(png.begin() + dataOffset,
+                       png.begin() + dataOffset + chunkSize);
+      } else if (type == "tRNS") {
+        trns.assign(png.begin() + dataOffset,
+                    png.begin() + dataOffset + chunkSize);
+      } else if (type == "IDAT") {
+        compressed.insert(compressed.end(), png.begin() + dataOffset,
+                          png.begin() + dataOffset + chunkSize);
+      } else if (type == "IEND") {
+        return false;
+      }
+    return true;
+  });
 
   const size_t bytesPerPixel = colorType == 6 ? 4 : 1;
   const size_t rowBytes =
@@ -335,32 +289,29 @@ std::vector<uint8_t> decodeIndexedAlphaPng(const std::string &encoded,
   std::vector<uint8_t> palette;
   std::vector<uint8_t> trns;
   std::vector<uint8_t> compressed;
-  size_t offset = 8;
-  while (offset + 12 <= png.size()) {
-    const uint32_t chunkSize = readU32(png, offset);
-    const size_t typeOffset = offset + 4;
-    const size_t dataOffset = typeOffset + 4;
-    const std::string type(reinterpret_cast<const char *>(&png[typeOffset]), 4);
-    assert(dataOffset + chunkSize + 4 <= png.size());
-    if (type == "IHDR") {
-      width = static_cast<int>(readU32(png, dataOffset));
-      height = static_cast<int>(readU32(png, dataOffset + 4));
-      assert(png[dataOffset + 8] == 1);
-      assert(png[dataOffset + 9] == 3);
-    } else if (type == "PLTE") {
-      palette.assign(png.begin() + dataOffset,
-                     png.begin() + dataOffset + chunkSize);
-    } else if (type == "tRNS") {
-      trns.assign(png.begin() + dataOffset,
-                  png.begin() + dataOffset + chunkSize);
-    } else if (type == "IDAT") {
-      compressed.insert(compressed.end(), png.begin() + dataOffset,
-                        png.begin() + dataOffset + chunkSize);
-    } else if (type == "IEND") {
-      break;
-    }
-    offset = dataOffset + chunkSize + 4;
-  }
+  forEachPngChunk(png, [&](const TestSupport::PngChunk &chunk) {
+    const uint32_t chunkSize = chunk.size;
+    const size_t dataOffset = chunk.dataOffset;
+    const std::string &type = chunk.type;
+      if (type == "IHDR") {
+        width = static_cast<int>(readU32(png, dataOffset));
+        height = static_cast<int>(readU32(png, dataOffset + 4));
+        assert(png[dataOffset + 8] == 1);
+        assert(png[dataOffset + 9] == 3);
+      } else if (type == "PLTE") {
+        palette.assign(png.begin() + dataOffset,
+                       png.begin() + dataOffset + chunkSize);
+      } else if (type == "tRNS") {
+        trns.assign(png.begin() + dataOffset,
+                    png.begin() + dataOffset + chunkSize);
+      } else if (type == "IDAT") {
+        compressed.insert(compressed.end(), png.begin() + dataOffset,
+                          png.begin() + dataOffset + chunkSize);
+      } else if (type == "IEND") {
+        return false;
+      }
+    return true;
+  });
   assert(palette.size() >= 6);
   assert(trns.size() >= 2);
 

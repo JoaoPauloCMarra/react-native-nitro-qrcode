@@ -1,4 +1,5 @@
 #include "QRCodeGenerator.hpp"
+#include "TestSupport.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -16,37 +17,6 @@ using NitroQRCode::QRCodeGenerator;
 
 namespace {
 
-std::vector<uint8_t> decodeBase64(const std::string &encoded) {
-  std::vector<int> values(256, -1);
-  const std::string alphabet =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  for (size_t index = 0; index < alphabet.size(); index++) {
-    values[static_cast<unsigned char>(alphabet[index])] =
-        static_cast<int>(index);
-  }
-
-  std::vector<uint8_t> output;
-  int accumulator = 0;
-  int bits = -8;
-  for (unsigned char character : encoded) {
-    if (character == '=') {
-      break;
-    }
-    const int value = values[character];
-    if (value < 0) {
-      continue;
-    }
-    accumulator = (accumulator << 6) + value;
-    bits += 6;
-    if (bits >= 0) {
-      output.push_back(
-          static_cast<uint8_t>((accumulator >> bits) & 0xFF));
-      bits -= 8;
-    }
-  }
-  return output;
-}
-
 void testQuircDecodesNayukiMatrix(
     const std::string &payload, GenerateOptions options = GenerateOptions{},
     int expectedVersion = 0, int expectedEccLevel = -1) {
@@ -54,7 +24,7 @@ void testQuircDecodesNayukiMatrix(
   options.size = 256;
   const int matrixSize = generator.getMatrixSize(payload, options);
   const std::vector<uint8_t> packed =
-      decodeBase64(generator.getMatrixPackedBase64(payload, options));
+      TestSupport::base64Decode(generator.getMatrixPackedBase64(payload, options));
   assert(matrixSize > 0);
   assert(!packed.empty());
 
