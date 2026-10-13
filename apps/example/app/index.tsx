@@ -103,45 +103,78 @@ const DEFAULT_BACKGROUND_CONFIG: BackgroundConfig = {
   color: "#FFFFFF",
 };
 
-const DEFAULT_STROKE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#111827",
-};
+type LayerColorKey =
+  | "strokeColor"
+  | "eyeColor"
+  | "eyeStrokeColor"
+  | "eyeballColor"
+  | "alignmentColor"
+  | "timingColor"
+  | "finderInnerColor"
+  | "quietZoneColor";
 
-const DEFAULT_EYE_CONFIG: SolidColorConfig = {
-  enabled: true,
-  color: "#1E40AF",
-};
+const LAYER_COLOR_FIELDS: readonly {
+  key: LayerColorKey;
+  label: string;
+  fallback: QRCodeColor;
+  defaults: SolidColorConfig;
+}[] = [
+  {
+    key: "strokeColor",
+    label: "Custom stroke color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#111827" },
+  },
+  {
+    key: "eyeColor",
+    label: "Custom eye color",
+    fallback: "#000000",
+    defaults: { enabled: true, color: "#1E40AF" },
+  },
+  {
+    key: "eyeStrokeColor",
+    label: "Custom eye stroke color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#020617" },
+  },
+  {
+    key: "eyeballColor",
+    label: "Custom eyeball color",
+    fallback: "#000000",
+    defaults: { enabled: true, color: "#0F172A" },
+  },
+  {
+    key: "alignmentColor",
+    label: "Custom alignment color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#B45309" },
+  },
+  {
+    key: "timingColor",
+    label: "Custom timing color",
+    fallback: "#000000",
+    defaults: { enabled: false, color: "#0F766E" },
+  },
+  {
+    key: "finderInnerColor",
+    label: "Custom finder inner color",
+    fallback: "#FFFFFF",
+    defaults: { enabled: false, color: "#FFF7ED" },
+  },
+  {
+    key: "quietZoneColor",
+    label: "Custom quiet-zone color",
+    fallback: "#FFFFFF",
+    defaults: { enabled: false, color: "#E2E8F0" },
+  },
+];
 
-const DEFAULT_EYE_STROKE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#020617",
-};
+type LayerColorConfigs = Record<LayerColorKey, SolidColorConfig>;
+type LayerColors = Partial<Record<LayerColorKey, QRCodeColor>>;
 
-const DEFAULT_EYEBALL_CONFIG: SolidColorConfig = {
-  enabled: true,
-  color: "#0F172A",
-};
-
-const DEFAULT_ALIGNMENT_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#B45309",
-};
-
-const DEFAULT_TIMING_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#0F766E",
-};
-
-const DEFAULT_QUIET_ZONE_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#E2E8F0",
-};
-
-const DEFAULT_FINDER_INNER_CONFIG: SolidColorConfig = {
-  enabled: false,
-  color: "#FFF7ED",
-};
+const DEFAULT_LAYER_CONFIGS = Object.fromEntries(
+  LAYER_COLOR_FIELDS.map((field) => [field.key, field.defaults]),
+) as LayerColorConfigs;
 
 const LOGO_PADDING_CONFIG: Record<LogoPaddingPreset, number> = {
   none: 0,
@@ -162,28 +195,8 @@ export default function DemoScreen() {
   const [backgroundConfig, setBackgroundConfig] = useState<BackgroundConfig>(
     DEFAULT_BACKGROUND_CONFIG,
   );
-  const [strokeConfig, setStrokeConfig] = useState<SolidColorConfig>(
-    DEFAULT_STROKE_CONFIG,
-  );
-  const [eyeConfig, setEyeConfig] =
-    useState<SolidColorConfig>(DEFAULT_EYE_CONFIG);
-  const [eyeStrokeConfig, setEyeStrokeConfig] = useState<SolidColorConfig>(
-    DEFAULT_EYE_STROKE_CONFIG,
-  );
-  const [eyeballConfig, setEyeballConfig] = useState<SolidColorConfig>(
-    DEFAULT_EYEBALL_CONFIG,
-  );
-  const [alignmentConfig, setAlignmentConfig] = useState<SolidColorConfig>(
-    DEFAULT_ALIGNMENT_CONFIG,
-  );
-  const [timingConfig, setTimingConfig] = useState<SolidColorConfig>(
-    DEFAULT_TIMING_CONFIG,
-  );
-  const [quietZoneConfig, setQuietZoneConfig] = useState<SolidColorConfig>(
-    DEFAULT_QUIET_ZONE_CONFIG,
-  );
-  const [finderInnerConfig, setFinderInnerConfig] = useState<SolidColorConfig>(
-    DEFAULT_FINDER_INNER_CONFIG,
+  const [layerConfigs, setLayerConfigs] = useState<LayerColorConfigs>(
+    DEFAULT_LAYER_CONFIGS,
   );
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("looks");
   const [look, setLook] = useState<QRCodePreset>("classy");
@@ -241,30 +254,10 @@ export default function DemoScreen() {
   );
   const foregroundColor = resolveForegroundColor(foregroundConfig);
   const backgroundColor = resolveBackgroundColor(backgroundConfig);
-  const strokeColor = strokeConfig.enabled
-    ? resolveSolidColor(strokeConfig, "#000000")
-    : undefined;
-  const eyeColor = eyeConfig.enabled
-    ? resolveSolidColor(eyeConfig, "#000000")
-    : undefined;
-  const eyeStrokeColor = eyeStrokeConfig.enabled
-    ? resolveSolidColor(eyeStrokeConfig, "#000000")
-    : undefined;
-  const eyeballColor = eyeballConfig.enabled
-    ? resolveSolidColor(eyeballConfig, "#000000")
-    : undefined;
-  const alignmentColor = alignmentConfig.enabled
-    ? resolveSolidColor(alignmentConfig, "#000000")
-    : undefined;
-  const timingColor = timingConfig.enabled
-    ? resolveSolidColor(timingConfig, "#000000")
-    : undefined;
-  const quietZoneColor = quietZoneConfig.enabled
-    ? resolveSolidColor(quietZoneConfig, "#FFFFFF")
-    : undefined;
-  const finderInnerColor = finderInnerConfig.enabled
-    ? resolveSolidColor(finderInnerConfig, "#FFFFFF")
-    : undefined;
+  const layerColors = useMemo(
+    () => resolveLayerColors(layerConfigs),
+    [layerConfigs],
+  );
   const gradient = useMemo(
     () => resolveGradient(foregroundConfig),
     [foregroundConfig],
@@ -281,36 +274,22 @@ export default function DemoScreen() {
       errorCorrectionLevel: showLogo ? "H" : "M",
       foregroundColor,
       backgroundColor,
-      strokeColor,
-      eyeColor,
-      eyeStrokeColor,
-      eyeballColor,
-      alignmentColor,
-      timingColor,
-      quietZoneColor,
-      finderInnerColor,
+      ...layerColors,
       gradient,
       shapeOptions: { ...PRESET_SHAPE_OPTIONS[look], ...shapeOptions },
       logoAreaSize,
       logoAreaBorderRadius,
     }),
     [
-      alignmentColor,
       backgroundColor,
-      eyeballColor,
-      eyeColor,
-      eyeStrokeColor,
-      finderInnerColor,
       foregroundColor,
       gradient,
+      layerColors,
       logoAreaBorderRadius,
       logoAreaSize,
       look,
-      quietZoneColor,
       shapeOptions,
       showLogo,
-      strokeColor,
-      timingColor,
       value,
     ],
   );
@@ -392,14 +371,7 @@ export default function DemoScreen() {
                     errorCorrectionLevel={showLogo ? "H" : "M"}
                     foregroundColor={foregroundColor}
                     backgroundColor={backgroundColor}
-                    strokeColor={strokeColor}
-                    eyeColor={eyeColor}
-                    eyeStrokeColor={eyeStrokeColor}
-                    eyeballColor={eyeballColor}
-                    alignmentColor={alignmentColor}
-                    timingColor={timingColor}
-                    quietZoneColor={quietZoneColor}
-                    finderInnerColor={finderInnerColor}
+                    {...layerColors}
                     gradient={gradient}
                     shapeOptions={shapeOptions}
                     logoAreaSize={logoAreaSize}
@@ -602,24 +574,12 @@ export default function DemoScreen() {
               <ColorConfigPanel
                 foregroundConfig={foregroundConfig}
                 backgroundConfig={backgroundConfig}
-                strokeConfig={strokeConfig}
-                eyeConfig={eyeConfig}
-                eyeStrokeConfig={eyeStrokeConfig}
-                eyeballConfig={eyeballConfig}
-                alignmentConfig={alignmentConfig}
-                timingConfig={timingConfig}
-                quietZoneConfig={quietZoneConfig}
-                finderInnerConfig={finderInnerConfig}
+                layerConfigs={layerConfigs}
                 onForegroundChange={setForegroundConfig}
                 onBackgroundChange={setBackgroundConfig}
-                onStrokeChange={setStrokeConfig}
-                onEyeChange={setEyeConfig}
-                onEyeStrokeChange={setEyeStrokeConfig}
-                onEyeballChange={setEyeballConfig}
-                onAlignmentChange={setAlignmentConfig}
-                onTimingChange={setTimingConfig}
-                onQuietZoneChange={setQuietZoneConfig}
-                onFinderInnerChange={setFinderInnerConfig}
+                onLayerChange={(key, config) => {
+                  setLayerConfigs((current) => ({ ...current, [key]: config }));
+                }}
               />
             ) : null}
             {activeConfigTab === "shapes" ? (
@@ -704,45 +664,17 @@ function ConfigTabs({
 function ColorConfigPanel({
   foregroundConfig,
   backgroundConfig,
-  strokeConfig,
-  eyeConfig,
-  eyeStrokeConfig,
-  eyeballConfig,
-  alignmentConfig,
-  timingConfig,
-  quietZoneConfig,
-  finderInnerConfig,
+  layerConfigs,
   onForegroundChange,
   onBackgroundChange,
-  onStrokeChange,
-  onEyeChange,
-  onEyeStrokeChange,
-  onEyeballChange,
-  onAlignmentChange,
-  onTimingChange,
-  onQuietZoneChange,
-  onFinderInnerChange,
+  onLayerChange,
 }: {
   foregroundConfig: ForegroundConfig;
   backgroundConfig: BackgroundConfig;
-  strokeConfig: SolidColorConfig;
-  eyeConfig: SolidColorConfig;
-  eyeStrokeConfig: SolidColorConfig;
-  eyeballConfig: SolidColorConfig;
-  alignmentConfig: SolidColorConfig;
-  timingConfig: SolidColorConfig;
-  quietZoneConfig: SolidColorConfig;
-  finderInnerConfig: SolidColorConfig;
+  layerConfigs: LayerColorConfigs;
   onForegroundChange: (value: ForegroundConfig) => void;
   onBackgroundChange: (value: BackgroundConfig) => void;
-  onStrokeChange: (value: SolidColorConfig) => void;
-  onEyeChange: (value: SolidColorConfig) => void;
-  onEyeStrokeChange: (value: SolidColorConfig) => void;
-  onEyeballChange: (value: SolidColorConfig) => void;
-  onAlignmentChange: (value: SolidColorConfig) => void;
-  onTimingChange: (value: SolidColorConfig) => void;
-  onQuietZoneChange: (value: SolidColorConfig) => void;
-  onFinderInnerChange: (value: SolidColorConfig) => void;
+  onLayerChange: (key: LayerColorKey, value: SolidColorConfig) => void;
 }) {
   return (
     <View style={styles.builderPanel}>
@@ -807,53 +739,16 @@ function ColorConfigPanel({
         )}
       </ColorSection>
 
-      <SolidColorSection
-        config={strokeConfig}
-        label="Custom stroke color"
-        onChange={onStrokeChange}
-      />
-
-      <SolidColorSection
-        config={eyeConfig}
-        label="Custom eye color"
-        onChange={onEyeChange}
-      />
-
-      <SolidColorSection
-        config={eyeStrokeConfig}
-        label="Custom eye stroke color"
-        onChange={onEyeStrokeChange}
-      />
-
-      <SolidColorSection
-        config={eyeballConfig}
-        label="Custom eyeball color"
-        onChange={onEyeballChange}
-      />
-
-      <SolidColorSection
-        config={alignmentConfig}
-        label="Custom alignment color"
-        onChange={onAlignmentChange}
-      />
-
-      <SolidColorSection
-        config={timingConfig}
-        label="Custom timing color"
-        onChange={onTimingChange}
-      />
-
-      <SolidColorSection
-        config={finderInnerConfig}
-        label="Custom finder inner color"
-        onChange={onFinderInnerChange}
-      />
-
-      <SolidColorSection
-        config={quietZoneConfig}
-        label="Custom quiet-zone color"
-        onChange={onQuietZoneChange}
-      />
+      {LAYER_COLOR_FIELDS.map((field) => (
+        <SolidColorSection
+          key={field.key}
+          config={layerConfigs[field.key]}
+          label={field.label}
+          onChange={(config) => {
+            onLayerChange(field.key, config);
+          }}
+        />
+      ))}
 
       <ColorSection
         checked={backgroundConfig.enabled}
@@ -1425,6 +1320,17 @@ function resolveBackgroundColor(config: BackgroundConfig): QRCodeBackgroundColor
     return "#FFFFFF";
   }
   return resolveHexColor(config.color, "#FFFFFF");
+}
+
+function resolveLayerColors(configs: LayerColorConfigs): LayerColors {
+  const colors: LayerColors = {};
+  for (const field of LAYER_COLOR_FIELDS) {
+    const config = configs[field.key];
+    if (config.enabled) {
+      colors[field.key] = resolveSolidColor(config, field.fallback);
+    }
+  }
+  return colors;
 }
 
 function resolveSolidColor(
