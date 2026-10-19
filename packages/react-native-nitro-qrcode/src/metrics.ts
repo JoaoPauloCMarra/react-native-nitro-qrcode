@@ -57,6 +57,16 @@ export function getQRCodeMetrics(): QRCodeMetricsSnapshot {
   };
 }
 
+export function getQRCodeMetricsWithCacheBytes(
+  readCacheBytes: () => number,
+): QRCodeMetricsSnapshot {
+  const snapshot = getQRCodeMetrics();
+  if (!snapshot.enabled) {
+    return snapshot;
+  }
+  return { ...snapshot, cacheBytes: readCacheBytes() };
+}
+
 export function recordGenerationRequest(parameters: {
   async: boolean;
   durationMs: number;

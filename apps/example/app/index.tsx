@@ -17,6 +17,7 @@ import {
   getQRCodeMetrics,
   PRESET_SHAPE_OPTIONS,
   QRCode,
+  setQRCodeMetricsEnabled,
   toPngBase64Async,
   toPngDataUri,
   toPngDataUriAsync,
@@ -36,7 +37,10 @@ import {
 } from "react-native-nitro-qrcode";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { E2eGate } from "../components/e2e-gate";
-import { PRESETS } from "../components/generation-matrix";
+import { PRESETS } from "../components/presets";
+
+setQRCodeMetricsEnabled(true);
+
 const INITIAL_URL =
   "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode";
 const PREVIEW_SIZE = 244;
@@ -72,11 +76,6 @@ type ForegroundConfig = {
   gradientType: GradientType;
 };
 
-type BackgroundConfig = {
-  enabled: boolean;
-  color: string;
-};
-
 type SolidColorConfig = {
   enabled: boolean;
   color: string;
@@ -98,7 +97,7 @@ const DEFAULT_FOREGROUND_CONFIG: ForegroundConfig = {
   gradientType: "linear",
 };
 
-const DEFAULT_BACKGROUND_CONFIG: BackgroundConfig = {
+const DEFAULT_BACKGROUND_CONFIG: SolidColorConfig = {
   enabled: true,
   color: "#FFFFFF",
 };
@@ -192,7 +191,7 @@ export default function DemoScreen() {
   const [foregroundConfig, setForegroundConfig] = useState<ForegroundConfig>(
     DEFAULT_FOREGROUND_CONFIG,
   );
-  const [backgroundConfig, setBackgroundConfig] = useState<BackgroundConfig>(
+  const [backgroundConfig, setSolidColorConfig] = useState<SolidColorConfig>(
     DEFAULT_BACKGROUND_CONFIG,
   );
   const [layerConfigs, setLayerConfigs] = useState<LayerColorConfigs>(
@@ -293,13 +292,11 @@ export default function DemoScreen() {
       value,
     ],
   );
-  const previewGeneration = useMemo(
-    () => ({
-      key: JSON.stringify(previewOptions),
-    }),
+  const previewKey = useMemo(
+    () => JSON.stringify(previewOptions),
     [previewOptions],
   );
-  const isPreviewReady = hasPayload && readyKey === previewGeneration.key;
+  const isPreviewReady = hasPayload && readyKey === previewKey;
 
   return (
     <ScrollView
@@ -340,8 +337,7 @@ export default function DemoScreen() {
                 {hasPayload ? (
                   <QRCode
                     ref={qrRef}
-                    value={value}
-                    size={PREVIEW_SIZE}
+                    {...previewOptions}
                     placeholder={
                       <View style={styles.qrPlaceholder}>
                         <Text style={styles.qrPlaceholderText}>
@@ -354,7 +350,7 @@ export default function DemoScreen() {
                       const generationMs =
                         getQRCodeMetrics().lastGenerationMs ?? 0;
                       const matrix = getMatrix(previewOptions);
-                      setReadyKey(previewGeneration.key);
+                      setReadyKey(previewKey);
                       setMetrics({
                         elapsed: generationMs,
                         bytes: estimateBase64Bytes(uri),
@@ -366,16 +362,8 @@ export default function DemoScreen() {
                     onError={(error) => {
                       setQrError(error.message);
                     }}
-                    scanSafe
                     preset={look}
-                    errorCorrectionLevel={showLogo ? "H" : "M"}
-                    foregroundColor={foregroundColor}
-                    backgroundColor={backgroundColor}
-                    {...layerColors}
-                    gradient={gradient}
                     shapeOptions={shapeOptions}
-                    logoAreaSize={logoAreaSize}
-                    logoAreaBorderRadius={logoAreaBorderRadius}
                     logoPadding={logoPaddingSize}
                     logo={showLogo ? <LogoMark /> : undefined}
                     testID="nitro-qrcode-preview"
@@ -576,7 +564,7 @@ export default function DemoScreen() {
                 backgroundConfig={backgroundConfig}
                 layerConfigs={layerConfigs}
                 onForegroundChange={setForegroundConfig}
-                onBackgroundChange={setBackgroundConfig}
+                onBackgroundChange={setSolidColorConfig}
                 onLayerChange={(key, config) => {
                   setLayerConfigs((current) => ({ ...current, [key]: config }));
                 }}
@@ -670,10 +658,10 @@ function ColorConfigPanel({
   onLayerChange,
 }: {
   foregroundConfig: ForegroundConfig;
-  backgroundConfig: BackgroundConfig;
+  backgroundConfig: SolidColorConfig;
   layerConfigs: LayerColorConfigs;
   onForegroundChange: (value: ForegroundConfig) => void;
-  onBackgroundChange: (value: BackgroundConfig) => void;
+  onBackgroundChange: (value: SolidColorConfig) => void;
   onLayerChange: (key: LayerColorKey, value: SolidColorConfig) => void;
 }) {
   return (
@@ -1315,7 +1303,7 @@ function resolveForegroundColor(config: ForegroundConfig): QRCodeColor {
   return resolveOpaqueHexColor(config.singleColor, "#111315");
 }
 
-function resolveBackgroundColor(config: BackgroundConfig): QRCodeBackgroundColor {
+function resolveBackgroundColor(config: SolidColorConfig): QRCodeBackgroundColor {
   if (!config.enabled) {
     return "#FFFFFF";
   }
@@ -1337,9 +1325,6 @@ function resolveSolidColor(
   config: SolidColorConfig,
   fallback: QRCodeColor,
 ): QRCodeColor {
-  if (!config.enabled) {
-    return fallback;
-  }
   return resolveOpaqueHexColor(config.color, fallback);
 }
 

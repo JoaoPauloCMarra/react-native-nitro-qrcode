@@ -2,16 +2,17 @@
 
 // Regenerates or verifies the native/web encoder parity corpus fixture.
 //
-// The corpus contract: for inputs that are entirely numeric, entirely
-// alphanumeric, or entirely byte-mode (no digits, uppercase letters, or
-// `$%*+-./:` characters), the web `qrcode` encoder and the native Nayuki
-// encoder must produce identical matrices when version, error correction
-// level, and mask are fixed. Automatic mask selection can differ because the
+// The corpus contract: the web `qrcode` encoder encodes the whole text as one
+// numeric, alphanumeric, or byte segment, chosen the way Nayuki's
+// `makeSegments` chooses it, so the web and native encoders must produce
+// identical matrices when version, error correction level, and mask are fixed. Automatic mask selection can differ because the
 // two encoders interpret the ISO N4 penalty rounding differently.
 //
-// The boostEcl emulation below mirrors `createModel` in
-// packages/react-native-nitro-qrcode/src/index.web.ts: encode at the
-// requested level, then raise the level as high as the same version allows.
+// `createModel` below copies the selection logic of `createModel` in
+// packages/react-native-nitro-qrcode/src/index.web.ts: encode at the requested
+// level, raise the version to `minVersion`, reject payloads above
+// `maxVersion`, then step through every higher level that the same version
+// still holds.
 //
 // Usage:
 //   bun scripts/generate-parity-corpus.js            # verify the fixture
@@ -43,6 +44,8 @@ const longAlpha = Array(12)
   .join("")
   .trim();
 
+const mixedModeUrl = "https://example.com/" + "A".repeat(40) + "1234567890123456789012345";
+
 const ENTRIES = [
   { value: "Hello, world!", ecl: "M", minVersion: 1, maxVersion: 40, mask: -1, boostEcl: true },
   { value: "hello, world!", ecl: "M", minVersion: 1, maxVersion: 40, mask: 0, boostEcl: true },
@@ -57,31 +60,50 @@ const ENTRIES = [
   { value: "boost tiny", ecl: "L", minVersion: 1, maxVersion: 40, mask: -1, boostEcl: true },
   { value: "boost tiny", ecl: "L", minVersion: 1, maxVersion: 40, mask: -1, boostEcl: false },
   { value: longAlpha, ecl: "M", minVersion: 1, maxVersion: 40, mask: 5, boostEcl: true },
+  { value: "a".repeat(12), ecl: "L", minVersion: 1, maxVersion: 40, mask: 0, boostEcl: true },
+  { value: "min version above natural", ecl: "M", minVersion: 5, maxVersion: 40, mask: 1, boostEcl: true },
+  { value: mixedModeUrl, ecl: "L", minVersion: 1, maxVersion: 40, mask: 0, boostEcl: false },
 ];
+
+function selectSegmentMode(value) {
+  if (/^[0-9]*$/.test(value)) {
+    return "numeric";
+  }
+  if (/^[0-9A-Z $%*+\-./:]*$/.test(value)) {
+    return "alphanumeric";
+  }
+  return "byte";
+}
 
 function createModel(value, ecl, minVersion, maxVersion, mask, boostEcl) {
   const make = (level, version) =>
-    QRCode.create(value, {
+    QRCode.create([{ data: value, mode: selectSegmentMode(value) }], {
       errorCorrectionLevel: level,
-      version: version ?? undefined,
+      version: version ?? (minVersion === maxVersion ? minVersion : undefined),
       maskPattern: mask >= 0 ? mask : undefined,
     });
-  const base = make(ecl, minVersion === maxVersion ? minVersion : undefined);
-  const version = (base.modules.size - 17) / 4;
-  if (boostEcl && ecl !== "H") {
-    let boosted = base;
-    for (const candidate of ["Q", "H"]) {
-      try {
-        boosted = make(candidate, version);
-      } catch {
-        break;
-      }
-    }
-    if (boosted !== base) {
-      return boosted;
+  let base = make(ecl);
+  let version = (base.modules.size - 17) / 4;
+  if (version > maxVersion) {
+    throw new Error("QR payload exceeds maxVersion capacity.");
+  }
+  if (version < minVersion) {
+    version = minVersion;
+    base = make(ecl, version);
+  }
+  if (!boostEcl || ecl === "H") {
+    return base;
+  }
+  let boosted;
+  const levels = ["L", "M", "Q", "H"];
+  for (const candidate of levels.slice(levels.indexOf(ecl) + 1)) {
+    try {
+      boosted = make(candidate, version);
+    } catch {
+      break;
     }
   }
-  return base;
+  return boosted ?? base;
 }
 
 function packMatrix(model) {

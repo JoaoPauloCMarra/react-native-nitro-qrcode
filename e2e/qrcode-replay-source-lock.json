@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeSourceSha256": "c187e08de04f49109fb01df72de7a35cbc174abc50ffef6c4083570a7af91d47",
+  "runtimeSourceSha256": "4346aed2c609041f7a6cc56f98b314c21a5c617063b455f46e1b7ed96325fca1",
   "runtimeSourceFiles": [
     "apps/example/app.config.js",
     "apps/example/app/_layout.tsx",
@@ -17,7 +17,9 @@
     "apps/example/assets/icon.png",
     "apps/example/components/e2e-gate.tsx",
     "apps/example/components/e2e-lab.tsx",
+    "apps/example/components/e2e-screen.tsx",
     "apps/example/components/generation-matrix.ts",
+    "apps/example/components/presets.ts",
     "apps/example/components/ready-wall.ts",
     "apps/example/components/scan-decode.ts",
     "apps/example/metro.config.js",
@@ -79,7 +81,7 @@
     "packages/react-native-nitro-qrcode/src/use-qrcode-generation.ts",
     "packages/react-native-nitro-qrcode/src/validation.ts"
   ],
-  "replayInputsSha256": "68a0f7de3356b1f12eaf04b2a390321bfac2f9a27a64b480c5ab9cc45ad7329c",
+  "replayInputsSha256": "d24030379c2e6937124bd2db4a6cde683b1d3a97b65d7532e60663f5fc83c97e",
   "replayInputs": [
     "e2e/qa-combo.ad",
     "e2e/qa-deeplink.ad",

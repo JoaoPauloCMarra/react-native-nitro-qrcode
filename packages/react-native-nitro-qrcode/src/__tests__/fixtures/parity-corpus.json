@@ -30,7 +30,7 @@
     "packedBase64": "/v2/wR4QboyLt1nV26k67BdhB/qq/gEHAIv4fMwzhbf/TIoJLUB6ByxjfnDdbAgYZcbTCPqAcka/uSqQSRF7q2+901u+6f2VBKpG/q1PgA=="
   },
   {
-    "value": "h\u00e9llo w\u00f6rld, \u4f60\u597d",
+    "value": "héllo wörld, 你好",
     "ecl": "M",
     "minVersion": 1,
     "maxVersion": 40,
@@ -128,5 +128,35 @@
     "boostEcl": true,
     "size": 73,
     "packedBase64": "/iNqQtbaZXa/wX1lkpgog/cQbrbEDH4PCdsLt1AJ7tdBlX/l26VxL/41+8Da7BHhdGcPxzqRB/qqqqqqqqqq/gHpGxMk8RIpAIKkcPkhv9Tl52gjaHD3TPQhpc7iLiihXnAKGhExsUn8jTSD5IHgBQ9gLclUpQYjn7u1GlTIevE5bF0vQNRezpHwpIwVs5oOg3pnma3g2kOZCtZEVRsPegqdw87qwHWJT8SztX/8pjnS8pjlrrN661NXvmlLLDr/TLivFkP9czhcOYWxWS/XGT9mGuz178jnqbKbL7t7/gLPkgz5nFHNR1GsXqvFOrktavQKsGfqCxEqcWc7F/0RaviUn6W/+RGvg8Rr6e0zIVB6cpil16RQ8VkU1vvGWCMm3VBLxDajVWkpMFxsMarr/GA7wnQtD7+O3SSHPrROM9Ejvhq/lrYTcDkrWUtMtl0C6F5snuPvZ8vrmV6e+l7zgkWPRgNCHJbnQqRCTqdDXvniy25faUhAmmmKnzpO0843m7yqYw06j+XymVCq8qj+bTRL+c0ftvH8yQ/7R7dEUo9H41RM6hTWuWuqcOq/sVe/F0SRRBUXz/jg/JffwDb52DGq5aKOvrXYLNZBiE1CvJA1o5MH6Gf61qROhrllV+f/uLDVyoxj8z4Bdep/3C2uaXxAnGj3T5LF+L8omCIbyfvbMkMFoMz1XeJt9Q/FX/wlABeKXkqg1hQOf+sfhpF0SCSD4U7lNkNJfBlUu5zmjgE6KOTIeLNfmcTE1E5ezVIybauPgq4OAsiKfOr+y0+bDP6AbATFvgxe40b/htEq64airWvwQsZxIbkZKhF7pccf3/n9SB/90CMHRgvrYxoW6fjAxwvaEK/nBFU6xNjQxLxI/r4LHxJbcS6BgA=="
+  },
+  {
+    "value": "aaaaaaaaaaaa",
+    "ecl": "L",
+    "minVersion": 1,
+    "maxVersion": 40,
+    "mask": 0,
+    "boostEcl": true,
+    "size": 21,
+    "packedBase64": "/iP8FFBuhLt0ZduvrsEJB/qv4AQAqkiULK7A7f978A9rCIBa7/k/8EQCuoiV0e6ur/sEwC/qiYA="
+  },
+  {
+    "value": "min version above natural",
+    "ecl": "M",
+    "minVersion": 5,
+    "maxVersion": 40,
+    "mask": 1,
+    "boostEcl": true,
+    "size": 37,
+    "packedBase64": "/mIsY/wVdiAQbrGFNrt1ShEV26uFfC7BSvPBB/qqqq/gD4N2ACfAon33IQOdY8CyE0uyCW08cOYn89C+xGnrZzbp1RAm/IUoM/k7VrQLQi5tRrhLpdHkW6LsfpSk5pllFXheVWwKLS0URW4jeBl6CwMt0dtqZOYM+YDBPMpoDcdHDWbSKfqATbVMV/qIe+qwWTk1G7pCIh/F0FtxpK6vBd8vBDP4Wo/gEBbcgA=="
+  },
+  {
+    "value": "https://example.com/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1234567890123456789012345",
+    "ecl": "L",
+    "minVersion": 1,
+    "maxVersion": 40,
+    "mask": 0,
+    "boostEcl": false,
+    "size": 37,
+    "packedBase64": "/iJaI/wSIq7QbqRCIrt0mB7l26TJoi7BHe7tB/qqqq/gEjnuAO+IYI4kwOMu81n+qolC8N/e4ZJxJgig9Aky7xSJkYiVfSoL7mor6GCOCUjjLuF7lrqIloHc/uEseyYI4Y6ZMu6GipAIj/wmKO4CFqhgjliM4y7jbYaiiK7SHs7hKqkmCPgAWTLsb/qRCKvwVirtELqJYI+d0eMuDS6msIr/BZ7u6i/pNontgA=="
   }
 ]

@@ -13,7 +13,6 @@ import type { NormalizedOptions, QRCodeShape } from "./validation";
 
 export type RenderLayer =
   | "foreground"
-  | "stroke"
   | "eye"
   | "eyeball"
   | "alignment"
@@ -36,7 +35,6 @@ export type RenderModulePlan = {
   cornerRadius: number;
   layer: RenderLayer;
   neighbors: RenderNeighbors;
-  stroke?: RenderLayer;
   strokeGap?: number;
 };
 
@@ -307,7 +305,6 @@ function buildModuleRows(
         },
       };
       if (layer === "foreground" && drawsBodyStroke(options)) {
-        plan.stroke = "stroke";
         plan.strokeGap = gap + Math.max(1, Math.floor((x1 - x0) / 5));
       }
       rowModules.push(plan);

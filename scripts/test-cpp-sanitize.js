@@ -1,8 +1,14 @@
-const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { resolveLlvmTool } = require("./llvm-tools.js");
-const { prepareNitroHeaders, sharedIncludeArgs } = require("./cpp-includes.js");
+const {
+  compileQuircObjects,
+  platformLinkArgs,
+  prepareNitroHeaders,
+  runCommand,
+  sharedIncludeArgs,
+  testSources,
+} = require("./cpp-includes.js");
 
 const packageDir = path.join(
   __dirname,
@@ -14,23 +20,15 @@ const cppDir = path.join(packageDir, "cpp");
 const buildDir = path.join(cppDir, "build-sanitize");
 const quircDir = path.join(cppDir, "tests", "quirc");
 
-function runCommand(command, args) {
-  execFileSync(command, args, {
-    stdio: "inherit",
-  });
+const generatedDir = path.join(packageDir, "nitrogen", "generated", "shared", "c++");
+const matrixObjectHeader = path.join(generatedDir, "MatrixObject.hpp");
+if (!fs.existsSync(matrixObjectHeader)) {
+  throw new Error(
+    `Missing generated MatrixObject converter: ${matrixObjectHeader}. Run codegen first.`,
+  );
 }
 
-const sources = [
-  path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
-  path.join(cppDir, "core", "parity-corpus.cpp"),
-  path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
-  path.join(cppDir, "tests", "QRCodeScanTest.cpp"),
-  path.join(cppDir, "tests", "QRCodeHardeningTest.cpp"),
-  path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
-  path.join(cppDir, "core", "QRCodeGenerator.cpp"),
-  path.join(cppDir, "vendor", "fpng", "fpng_unity.cpp"),
-  path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
-];
+const sources = testSources(packageDir, { includeMemory: false });
 
 const sanitizers = [
   { label: "ASan/UBSan", flag: "address,undefined", suffix: "sanitize" },
@@ -43,25 +41,13 @@ const includeRoot = prepareNitroHeaders(path.join(__dirname, ".."), buildDir);
 
 for (const { label, flag, suffix } of sanitizers) {
   const outputFile = path.join(buildDir, `qrcode_generator_test_${suffix}`);
-  const quircObjects = ["quirc.c", "decode.c", "identify.c", "version_db.c"].map(
-    (file) => {
-      const objectFile = path.join(buildDir, `${file}.${suffix}.o`);
-      runCommand(resolveLlvmTool("clang"), [
-        "-std=c11",
-        "-DQUIRC_MAX_REGIONS=65534",
-        "-O1",
-        "-g",
-        "-fno-omit-frame-pointer",
-        `-fsanitize=${flag}`,
-        `-I${quircDir}`,
-        "-c",
-        path.join(quircDir, file),
-        "-o",
-        objectFile,
-      ]);
-      return objectFile;
-    },
-  );
+  const quircObjects = compileQuircObjects({
+    clang: resolveLlvmTool("clang"),
+    quircDir,
+    buildDir,
+    suffix,
+    flags: ["-O1", "-g", "-fno-omit-frame-pointer", `-fsanitize=${flag}`],
+  });
 
   console.log(`Compiling C++ QRCode tests with ${label}...`);
   runCommand(resolveLlvmTool("clang++"), [
@@ -69,6 +55,7 @@ for (const { label, flag, suffix } of sanitizers) {
     "-Wall",
     "-Wextra",
     "-Werror",
+    "-DNITRO_HYBRID_BINDING_TEST",
     "-O1",
     "-g",
     "-fno-omit-frame-pointer",
@@ -80,8 +67,7 @@ for (const { label, flag, suffix } of sanitizers) {
     ...quircObjects,
     "-o",
     outputFile,
-    "-lz",
-    process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread",
+    ...platformLinkArgs(),
   ]);
 
   console.log(`Running C++ QRCode ${label} tests...`);

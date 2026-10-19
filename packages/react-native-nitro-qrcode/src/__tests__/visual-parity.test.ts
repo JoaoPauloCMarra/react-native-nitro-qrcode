@@ -1,7 +1,16 @@
 import * as Web from "../index.web";
 import { createRenderPlan } from "../render-plan";
-import { normalizeOptions, validateOptions } from "../validation";
-import { installRecordingCanvas, type RecordedCall } from "./helpers/canvas";
+import {
+  normalizeOptions,
+  validateOptions,
+  type QRCodeOptions,
+} from "../validation";
+import {
+  createMockContext,
+  installCanvas,
+  installRecordingCanvas,
+  type RecordedCall,
+} from "./helpers/canvas";
 import { allDarkModel } from "./helpers/matrix";
 
 afterEach(() => {
@@ -47,7 +56,7 @@ describe("layer color defaults", () => {
     );
     expect(plan.drawGroupedFinders).toBe(false);
     expect(
-      plan.rows.flatMap((row) => row.modules).some((module) => module.stroke),
+      plan.rows.flatMap((row) => row.modules).some((module) => module.strokeGap !== undefined),
     ).toBe(false);
   });
 
@@ -164,7 +173,7 @@ describe("reviewer probes on web", () => {
       128,
     );
     expect(
-      plan.rows.flatMap((row) => row.modules).some((module) => module.stroke),
+      plan.rows.flatMap((row) => row.modules).some((module) => module.strokeGap !== undefined),
     ).toBe(false);
     expect(plan.drawGroupedFinders).toBe(false);
   });
@@ -223,7 +232,7 @@ describe("native pixel geometry parity", () => {
     );
     const stroked = plan.rows
       .flatMap((row) => row.modules)
-      .filter((module) => module.stroke !== undefined);
+      .filter((module) => module.strokeGap !== undefined);
     expect(stroked.length).toBeGreaterThan(0);
     for (const module of stroked) {
       expect(module.strokeGap).toBe(
@@ -310,5 +319,55 @@ describe("web metrics", () => {
     Web.resetQRCodeMetrics();
     Web.getMatrix({ value: "matrix-metrics" });
     expect(Web.getQRCodeMetrics().requests).toBe(1);
+  });
+});
+
+describe("svg and png gradient frames", () => {
+  function linearT(
+    [x1, y1, x2, y2]: number[],
+    x: number,
+    y: number,
+  ): number {
+    const dx = x2! - x1!;
+    const dy = y2! - y1!;
+    return ((x - x1!) * dx + (y - y1!) * dy) / (dx * dx + dy * dy);
+  }
+
+  it("svg gradient matches png at the top-left module", () => {
+    const options: QRCodeOptions = {
+      value: "Hello",
+      size: 290,
+      gradient: {
+        type: "linear",
+        colors: ["#0000FF", "#00FF00"],
+        start: { x: 0.1, y: 0.2 },
+        end: { x: 0.9, y: 0.8 },
+      },
+    };
+    const svg = Web.toSvgString(options);
+    expect(svg).toContain('gradientUnits="userSpaceOnUse"');
+    const svgCoords = ["x1", "y1", "x2", "y2"].map((name) =>
+      Number(new RegExp(`${name}="([\\d.]+)"`).exec(svg)![1]),
+    );
+
+    const context = createMockContext();
+    installCanvas(() => context);
+    Web.toPngDataUri(options);
+    const pngCoords = context.createLinearGradient.mock.calls[0]!;
+
+    const moduleCenter = 4.5;
+    expect(linearT(svgCoords, moduleCenter, moduleCenter)).toBeCloseTo(
+      linearT(pngCoords, moduleCenter * 10, moduleCenter * 10),
+      2,
+    );
+  });
+
+  it("scales radial svg gradients to the full image", () => {
+    const svg = Web.toSvgString({
+      value: "Hello",
+      gradient: { type: "radial", colors: ["#0000FF", "#00FF00"] },
+    });
+    expect(svg).toContain('gradientUnits="userSpaceOnUse"');
+    expect(svg).toContain('cx="14.50" cy="14.50" r="20.51"');
   });
 });

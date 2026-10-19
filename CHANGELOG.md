@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.12.0] - 2026-10-15
+
+### Breaking changes
+
+No API removals. Two output changes can affect pixel or string snapshots:
+
+- **Web encodes mixed text like native.** The web encoder now encodes the whole value as one segment (numeric, alphanumeric or byte, chosen as the native encoder does) instead of mixing segment modes. Mixed text such as a URL with a long uppercase or digit run can get a larger version on web than before, and now matches native. A value that fit `maxVersion` on web only because of mixed segments can now be rejected, as it already was on native. Migration: refresh web matrix, SVG and PNG snapshots for mixed text, and raise `maxVersion` if a value no longer fits.
+- **SVG gradients span the whole image, like PNG.** SVG output from web and native now uses `gradientUnits="userSpaceOnUse"` with coordinates over the full image including the quiet zone. Gradient colors at a given module now match the PNG output. Migration: refresh SVG snapshots that use gradients.
+
+### Fixed
+
+- Async web PNG generation yields to the main thread only after an 8 ms time budget, and uses `scheduler.yield` or a `MessageChannel` when available, instead of a nested `setTimeout(0)` after every 8 rows, so browser timer clamping no longer adds a wait per band.
+
+### Changed
+
+- `getMatrixPackedBase64` and `getMatrixSize` on the native `HybridQRCode` object are marked deprecated; use `getMatrixObject`.
+- Tested with Expo SDK 58 (React Native 0.88.0, React 19.3.0). Supported ranges are unchanged.
+
 ## [0.11.0] - 2026-10-13
 
 ### Breaking changes

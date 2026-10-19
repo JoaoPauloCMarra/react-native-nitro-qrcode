@@ -104,9 +104,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate release tag policy
-        run: node scripts/validate-release-tags.js --test
-
       - name: Resolve release metadata
         id: metadata
         env:

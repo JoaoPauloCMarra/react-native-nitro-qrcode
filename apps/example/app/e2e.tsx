@@ -1,23 +1,20 @@
 import { Link, type Href } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { QrcodeE2eLab } from "../components/e2e-lab";
+import { E2eScreen } from "../components/e2e-screen";
+
+const LABS = [
+  { id: "render", label: "Open render wall" },
+  { id: "visuals", label: "Open visual wall" },
+  { id: "scanability", label: "Open scanability wall" },
+  { id: "combo", label: "Open combo sweep" },
+  { id: "png-bench", label: "Open PNG bench" },
+  { id: "image-swap", label: "Open image swap" },
+] as const;
 
 export default function QrcodeE2eScreen() {
-  const insets = useSafeAreaInsets();
-
   return (
-    <ScrollView
-      testID="e2e-screen"
-      accessibilityLabel="E2E lab"
-      style={styles.screen}
-      contentContainerStyle={{
-        paddingTop: insets.top + 20,
-        paddingBottom: insets.bottom + 32,
-        paddingHorizontal: 16,
-        gap: 16,
-      }}
-    >
+    <E2eScreen testID="e2e-screen" label="E2E lab">
       <View>
         <Text testID="e2e-ready" style={styles.ready}>
           e2e-ready
@@ -32,65 +29,23 @@ export default function QrcodeE2eScreen() {
         </Text>
       </View>
       <QrcodeE2eLab />
-      <Link href={"/e2e-render" as Href} asChild>
-        <Pressable
-          testID="open-e2e-render"
-          accessibilityRole="link"
-          accessibilityLabel="Open render wall"
-          style={styles.renderLink}
-        >
-          <Text style={styles.renderLinkText}>Open render wall</Text>
-        </Pressable>
-      </Link>
-      <Link href={"/e2e-visuals" as Href} asChild>
-        <Pressable
-          testID="open-e2e-visuals"
-          accessibilityRole="link"
-          accessibilityLabel="Open visual wall"
-          style={styles.renderLink}
-        >
-          <Text style={styles.renderLinkText}>Open visual wall</Text>
-        </Pressable>
-      </Link>
-      <Link href={"/e2e-scanability" as Href} asChild>
-        <Pressable
-          testID="open-e2e-scanability"
-          accessibilityRole="link"
-          accessibilityLabel="Open scanability wall"
-          style={styles.renderLink}
-        >
-          <Text style={styles.renderLinkText}>Open scanability wall</Text>
-        </Pressable>
-      </Link>
-      <Link href={"/e2e-combo" as Href} asChild>
-        <Pressable
-          testID="open-e2e-combo"
-          accessibilityRole="link"
-          accessibilityLabel="Open combo sweep"
-          style={styles.renderLink}
-        >
-          <Text style={styles.renderLinkText}>Open combo sweep</Text>
-        </Pressable>
-      </Link>
-      <Link href={"/e2e-png-bench" as Href} asChild>
-        <Pressable
-          testID="open-e2e-png-bench"
-          accessibilityRole="link"
-          accessibilityLabel="Open PNG bench"
-          style={styles.renderLink}
-        >
-          <Text style={styles.renderLinkText}>Open PNG bench</Text>
-        </Pressable>
-      </Link>
-    </ScrollView>
+      {LABS.map((lab) => (
+        <Link key={lab.id} href={`/e2e-${lab.id}` as Href} asChild>
+          <Pressable
+            testID={`open-e2e-${lab.id}`}
+            accessibilityRole="link"
+            accessibilityLabel={lab.label}
+            style={styles.renderLink}
+          >
+            <Text style={styles.renderLinkText}>{lab.label}</Text>
+          </Pressable>
+        </Link>
+      ))}
+    </E2eScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#101112",
-  },
   ready: {
     color: "#86EFAC",
     fontFamily: "Menlo",

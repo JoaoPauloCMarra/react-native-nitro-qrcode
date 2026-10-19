@@ -228,7 +228,7 @@ void testGradientHostileNumbers() {
   assert(!generator.renderPngBytes("gradient", zeroSpan).empty());
   zeroSpan.gradient.type = "radial";
   assert(!generator.renderPngBytes("gradient", zeroSpan).empty());
-  assert(generator.generateSvgString("gradient", zeroSpan).find("r=\"1.00%\"") !=
+  assert(generator.generateSvgString("gradient", zeroSpan).find("r=\"0.29\"") !=
          std::string::npos);
 }
 
@@ -857,8 +857,6 @@ std::vector<GenerateOptions> gradientVariants(int size) {
   GenerateOptions translucent = linear;
   translucent.background = parseColor("transparent");
   translucent.backgroundColor = "transparent";
-  translucent.quietZoneFill = translucent.background;
-  translucent.finderInner = translucent.background;
   translucent.moduleShape = "circle";
   translucent.eyePatternShape = "rounded";
   translucent.eyeballShape = "diamond";

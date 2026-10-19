@@ -6,7 +6,6 @@ export type QRCodeGenerationResult = {
   displayedValue: string | undefined;
   pending: boolean;
   error: Error | undefined;
-  options: QRCodeOptions;
 };
 
 export type QRCodeAsyncGenerator = {
@@ -75,6 +74,5 @@ export function useQRCodeGeneration(
     displayedValue: uri === undefined ? undefined : result?.options.value,
     pending: !isCurrent && failedOptions !== options,
     error: generationError,
-    options,
   };
 }

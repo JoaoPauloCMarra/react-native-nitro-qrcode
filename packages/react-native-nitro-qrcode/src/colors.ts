@@ -22,7 +22,7 @@ export function sanitizeBackgroundColor(
   return sanitizeHexColor(value, name);
 }
 
-export function sanitizeHexColor(value: string, name: string): QRCodeColor {
+function sanitizeHexColor(value: string, name: string): QRCodeColor {
   if (/^#[0-9A-Fa-f]{3}([0-9A-Fa-f])?$/.test(value)) {
     const hex = value.slice(1);
     return `#${hex
@@ -143,14 +143,14 @@ export function parseHexColor(color: string): {
   };
 }
 
-export function linearizeChannel(value: number): number {
+function linearizeChannel(value: number): number {
   const normalized = value / 255;
   return normalized <= 0.03928
     ? normalized / 12.92
     : ((normalized + 0.055) / 1.055) ** 2.4;
 }
 
-export function relativeLuminance(color: {
+function relativeLuminance(color: {
   red: number;
   green: number;
   blue: number;

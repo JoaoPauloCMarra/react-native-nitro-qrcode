@@ -178,7 +178,6 @@ void testRenderedPngDecodesWithDefaultsAndTranslucentLayers() {
   GenerateOptions transparent;
   transparent.backgroundColor = "#00000000";
   transparent.background = {0, 0, 0, 0};
-  transparent.quietZoneFill = {0, 0, 0, 0};
   const std::string transparentPng =
       generator.renderPngBase64(payload, transparent);
   assert(quircDecodesRgbaPng(payload, transparentPng, 255));

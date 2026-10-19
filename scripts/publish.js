@@ -70,12 +70,12 @@ function must(command, commandArgs = [], options = {}) {
   }
 }
 
-function runPackageCommandWithDocs(command, commandArgs, options, label) {
+function runPackageCommandWithDocs(command, commandArgs, options) {
   try {
     must("node", [packageDocsSyncScript, "prepare"], {
       cwd: packageDir,
     });
-    must(command, commandArgs, { ...options, label });
+    must(command, commandArgs, options);
   } finally {
     must("node", [packageDocsSyncScript, "cleanup"], {
       cwd: packageDir,
@@ -169,10 +169,6 @@ async function main() {
   const tag = requestedTag || (isPrerelease ? "next" : "latest");
   const publishArgs = ["publish", "--tag", tag, "--access", "public"];
 
-  if (dryRun) {
-    publishArgs.push("--dry-run");
-  }
-
   if (otp) {
     publishArgs.push("--otp", otp);
   }
@@ -214,17 +210,15 @@ async function main() {
   }
 
   if (dryRun) {
-    log("Dry run complete. Package is publishable.", "green");
+    log(
+      `Dry run complete: ${skipChecks ? "release checks skipped" : "release checks passed"}, package contents audit passed; bun publish was not called.`,
+      "green"
+    );
     return;
   }
 
   log("Publishing to npm...", "cyan");
-  runPackageCommandWithDocs(
-    "bun",
-    publishArgs,
-    { cwd: packageDir },
-    "Publish package",
-  );
+  runPackageCommandWithDocs("bun", publishArgs, { cwd: packageDir });
 
   log(
     `Published ${packageJson.name}@${packageJson.version}.`,

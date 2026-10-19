@@ -19,6 +19,7 @@ import {
   type QRCodeOptions,
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
+import { PRESETS } from "./presets";
 
 const SHAPES: readonly QRCodeBodyShape[] = [
   "square",
@@ -29,24 +30,22 @@ const SHAPES: readonly QRCodeBodyShape[] = [
   "classy",
 ];
 
-export const PRESETS = Object.keys(PRESET_SHAPE_OPTIONS) as QRCodePreset[];
-
 const ECLS = ["L", "M", "Q", "H"] as const;
 const DENSITIES = ["sparse", "balanced", "dense"] as const;
 const COLOR_MODES = ["solid", "linear", "radial"] as const;
 const CACHE_MAX_ENTRIES = 128;
 const CACHE_MAX_BYTES = 4 * 1024 * 1024;
 
-export type ComboGroup = "shapes" | "core" | "errors";
+type ComboGroup = "shapes" | "core" | "errors";
 
-export type ComboCase = {
+type ComboCase = {
   id: string;
   group: ComboGroup;
   options: QRCodeOptions;
   expectError?: boolean;
 };
 
-export type ComboFailure = {
+type ComboFailure = {
   id: string;
   method: string;
   message: string;
@@ -71,7 +70,7 @@ export type ComboReport = {
   metrics: ReturnType<typeof getQRCodeMetrics>;
 };
 
-export type VisualSpecimen = {
+type VisualSpecimen = {
   id: string;
   label: string;
   options: QRCodeOptions;
@@ -102,23 +101,46 @@ function percentile(samples: number[], fraction: number): number {
   return sorted[index]!;
 }
 
-function isPngBase64(value: string): boolean {
-  return value.startsWith("iVBOR");
+function checkPngBase64(output: unknown): string | undefined {
+  return typeof output === "string" && output.startsWith("iVBOR")
+    ? undefined
+    : "not a PNG base64 payload";
 }
 
-function isPngUri(value: string): boolean {
-  return value.startsWith("data:image/png;base64,iVBOR");
+function checkPngUri(output: unknown): string | undefined {
+  return typeof output === "string" &&
+    output.startsWith("data:image/png;base64,iVBOR")
+    ? undefined
+    : "not a PNG data URI";
 }
 
-function isPngBuffer(buffer: ArrayBuffer): boolean {
-  const bytes = new Uint8Array(buffer);
-  return (
-    bytes.length >= 8 &&
+function checkPngBuffer(output: unknown): string | undefined {
+  if (!(output instanceof ArrayBuffer)) {
+    return "not a PNG ArrayBuffer";
+  }
+  const bytes = new Uint8Array(output);
+  return bytes.length >= 8 &&
     bytes[0] === 0x89 &&
     bytes[1] === 0x50 &&
     bytes[2] === 0x4e &&
     bytes[3] === 0x47
-  );
+    ? undefined
+    : "not a PNG ArrayBuffer";
+}
+
+function checkSvg(output: unknown): string | undefined {
+  return String(output).includes("<svg") ? undefined : "not an SVG document";
+}
+
+function checkMatrix(output: unknown): string | undefined {
+  const matrix = output as { size?: number; packedBase64?: string } | undefined;
+  return matrix !== undefined &&
+    typeof matrix.size === "number" &&
+    matrix.size >= 21 &&
+    typeof matrix.packedBase64 === "string" &&
+    matrix.packedBase64.length > 0
+    ? undefined
+    : `invalid matrix ${matrix?.size}`;
 }
 
 function applyColorMode(
@@ -458,66 +480,82 @@ export function buildVisualSpecimens(): VisualSpecimen[] {
   return specimens;
 }
 
-function assertOutput(
-  method: string,
+const EVERY_GROUP: readonly ComboGroup[] = ["shapes", "core", "errors"];
+const FULL_GROUPS: readonly ComboGroup[] = ["core", "errors"];
+const CORE_GROUP: readonly ComboGroup[] = ["core"];
+
+type OutputMethod = {
+  name: string;
+  async: boolean;
+  groups: readonly ComboGroup[];
+  run: (options: QRCodeOptions) => unknown;
+  check: (output: unknown) => string | undefined;
+};
+
+const METHODS: readonly OutputMethod[] = [
+  { name: "png-b64", async: false, groups: EVERY_GROUP, run: toPngBase64, check: checkPngBase64 },
+  { name: "png-uri", async: false, groups: FULL_GROUPS, run: toPngDataUri, check: checkPngUri },
+  { name: "png-buf", async: false, groups: FULL_GROUPS, run: toPngArrayBuffer, check: checkPngBuffer },
+  { name: "svg", async: false, groups: FULL_GROUPS, run: toSvgString, check: checkSvg },
+  { name: "matrix", async: false, groups: EVERY_GROUP, run: getMatrix, check: checkMatrix },
+  { name: "png-b64-async", async: true, groups: CORE_GROUP, run: toPngBase64Async, check: checkPngBase64 },
+  { name: "png-uri-async", async: true, groups: CORE_GROUP, run: toPngDataUriAsync, check: checkPngUri },
+  { name: "png-buf-async", async: true, groups: CORE_GROUP, run: toPngArrayBufferAsync, check: checkPngBuffer },
+];
+
+function failureFor(
+  method: OutputMethod,
   id: string,
   expectError: boolean | undefined,
-  run: () => unknown,
+  output: unknown,
+): ComboFailure | undefined {
+  if (expectError === true) {
+    return { id, method: method.name, message: "expected error, got success" };
+  }
+  const message = method.check(output);
+  return message === undefined ? undefined : { id, method: method.name, message };
+}
+
+function failureFromError(
+  method: OutputMethod,
+  id: string,
+  expectError: boolean | undefined,
+  error: unknown,
+): ComboFailure | undefined {
+  if (expectError === true) {
+    return undefined;
+  }
+  return {
+    id,
+    method: method.name,
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+function assertOutput(
+  method: OutputMethod,
+  current: ComboCase,
 ): ComboFailure | undefined {
   try {
-    const output = run();
-    if (expectError === true) {
-      return { id, method, message: "expected error, got success" };
-    }
-    if (method === "png-b64" && !isPngBase64(output as string)) {
-      return { id, method, message: "not a PNG base64 payload" };
-    }
-    if (method === "png-uri" && !isPngUri(output as string)) {
-      return { id, method, message: "not a PNG data URI" };
-    }
-    if (method === "png-buf" && !isPngBuffer(output as ArrayBuffer)) {
-      return { id, method, message: "not a PNG ArrayBuffer" };
-    }
-    if (method === "svg" && !String(output).includes("<svg")) {
-      return { id, method, message: "not an SVG document" };
-    }
-    if (method === "matrix") {
-      const matrix = output as { size: number; packedBase64: string };
-      if (matrix.size < 21 || matrix.packedBase64.length === 0) {
-        return { id, method, message: `invalid matrix ${matrix.size}` };
-      }
-    }
-    return undefined;
+    return failureFor(method, current.id, current.expectError, method.run(current.options));
   } catch (error) {
-    if (expectError === true) {
-      return undefined;
-    }
-    return {
-      id,
-      method,
-      message: error instanceof Error ? error.message : String(error),
-    };
+    return failureFromError(method, current.id, current.expectError, error);
   }
 }
 
 async function assertOutputAsync(
-  method: string,
-  id: string,
-  expectError: boolean | undefined,
-  run: () => Promise<unknown>,
+  method: OutputMethod,
+  current: ComboCase,
 ): Promise<ComboFailure | undefined> {
   try {
-    const output = await run();
-    return assertOutput(method, id, expectError, () => output);
-  } catch (error) {
-    if (expectError === true) {
-      return undefined;
-    }
-    return {
-      id,
+    return failureFor(
       method,
-      message: error instanceof Error ? error.message : String(error),
-    };
+      current.id,
+      current.expectError,
+      await method.run(current.options),
+    );
+  } catch (error) {
+    return failureFromError(method, current.id, current.expectError, error);
   }
 }
 
@@ -529,7 +567,7 @@ async function runRace(): Promise<boolean> {
   const syncResults = values.map((value) => toPngBase64({ value, size: 80 }));
   return asyncResults.every(
     (value, index) =>
-      isPngBase64(value) && value === syncResults[index],
+      checkPngBase64(value) === undefined && value === syncResults[index],
   );
 }
 
@@ -565,53 +603,27 @@ export async function runComboSweep(
   let done = 0;
   for (const current of cases) {
     const caseStarted = nowMs();
-    const methods =
-      current.group === "core" || current.group === "errors"
-        ? (["png-b64", "png-uri", "png-buf", "svg", "matrix"] as const)
-        : (["png-b64", "matrix"] as const);
+    const applicable = METHODS.filter((method) =>
+      method.groups.includes(current.group),
+    );
 
-    for (const method of methods) {
-      const failure =
-        method === "png-b64"
-          ? assertOutput(method, current.id, current.expectError, () =>
-              toPngBase64(current.options),
-            )
-          : method === "png-uri"
-            ? assertOutput(method, current.id, current.expectError, () =>
-                toPngDataUri(current.options),
-              )
-            : method === "png-buf"
-              ? assertOutput(method, current.id, current.expectError, () =>
-                  toPngArrayBuffer(current.options),
-                )
-              : method === "svg"
-                ? assertOutput(method, current.id, current.expectError, () =>
-                    toSvgString(current.options),
-                  )
-                : assertOutput(method, current.id, current.expectError, () =>
-                    getMatrix(current.options),
-                  );
-      if (failure !== undefined) {
-        failures.push(failure);
-      }
-    }
-
-    if (current.group === "core") {
-      const asyncFailures = await Promise.all([
-        assertOutputAsync("png-b64-async", current.id, current.expectError, () =>
-          toPngBase64Async(current.options),
-        ),
-        assertOutputAsync("png-uri-async", current.id, current.expectError, () =>
-          toPngDataUriAsync(current.options),
-        ),
-        assertOutputAsync("png-buf-async", current.id, current.expectError, () =>
-          toPngArrayBufferAsync(current.options),
-        ),
-      ]);
-      for (const failure of asyncFailures) {
+    for (const method of applicable) {
+      if (!method.async) {
+        const failure = assertOutput(method, current);
         if (failure !== undefined) {
           failures.push(failure);
         }
+      }
+    }
+
+    const asyncFailures = await Promise.all(
+      applicable
+        .filter((method) => method.async)
+        .map((method) => assertOutputAsync(method, current)),
+    );
+    for (const failure of asyncFailures) {
+      if (failure !== undefined) {
+        failures.push(failure);
       }
     }
 

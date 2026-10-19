@@ -44,7 +44,7 @@ export type ErrorCorrectionLevel =
   | "quartile"
   | "high";
 
-export const QR_MODULE_SHAPES = [
+const QR_MODULE_SHAPES = [
   "square",
   "circle",
   "rounded",
@@ -410,7 +410,7 @@ function normalizeOptionsUnchecked(options: QRCodeOptions): NormalizedOptions {
   };
 }
 
-export function normalizeGradient(
+function normalizeGradient(
   gradient: QRCodeGradient | undefined,
 ): NormalizedGradient {
   if (gradient === undefined) {
@@ -459,17 +459,23 @@ export function normalizeGradient(
   };
 }
 
-export function normalizeShapeOptions(
+function normalizeShapeOptions(
   options: QRCodeShapeOptions | undefined,
 ): NormalizedShapeOptions {
-  const shape = sanitizeShape(options?.shape, "shape");
+  const shape = sanitizeShape(options?.shape, "shape", DEFAULT_SHAPE);
   return {
     layout: sanitizeLayout(options?.layout),
     shape,
-    eyeFrameShape: sanitizeEyeFrameShape(
+    eyeFrameShape: sanitizeShape(
       options?.eyeFrameShape ?? options?.eyePatternShape,
+      "eyeFrameShape",
+      DEFAULT_EYE_FRAME_SHAPE,
     ),
-    eyeballShape: sanitizeEyeballShape(options?.eyeballShape),
+    eyeballShape: sanitizeShape(
+      options?.eyeballShape,
+      "eyeballShape",
+      DEFAULT_EYEBALL_SHAPE,
+    ),
     gap: sanitizeInteger(options?.gap, 0, "gap", 0, 256),
     eyePatternGap: sanitizeInteger(
       options?.eyePatternGap,
@@ -494,12 +500,17 @@ export function normalizeShapeOptions(
     alignmentShape: sanitizeShape(
       options?.alignmentShape ?? shape,
       "alignmentShape",
+      DEFAULT_SHAPE,
     ),
-    timingShape: sanitizeShape(options?.timingShape ?? shape, "timingShape"),
+    timingShape: sanitizeShape(
+      options?.timingShape ?? shape,
+      "timingShape",
+      DEFAULT_SHAPE,
+    ),
   };
 }
 
-export function normalizeScanSafe(
+function normalizeScanSafe(
   value: QRCodeOptions["scanSafe"],
 ): false | "standard" | "strict" {
   if (value === undefined || value === false) {
@@ -514,7 +525,7 @@ export function normalizeScanSafe(
   throw new Error("scanSafe must be true, false, or strict.");
 }
 
-export function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
+function sanitizeLayout(value: QRCodeLayout | undefined): QRCodeLayout {
   const resolved = value ?? DEFAULT_LAYOUT;
   if (resolved !== "matrix") {
     throw new Error("layout must be matrix; radial layouts are not scan-safe.");
@@ -529,38 +540,19 @@ function isModuleShape(value: string): value is QRCodeBodyShape {
 const MODULE_SHAPE_ERROR =
   "must be square, circle, rounded, diamond, squircle, or classy.";
 
-export function sanitizeShape(
+function sanitizeShape(
   value: QRCodeBodyShape | undefined,
   name: string,
+  fallback: QRCodeBodyShape,
 ): QRCodeBodyShape {
-  const resolved = value ?? DEFAULT_SHAPE;
+  const resolved = value ?? fallback;
   if (!isModuleShape(resolved)) {
     throw new Error(`${name} ${MODULE_SHAPE_ERROR}`);
   }
   return resolved;
 }
 
-export function sanitizeEyeFrameShape(
-  value: QRCodeEyeFrameShape | undefined,
-): QRCodeEyeFrameShape {
-  const resolved = value ?? DEFAULT_EYE_FRAME_SHAPE;
-  if (!isModuleShape(resolved)) {
-    throw new Error(`eyeFrameShape ${MODULE_SHAPE_ERROR}`);
-  }
-  return resolved;
-}
-
-export function sanitizeEyeballShape(
-  value: QRCodeEyeBallShape | undefined,
-): QRCodeEyeBallShape {
-  const resolved = value ?? DEFAULT_EYEBALL_SHAPE;
-  if (!isModuleShape(resolved)) {
-    throw new Error(`eyeballShape ${MODULE_SHAPE_ERROR}`);
-  }
-  return resolved;
-}
-
-export function sanitizeBodyDensity(
+function sanitizeBodyDensity(
   value: QRCodeBodyDensity | undefined,
 ): QRCodeBodyDensity {
   const resolved = value ?? DEFAULT_BODY_DENSITY;
@@ -574,7 +566,7 @@ export function sanitizeBodyDensity(
   return resolved;
 }
 
-export function sanitizeGradientType(
+function sanitizeGradientType(
   value: QRCodeGradientType | undefined,
 ): QRCodeGradientType {
   const resolved = value ?? "linear";
@@ -584,7 +576,7 @@ export function sanitizeGradientType(
   return resolved;
 }
 
-export function normalizeGradientLocations(
+function normalizeGradientLocations(
   value: readonly number[] | undefined,
   colorCount: number,
 ): number[] {
@@ -611,7 +603,7 @@ export function normalizeGradientLocations(
   });
 }
 
-export function sanitizeGradientPoint(
+function sanitizeGradientPoint(
   value: QRCodeGradientPoint | undefined,
   fallback: QRCodeGradientPoint,
   name: string,
@@ -623,7 +615,7 @@ export function sanitizeGradientPoint(
   };
 }
 
-export function sanitizeUnitNumber(value: number, name: string): number {
+function sanitizeUnitNumber(value: number, name: string): number {
   if (!Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`${name} must be a finite number between 0 and 1.`);
   }
@@ -649,7 +641,7 @@ export function validateLogoDimensions(
   }
 }
 
-export function validateVersionRange(
+function validateVersionRange(
   minVersion: number,
   maxVersion: number,
 ): void {
@@ -690,7 +682,7 @@ export function scaleShapeOptions(
   };
 }
 
-export function normalizeEcl(
+function normalizeEcl(
   value: ErrorCorrectionLevel,
 ): "L" | "M" | "Q" | "H" {
   if (value === "L" || value === "M" || value === "Q" || value === "H") {
@@ -705,7 +697,7 @@ export function normalizeEcl(
   );
 }
 
-export function sanitizeInteger(
+function sanitizeInteger(
   value: number | undefined,
   fallback: number,
   name: string,
@@ -719,7 +711,7 @@ export function sanitizeInteger(
   return resolved;
 }
 
-export function sanitizeVersion(
+function sanitizeVersion(
   value: QRCodeVersion | undefined,
   fallback: QRCodeVersion,
   name: string,
@@ -727,14 +719,14 @@ export function sanitizeVersion(
   return sanitizeInteger(value, fallback, name, 1, 40) as QRCodeVersion;
 }
 
-export function sanitizeMask(
+function sanitizeMask(
   value: QRCodeMaskPattern | undefined,
   fallback: QRCodeMaskPattern,
 ): QRCodeMaskPattern {
   return sanitizeInteger(value, fallback, "mask", -1, 7) as QRCodeMaskPattern;
 }
 
-export function sanitizeOptionalInteger(
+function sanitizeOptionalInteger(
   value: number | undefined,
   name: string,
   min: number,

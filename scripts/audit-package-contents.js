@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { spawnSync } = require("child_process");
 const path = require("path");
 
@@ -14,48 +15,7 @@ const docsSyncScript = path.join(
   "sync-package-docs.js",
 );
 
-function runDocsSync(mode) {
-  const result = spawnSync("node", [docsSyncScript, mode], {
-    cwd: packageDir,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || `${mode} docs sync failed`);
-  }
-}
-
-let result;
-try {
-  try {
-    runDocsSync("prepare");
-    result = spawnSync("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
-      cwd: packageDir,
-      encoding: "utf8",
-    });
-  } finally {
-    runDocsSync("cleanup");
-  }
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-}
-
-process.stdout.write(result.stdout);
-process.stderr.write(result.stderr);
-
-if (result.status !== 0) {
-  process.exit(result.status ?? 1);
-}
-
-const packedFiles = new Set(
-  result.stdout
-    .split("\n")
-    .map((line) => line.match(/^packed\s+\S+\s+(.+)$/)?.[1])
-    .filter(Boolean)
-);
-
-const requiredFiles = [
+const literalRequiredFiles = [
   ".watchmanconfig",
   "LICENSE",
   "README.md",
@@ -76,69 +36,11 @@ const requiredFiles = [
   "cpp/vendor/fpng/fpng.h",
   "cpp/vendor/fpng/fpng_unity.cpp",
   "cpp/vendor/fpng/README.md",
-  "lib/commonjs/index.js",
-  "lib/commonjs/index.web.js",
-  "lib/commonjs/qrcode-component.js",
-  "lib/commonjs/cache.js",
-  "lib/commonjs/colors.js",
-  "lib/commonjs/defaults.js",
-  "lib/commonjs/metrics.js",
-  "lib/commonjs/render-plan.js",
-  "lib/commonjs/scan-policy.js",
-  "lib/commonjs/styles.js",
-  "lib/commonjs/use-qrcode-generation.js",
-  "lib/commonjs/validation.js",
-  "lib/module/index.js",
-  "lib/module/index.web.js",
-  "lib/module/qrcode-component.js",
-  "lib/module/cache.js",
-  "lib/module/colors.js",
-  "lib/module/defaults.js",
-  "lib/module/metrics.js",
-  "lib/module/render-plan.js",
-  "lib/module/scan-policy.js",
-  "lib/module/styles.js",
-  "lib/module/use-qrcode-generation.js",
-  "lib/module/validation.js",
-  "lib/typescript/commonjs/index.d.ts",
-  "lib/typescript/commonjs/qrcode-component.d.ts",
-  "lib/typescript/commonjs/cache.d.ts",
-  "lib/typescript/commonjs/colors.d.ts",
-  "lib/typescript/commonjs/defaults.d.ts",
-  "lib/typescript/commonjs/metrics.d.ts",
-  "lib/typescript/commonjs/render-plan.d.ts",
-  "lib/typescript/commonjs/scan-policy.d.ts",
-  "lib/typescript/commonjs/styles.d.ts",
-  "lib/typescript/commonjs/use-qrcode-generation.d.ts",
-  "lib/typescript/commonjs/validation.d.ts",
-  "lib/typescript/module/index.d.ts",
-  "lib/typescript/module/qrcode-component.d.ts",
-  "lib/typescript/module/cache.d.ts",
-  "lib/typescript/module/colors.d.ts",
-  "lib/typescript/module/defaults.d.ts",
-  "lib/typescript/module/metrics.d.ts",
-  "lib/typescript/module/render-plan.d.ts",
-  "lib/typescript/module/scan-policy.d.ts",
-  "lib/typescript/module/styles.d.ts",
-  "lib/typescript/module/use-qrcode-generation.d.ts",
-  "lib/typescript/module/validation.d.ts",
   "nitrogen/generated/android/NitroQRCode+autolinking.cmake",
   "nitrogen/generated/ios/NitroQRCode+autolinking.rb",
   "nitrogen/generated/shared/c++/GenerateOptions.hpp",
   "nitrogen/generated/shared/c++/MatrixObject.hpp",
   "nitrogen/generated/shared/c++/HybridQRCodeSpec.hpp",
-  "src/index.ts",
-  "src/index.web.ts",
-  "src/cache.ts",
-  "src/colors.ts",
-  "src/defaults.ts",
-  "src/metrics.ts",
-  "src/qrcode-component.ts",
-  "src/render-plan.ts",
-  "src/scan-policy.ts",
-  "src/styles.ts",
-  "src/use-qrcode-generation.ts",
-  "src/validation.ts",
 ];
 
 const forbiddenPatterns = [
@@ -157,21 +59,89 @@ const forbiddenPatterns = [
   /^node_modules\//,
 ];
 
-const missing = requiredFiles.filter((file) => !packedFiles.has(file));
-const forbidden = [...packedFiles].filter((file) =>
-  forbiddenPatterns.some((pattern) => pattern.test(file))
-);
-
-if (missing.length > 0 || forbidden.length > 0) {
-  if (missing.length > 0) {
-    console.error(`Missing package files: ${missing.join(", ")}`);
-  }
-  if (forbidden.length > 0) {
-    console.error(`Forbidden package files: ${forbidden.join(", ")}`);
-  }
-  process.exit(1);
+function sourceModuleFiles(srcDir) {
+  return fs
+    .readdirSync(srcDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name) && !entry.name.endsWith(".d.ts"))
+    .map((entry) => entry.name.replace(/\.tsx?$/, ""))
+    .sort()
+    .flatMap((name) => [
+      `src/${name}.ts`,
+      `lib/commonjs/${name}.js`,
+      `lib/module/${name}.js`,
+      `lib/typescript/commonjs/${name}.d.ts`,
+      `lib/typescript/module/${name}.d.ts`,
+    ]);
 }
 
-console.log(
-  `Package contents audit passed with ${packedFiles.size} packed files.`
-);
+function requiredPackageFiles(dir = packageDir) {
+  return [...literalRequiredFiles, ...sourceModuleFiles(path.join(dir, "src"))];
+}
+
+function runDocsSync(mode) {
+  const result = spawnSync("node", [docsSyncScript, mode], {
+    cwd: packageDir,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `${mode} docs sync failed`);
+  }
+}
+
+function main() {
+  let result;
+  try {
+    try {
+      runDocsSync("prepare");
+      result = spawnSync("bun", ["pm", "pack", "--dry-run", "--ignore-scripts"], {
+        cwd: packageDir,
+        encoding: "utf8",
+      });
+    } finally {
+      runDocsSync("cleanup");
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+
+  process.stdout.write(result.stdout);
+  process.stderr.write(result.stderr);
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+
+  const packedFiles = new Set(
+    result.stdout
+      .split("\n")
+      .map((line) => line.match(/^packed\s+\S+\s+(.+)$/)?.[1])
+      .filter(Boolean)
+  );
+
+  const missing = requiredPackageFiles().filter((file) => !packedFiles.has(file));
+  const forbidden = [...packedFiles].filter((file) =>
+    forbiddenPatterns.some((pattern) => pattern.test(file))
+  );
+
+  if (missing.length > 0 || forbidden.length > 0) {
+    if (missing.length > 0) {
+      console.error(`Missing package files: ${missing.join(", ")}`);
+    }
+    if (forbidden.length > 0) {
+      console.error(`Forbidden package files: ${forbidden.join(", ")}`);
+    }
+    process.exit(1);
+  }
+
+  console.log(
+    `Package contents audit passed with ${packedFiles.size} packed files.`
+  );
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { requiredPackageFiles, sourceModuleFiles };

@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { resolveLlvmTool } = require("./llvm-tools.js");
+const { platformLinkArgs, runCommand } = require("./cpp-includes.js");
 
 const packageDir = path.join(
   __dirname,
@@ -24,11 +25,6 @@ if (packageManifest.name !== "react-native-nitro-qrcode") {
   );
 }
 
-function runCommand(command, args) {
-  execFileSync(command, args, {
-    stdio: "inherit",
-  });
-}
 
 function parseBenchmarkOutput(output) {
   const lines = output.trim().split(/\r?\n/);
@@ -70,8 +66,7 @@ const compileArgs = [
   ...sources,
   "-o",
   outputFile,
-  "-lz",
-  process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread",
+  ...platformLinkArgs(),
 ];
 
 console.log("Compiling optimized C++ QRCode benchmark...");

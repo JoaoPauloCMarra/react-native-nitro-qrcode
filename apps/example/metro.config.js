@@ -1,27 +1,13 @@
 const { getDefaultConfig } = require("expo/metro-config");
-const exclusionList =
-  require("metro-config/private/defaults/exclusionList").default;
-const path = require("path");
 
-const projectRoot = __dirname;
-const monorepoRoot = path.resolve(projectRoot, "../..");
+const config = getDefaultConfig(__dirname);
 
-const config = getDefaultConfig(projectRoot);
-
-config.watchFolders = Array.from(
-  new Set([...(config.watchFolders ?? []), monorepoRoot])
-);
-
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(monorepoRoot, "node_modules"),
-];
-
-config.resolver.blockList = exclusionList([
+config.resolver.blockList = [
+  ...config.resolver.blockList,
   /node_modules\/.*\/android\/\.cxx\/.*/,
   /apps\/example\/android\/app\/\.cxx\/.*/,
   /apps\/example\/android\/\.gradle\/.*/,
   /apps\/example\/android\/build\/.*/,
-]);
+];
 
 module.exports = config;

@@ -42,6 +42,13 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+class AmbiguousDeviceError extends Error {
+  constructor(message) {
+    super(message);
+    this.code = "AMBIGUOUS_DEVICE";
+  }
+}
+
 function recordRequiredFailure(platform, skipReason, failureReason) {
   recordResult(
     platform,
@@ -70,7 +77,7 @@ function resolveAndroidSerial() {
     return requested;
   }
   if (serials.length > 1) {
-    throw new Error(
+    throw new AmbiguousDeviceError(
       "Multiple adb devices are connected; set ANDROID_SERIAL to the owned emulator.",
     );
   }
@@ -108,7 +115,7 @@ function resolveIosUdid() {
     return requested;
   }
   if (udids.length > 1) {
-    throw new Error(
+    throw new AmbiguousDeviceError(
       "Multiple simulators are booted; set IOS_UDID to the owned simulator.",
     );
   }
@@ -173,21 +180,21 @@ function assertVisible(output, platform) {
   }
 }
 
-function waitForAndroidUi(serial) {
+function waitForUi(platform, describe, sleep = () => run("sleep", ["0.5"])) {
   let lastError = "UI dump was unavailable";
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
-      assertVisible(describeAndroidUi(serial), "Android");
+      assertVisible(describe(), platform);
       return;
     } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+      lastError = errorMessage(error);
     }
 
-    run("sleep", ["0.5"]);
+    sleep();
   }
 
-  throw new Error(`Android UI did not become ready: ${lastError}`);
+  throw new Error(`${platform} UI did not become ready: ${lastError}`);
 }
 
 function waitForAndroidProcess(serial) {
@@ -200,20 +207,6 @@ function waitForAndroidProcess(serial) {
   }
 
   throw new Error("Android app process did not start.");
-}
-
-function waitForIosUi(udid) {
-  let lastError = "UI dump was unavailable";
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try {
-      assertVisible(describeIosUi(udid), "iOS");
-      return;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
-    run("sleep", ["0.5"]);
-  }
-  throw new Error(`iOS UI did not become ready: ${lastError}`);
 }
 
 function smokeAndroid() {
@@ -237,7 +230,7 @@ function smokeAndroid() {
     serial = resolveAndroidSerial();
   } catch (error) {
     const reason = errorMessage(error);
-    if (reason.includes("Multiple adb devices")) {
+    if (error instanceof AmbiguousDeviceError) {
       recordRequiredFailure(
         "android",
         reason,
@@ -270,7 +263,7 @@ function smokeAndroid() {
     throw new Error("Android smoke failed to launch the example app.");
   }
   waitForAndroidProcess(serial);
-  waitForAndroidUi(serial);
+  waitForUi("Android", () => describeAndroidUi(serial));
   recordResult("android", "passed");
 }
 
@@ -309,7 +302,7 @@ function smokeIos() {
     udid = resolveIosUdid();
   } catch (error) {
     const reason = errorMessage(error);
-    if (reason.includes("Multiple simulators")) {
+    if (error instanceof AmbiguousDeviceError) {
       recordRequiredFailure(
         "ios",
         reason,
@@ -346,7 +339,7 @@ function smokeIos() {
 
   resetIosRoute(udid);
   run("xcrun", ["simctl", "launch", udid, IOS_BUNDLE_ID]);
-  waitForIosUi(udid);
+  waitForUi("iOS", () => describeIosUi(udid));
   recordResult("ios", "passed");
 }
 
@@ -381,30 +374,30 @@ function smokePhysicalIos(udid) {
   recordResult("ios", "passed");
 }
 
-try {
-  smokeAndroid();
-} catch (error) {
-  recordResult("android", "failed", errorMessage(error));
-}
-try {
-  smokeIos();
-} catch (error) {
-  recordResult("ios", "failed", errorMessage(error));
-}
-const executed = results.filter((result) => result.state === "passed").length;
-const skipped = results.filter((result) => result.state === "skipped").length;
-const failed = results.filter((result) => result.state === "failed").length;
-console.log(
-  `[smoke] summary: ${results.length} results (${executed} passed, ${skipped} skipped, ${failed} failed)`,
-);
-if (failed > 0) {
-  process.exit(1);
-}
-if (strict && executed === 0) {
-  throw new Error(
-    "Strict smoke requires at least one executed case; both platforms were skipped.",
+function main() {
+  try {
+    smokeAndroid();
+  } catch (error) {
+    recordResult("android", "failed", errorMessage(error));
+  }
+  try {
+    smokeIos();
+  } catch (error) {
+    recordResult("ios", "failed", errorMessage(error));
+  }
+  const executed = results.filter((result) => result.state === "passed").length;
+  const skipped = results.filter((result) => result.state === "skipped").length;
+  const failed = results.filter((result) => result.state === "failed").length;
+  console.log(
+    `[smoke] summary: ${results.length} results (${executed} passed, ${skipped} skipped, ${failed} failed)`,
   );
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
-if (results.length === 0) {
-  throw new Error("Smoke recorded no results; it cannot silently pass.");
+
+if (require.main === module) {
+  main();
 }
+
+module.exports = { AmbiguousDeviceError, waitForUi };

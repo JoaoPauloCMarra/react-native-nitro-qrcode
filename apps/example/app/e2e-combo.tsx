@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   QRCode,
   getQRCodeMetrics,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "react-native-nitro-qrcode";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   buildVisualSpecimens,
   runComboSweep,
   type ComboReport,
 } from "../components/generation-matrix";
+import { E2eScreen, e2eStyles } from "../components/e2e-screen";
 import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 
 const VISUALS = buildVisualSpecimens();
@@ -44,7 +44,6 @@ function formatReport(report: ComboReport): string {
 }
 
 export default function ComboScreen() {
-  const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState("starting");
   const [reportText, setReportText] = useState("(idle)");
   const [showProbe, setShowProbe] = useState(false);
@@ -112,22 +111,12 @@ export default function ComboScreen() {
   const stableValue = useMemo(() => "rerender-stable-qr", []);
 
   return (
-    <ScrollView
-      testID="e2e-combo-screen"
-      accessibilityLabel="E2E combo sweep"
-      style={styles.screen}
-      contentContainerStyle={{
-        paddingTop: insets.top + 20,
-        paddingBottom: insets.bottom + 32,
-        paddingHorizontal: 16,
-        gap: 16,
-      }}
-    >
-      <Text testID="e2e-combo-ready" style={styles.ready}>
+    <E2eScreen testID="e2e-combo-screen" label="E2E combo sweep">
+      <Text testID="e2e-combo-ready" style={e2eStyles.ready}>
         {progress}
       </Text>
-      <Text style={styles.title}>Combo sweep</Text>
-      <Text style={styles.subtitle}>
+      <Text style={e2eStyles.title}>Combo sweep</Text>
+      <Text style={e2eStyles.subtitle}>
         Every discrete QR generation path, plus cache leak, async race, and
         parent rerender checks.
       </Text>
@@ -172,7 +161,7 @@ export default function ComboScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Re-run combo sweep"
-        style={styles.button}
+        style={[e2eStyles.button, styles.button]}
         onPress={() => {
           setProgress("starting");
           setReportText("(idle)");
@@ -181,31 +170,13 @@ export default function ComboScreen() {
           startSweep();
         }}
       >
-        <Text style={styles.buttonText}>Re-run sweep</Text>
+        <Text style={e2eStyles.buttonText}>Re-run sweep</Text>
       </Pressable>
-    </ScrollView>
+    </E2eScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#101112",
-  },
-  ready: {
-    color: "#86EFAC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#CBD5E1",
-    fontSize: 14,
-  },
   metric: {
     color: "#A7F3D0",
     fontFamily: "Menlo",
@@ -247,14 +218,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   button: {
-    backgroundColor: "#1E293B",
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    alignSelf: "stretch",
     paddingVertical: 12,
-  },
-  buttonText: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

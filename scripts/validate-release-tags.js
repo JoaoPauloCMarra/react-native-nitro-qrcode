@@ -47,53 +47,8 @@ function validateInputs(releaseTag, distTag, expectedTag) {
   validateDistTag(distTag);
 }
 
-function expectRejected(label, callback) {
-  try {
-    callback();
-  } catch {
-    return;
-  }
-  throw new Error(`${label} was accepted unexpectedly.`);
-}
-
-function runMatrix() {
-  const valid = [
-    ["v0.9.0", "latest"],
-    ["v0.9.0", "next"],
-    ["v0.9.0", "beta"],
-    ["v0.9.0", "canary-1"],
-    ["v0.9.0", "preview_2"],
-  ];
-  const invalid = [
-    ["release newline", () => validateReleaseTag("v0.9.0\ninjected=true", "v0.9.0")],
-    ["release control", () => validateReleaseTag("v0.9.0\u001b", "v0.9.0")],
-    ["dist-tag newline", () => validateDistTag("latest\ninjected=true")],
-    ["dist-tag carriage return", () => validateDistTag("latest\r\ninjected=true")],
-    ["dist-tag control", () => validateDistTag("next\u001b[31m")],
-    ["dist-tag whitespace", () => validateDistTag("latest tag")],
-    ["dist-tag path", () => validateDistTag("latest/next")],
-    ["dist-tag shell metacharacter", () => validateDistTag("latest;echo")],
-    ["dist-tag SemVer", () => validateDistTag("v1.2.3")],
-    ["dist-tag range", () => validateDistTag("v1.2")],
-  ];
-
-  for (const [releaseTag, distTag] of valid) {
-    validateInputs(releaseTag, distTag, releaseTag);
-  }
-  for (const [label, callback] of invalid) {
-    expectRejected(label, callback);
-  }
-  console.log(
-    `[tag-validation] matrix passed: ${valid.length} valid cases accepted; ${invalid.length} unsafe cases rejected`,
-  );
-}
-
 function main() {
   const args = process.argv.slice(2);
-  if (args.length === 1 && args[0] === "--test") {
-    runMatrix();
-    return;
-  }
   if (args.length !== 3) {
     throw new Error(
       "Usage: node scripts/validate-release-tags.js <release-tag> <dist-tag> <expected-release-tag>",

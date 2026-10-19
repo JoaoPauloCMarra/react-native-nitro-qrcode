@@ -1,8 +1,9 @@
 import { createBoundedCache } from "./cache";
 import {
-  getQRCodeMetrics as readQRCodeMetrics,
+  getQRCodeMetricsWithCacheBytes,
   measuredAsync,
   measuredSync,
+  nowMilliseconds,
   recordCacheLookup,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
@@ -23,6 +24,7 @@ import {
   hasCustomFinderColors,
   paintsSolidLayer,
   logoAreaOrigin,
+  type RenderLayer,
   type RenderNeighbors,
   type RenderPlan,
 } from "./render-plan";
@@ -85,11 +87,7 @@ export {
 } from "./metrics";
 
 export function getQRCodeMetrics() {
-  const snapshot = readQRCodeMetrics();
-  if (!snapshot.enabled) {
-    return snapshot;
-  }
-  return { ...snapshot, cacheBytes: webCache.bytes() };
+  return getQRCodeMetricsWithCacheBytes(() => webCache.bytes());
 }
 
 type QRCodeModuleData = {
@@ -101,9 +99,11 @@ type QRCodeModel = {
   modules: QRCodeModuleData;
 };
 
+type QRCodeSegmentMode = "numeric" | "alphanumeric" | "byte";
+
 type QRCodeFactory = {
   create(
-    value: string,
+    value: string | { data: string; mode: QRCodeSegmentMode }[],
     options: {
       errorCorrectionLevel: "L" | "M" | "Q" | "H";
       version?: number;
@@ -114,9 +114,11 @@ type QRCodeFactory = {
 
 type CanvasFill = string | CanvasGradient;
 
+const PNG_DATA_URI_PREFIX = "data:image/png;base64,";
 const MAX_CACHE_ENTRIES = 128;
 const MAX_CACHE_BYTES = 4 * 1024 * 1024;
 const ASYNC_BAND_ROWS = 8;
+const ASYNC_YIELD_BUDGET_MS = 8;
 const webCache = createBoundedCache<string>(
   MAX_CACHE_ENTRIES,
   MAX_CACHE_BYTES,
@@ -125,7 +127,7 @@ const webCache = createBoundedCache<string>(
 const qrcode = QRCodeJS as unknown as QRCodeFactory;
 
 function dataUriToArrayBuffer(uri: string): ArrayBuffer {
-  const encoded = uri.slice("data:image/png;base64,".length);
+  const encoded = uri.slice(PNG_DATA_URI_PREFIX.length);
   const binary = globalThis.atob(encoded);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
@@ -146,7 +148,7 @@ export async function toPngArrayBufferAsync(
 
 export function toPngBase64(options: QRCodeOptions): string {
   const uri = toPngDataUri(options);
-  return uri.slice("data:image/png;base64,".length);
+  return uri.slice(PNG_DATA_URI_PREFIX.length);
 }
 export function toPngDataUri(options: QRCodeOptions): string {
   const normalized = normalizeOptions(options);
@@ -166,7 +168,7 @@ export async function toPngBase64Async(
   options: QRCodeOptions,
 ): Promise<string> {
   const uri = await toPngDataUriAsync(options);
-  return uri.slice("data:image/png;base64,".length);
+  return uri.slice(PNG_DATA_URI_PREFIX.length);
 }
 
 export async function toPngDataUriAsync(
@@ -180,16 +182,21 @@ export async function toPngDataUriAsync(
 
   return measuredAsync(async () => {
     const session = createPngRenderSession(normalized, lookup);
+    let sliceStarted = nowMilliseconds();
     for (
       let startRow = 0;
       startRow < session.rowCount;
       startRow += ASYNC_BAND_ROWS
     ) {
-      session.drawRows(
-        startRow,
-        Math.min(startRow + ASYNC_BAND_ROWS, session.rowCount),
-      );
-      await yieldToMainThread();
+      const endRow = Math.min(startRow + ASYNC_BAND_ROWS, session.rowCount);
+      session.drawRows(startRow, endRow);
+      if (
+        endRow < session.rowCount &&
+        nowMilliseconds() - sliceStarted >= ASYNC_YIELD_BUDGET_MS
+      ) {
+        await yieldToMainThread();
+        sliceStarted = nowMilliseconds();
+      }
     }
     return session.finish();
   });
@@ -292,7 +299,7 @@ export function toSvgString(options: QRCodeOptions): string {
       }
     }
 
-    const gradientMarkup = createSvgGradient(normalized);
+    const gradientMarkup = createSvgGradient(normalized, totalSize);
     const foregroundFill =
       gradientMarkup === ""
         ? normalized.foregroundColor
@@ -456,7 +463,7 @@ function drawPlanRows(
         );
       };
       const strokeGap = module.strokeGap;
-      if (module.stroke !== undefined && strokeGap !== undefined) {
+      if (strokeGap !== undefined) {
         paintOrErase(context, toSvgColor(options.strokeColor), backdrop, () => {
           drawAt(module.gap);
         });
@@ -485,7 +492,7 @@ function drawPlanRows(
 function resolvePlanFill(
   options: NormalizedOptions,
   foregroundFill: CanvasFill,
-  layer: "foreground" | "stroke" | "eye" | "eyeball" | "alignment" | "timing",
+  layer: RenderLayer,
 ): CanvasFill {
   const explicit = options.explicitColors;
   if (layer === "eyeball") {
@@ -512,6 +519,22 @@ function layerFill(
 }
 
 function yieldToMainThread(): Promise<void> {
+  const scheduler = (
+    globalThis as { scheduler?: { yield?: () => Promise<void> } }
+  ).scheduler;
+  if (typeof scheduler?.yield === "function") {
+    return scheduler.yield();
+  }
+  if (typeof MessageChannel === "function") {
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => {
+        channel.port1.close();
+        resolve();
+      };
+      channel.port2.postMessage(undefined);
+    });
+  }
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
@@ -550,16 +573,29 @@ function renderPixelSize(
   );
 }
 
+function selectSegmentMode(value: string): QRCodeSegmentMode {
+  if (/^[0-9]*$/.test(value)) {
+    return "numeric";
+  }
+  if (/^[0-9A-Z $%*+\-./:]*$/.test(value)) {
+    return "alphanumeric";
+  }
+  return "byte";
+}
+
 function createModelAt(
   options: NormalizedOptions,
   errorCorrectionLevel: "L" | "M" | "Q" | "H",
   version?: number,
 ): QRCodeModel {
-  return qrcode.create(options.value, {
-    errorCorrectionLevel,
-    version: version ?? (options.minVersion === options.maxVersion ? options.minVersion : undefined),
-    maskPattern: options.mask >= 0 ? options.mask : undefined,
-  });
+  return qrcode.create(
+    [{ data: options.value, mode: selectSegmentMode(options.value) }],
+    {
+      errorCorrectionLevel,
+      version: version ?? (options.minVersion === options.maxVersion ? options.minVersion : undefined),
+      maskPattern: options.mask >= 0 ? options.mask : undefined,
+    },
+  );
 }
 
 function createForegroundFill(
@@ -1181,7 +1217,10 @@ function resolveGradientLocations(gradient: NormalizedGradient): number[] {
   );
 }
 
-function createSvgGradient(options: NormalizedOptions): string {
+function createSvgGradient(
+  options: NormalizedOptions,
+  totalSize: number,
+): string {
   if (options.gradient.type === "none") {
     return "";
   }
@@ -1199,10 +1238,14 @@ function createSvgGradient(options: NormalizedOptions): string {
       ),
       0.01,
     );
-    return `<defs><radialGradient id="nitro-qrcode-gradient" cx="${formatPercent(options.gradient.startX)}" cy="${formatPercent(options.gradient.startY)}" r="${formatPercent(radius)}">${stops}</radialGradient></defs>`;
+    return `<defs><radialGradient id="nitro-qrcode-gradient" gradientUnits="userSpaceOnUse" cx="${formatUserSpace(options.gradient.startX, totalSize)}" cy="${formatUserSpace(options.gradient.startY, totalSize)}" r="${formatUserSpace(radius, totalSize)}">${stops}</radialGradient></defs>`;
   }
 
-  return `<defs><linearGradient id="nitro-qrcode-gradient" x1="${formatPercent(options.gradient.startX)}" y1="${formatPercent(options.gradient.startY)}" x2="${formatPercent(options.gradient.endX)}" y2="${formatPercent(options.gradient.endY)}">${stops}</linearGradient></defs>`;
+  return `<defs><linearGradient id="nitro-qrcode-gradient" gradientUnits="userSpaceOnUse" x1="${formatUserSpace(options.gradient.startX, totalSize)}" y1="${formatUserSpace(options.gradient.startY, totalSize)}" x2="${formatUserSpace(options.gradient.endX, totalSize)}" y2="${formatUserSpace(options.gradient.endY, totalSize)}">${stops}</linearGradient></defs>`;
+}
+
+function formatUserSpace(fraction: number, totalSize: number): string {
+  return (fraction * totalSize).toFixed(2);
 }
 
 function formatPercent(value: number): string {

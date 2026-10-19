@@ -31,10 +31,10 @@ void testBridgeOptionMapping() {
   assert(options.errorCorrectionLevel == "H");
   assert(options.foregroundColor == "#111111");
   assert(options.backgroundColor == "#EEEEEE");
-  assert(options.strokeColor == "#222222");
-  assert(options.eyeColor == "#333333");
-  assert(options.eyeStrokeColor == "#444444");
-  assert(options.eyeballColor == "#555555");
+  assert(options.stroke == ::NitroQRCode::parseColor("#222222"));
+  assert(options.eye == ::NitroQRCode::parseColor("#333333"));
+  assert(options.eyeStroke == ::NitroQRCode::parseColor("#444444"));
+  assert(options.eyeball == ::NitroQRCode::parseColor("#555555"));
   assert(options.minVersion == 2);
   assert(options.maxVersion == 8);
   assert(options.mask == 4);
@@ -67,8 +67,8 @@ void testBridgeDerivedLayerDefaults() {
       "#FF0000", 1, 40, -1, true, "circle");
   assert(options.alignment == options.foreground);
   assert(options.timing == options.foreground);
-  assert(options.quietZoneFill == options.background);
-  assert(options.finderInner == options.background);
+  assert(options.resolvedQuietZoneFill() == options.background);
+  assert(options.resolvedFinderInner() == options.background);
   assert(options.alignmentShape == "circle");
   assert(options.timingShape == "circle");
 }
@@ -87,7 +87,7 @@ void testBridgeObjectMapping() {
          !resolved.eyeballSet);
   assert(!resolved.alignmentSet && !resolved.timingSet);
   assert(resolved.alignment == resolved.foreground);
-  assert(resolved.quietZoneFill == resolved.background);
+  assert(resolved.resolvedQuietZoneFill() == resolved.background);
   assert(resolved.alignmentShape == "circle");
 
   GenerateOptions styled = plain;

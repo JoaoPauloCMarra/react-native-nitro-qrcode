@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   QRCode,
   PRESET_SHAPE_OPTIONS,
   getQRCodeMetrics,
+  setQRCodeMetricsEnabled,
   toPngBase64Async,
   type QRCodeBodyShape,
   type QRCodeColor,
@@ -11,9 +12,9 @@ import {
   type QRCodePreset,
 } from "react-native-nitro-qrcode";
 import { decodePngBase64, type Backdrop } from "../components/scan-decode";
-import { PRESETS } from "../components/generation-matrix";
+import { PRESETS } from "../components/presets";
+import { E2eScreen, e2eStyles } from "../components/e2e-screen";
 import { formatReadyWall, useReadyWall } from "../components/ready-wall";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Specimen = {
   id: string;
@@ -101,10 +102,11 @@ function useDecodeProbes(): string {
   ).join(" ");
 }
 
+setQRCodeMetricsEnabled(true);
+
 const lastGenerationMs = () => getQRCodeMetrics().lastGenerationMs ?? 0;
 
 export default function QrcodeE2eVisualsScreen() {
-  const insets = useSafeAreaInsets();
   const [generation, setGeneration] = useState(0);
   const decodeProbes = useDecodeProbes();
   const wall = useReadyWall(SPECIMENS.length, lastGenerationMs);
@@ -116,28 +118,18 @@ export default function QrcodeE2eVisualsScreen() {
   );
 
   return (
-    <ScrollView
-      testID="e2e-visuals-screen"
-      accessibilityLabel="E2E visual wall"
-      style={styles.screen}
-      contentContainerStyle={{
-        paddingTop: insets.top + 20,
-        paddingBottom: insets.bottom + 32,
-        paddingHorizontal: 16,
-        gap: 16,
-      }}
-    >
-      <Text testID="e2e-visuals-ready" style={styles.ready}>
+    <E2eScreen testID="e2e-visuals-screen" label="E2E visual wall">
+      <Text testID="e2e-visuals-ready" style={e2eStyles.ready}>
         e2e-visuals-ready
       </Text>
-      <Text style={styles.title}>Visual wall</Text>
-      <Text style={styles.subtitle}>
+      <Text style={e2eStyles.title}>Visual wall</Text>
+      <Text style={e2eStyles.subtitle}>
         Every look with and without a center logo. Times the full wall.
       </Text>
-      <Text testID="e2e-visuals-generation" style={styles.metric}>
+      <Text testID="e2e-visuals-generation" style={e2eStyles.metric}>
         {`generation=${generation};`}
       </Text>
-      <Text testID="e2e-visuals-ready-count" style={styles.metric}>
+      <Text testID="e2e-visuals-ready-count" style={e2eStyles.metric}>
         {status}
       </Text>
       <View
@@ -154,11 +146,11 @@ export default function QrcodeE2eVisualsScreen() {
           wall.reset();
           setGeneration((value) => value + 1);
         }}
-        style={styles.button}
+        style={e2eStyles.button}
       >
-        <Text style={styles.buttonText}>Remount all</Text>
+        <Text style={e2eStyles.buttonText}>Remount all</Text>
       </Pressable>
-      <View testID="e2e-visuals-grid" style={styles.grid}>
+      <View testID="e2e-visuals-grid" style={e2eStyles.grid}>
         {SPECIMENS.map((specimen) => (
           <View
             key={`${specimen.id}-${generation}`}
@@ -208,51 +200,12 @@ export default function QrcodeE2eVisualsScreen() {
           </View>
         ))}
       </View>
-    </ScrollView>
+    </E2eScreen>
   );
 }
 
 const styles = StyleSheet.create({
   decodeProbe: { width: "100%", height: 1 },
-  screen: {
-    flex: 1,
-    backgroundColor: "#101112",
-  },
-  ready: {
-    color: "#86EFAC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#CBD5E1",
-    fontSize: 14,
-  },
-  metric: {
-    color: "#F8FAFC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  button: {
-    alignSelf: "flex-start",
-    backgroundColor: "#1E293B",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  buttonText: {
-    color: "#F8FAFC",
-    fontWeight: "600",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
   cell: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
