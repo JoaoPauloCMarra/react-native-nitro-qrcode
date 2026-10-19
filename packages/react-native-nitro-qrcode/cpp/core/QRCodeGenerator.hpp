@@ -37,10 +37,6 @@ struct GenerateOptions {
   std::string errorCorrectionLevel = "M";
   std::string foregroundColor = "#000000";
   std::string backgroundColor = "#FFFFFF";
-  std::string strokeColor = "#000000";
-  std::string eyeColor = "#000000";
-  std::string eyeStrokeColor = "#000000";
-  std::string eyeballColor = "#000000";
   Color foreground = {0, 0, 0, 255};
   Color background = {255, 255, 255, 255};
   Color stroke = {0, 0, 0, 255};
@@ -55,8 +51,8 @@ struct GenerateOptions {
   bool timingSet = false;
   Color alignment = {0, 0, 0, 255};
   Color timing = {0, 0, 0, 255};
-  Color quietZoneFill = {255, 255, 255, 255};
-  Color finderInner = {255, 255, 255, 255};
+  std::optional<Color> quietZoneFill;
+  std::optional<Color> finderInner;
   GradientOptions gradient;
   int minVersion = 1;
   int maxVersion = 40;
@@ -75,6 +71,13 @@ struct GenerateOptions {
   std::string layout = "matrix";
   int logoAreaSize = 0;
   int logoAreaBorderRadius = 0;
+
+  Color resolvedQuietZoneFill() const {
+    return quietZoneFill.value_or(background);
+  }
+  Color resolvedFinderInner() const {
+    return finderInner.value_or(background);
+  }
 };
 
 struct Matrix {
@@ -128,6 +131,8 @@ private:
   BoundedCache<MatrixObject> matrixCache_;
 
   Matrix createMatrix(const std::string &value,
+                      const GenerateOptions &options) const;
+  Matrix encodeMatrix(const std::string &value,
                       const GenerateOptions &options) const;
   MatrixObject getMatrix(const std::string &value,
                          const GenerateOptions &options);

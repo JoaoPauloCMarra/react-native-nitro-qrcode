@@ -18,7 +18,7 @@ const BASE64_LOOKUP = (() => {
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
-export function base64ToBytes(base64: string): Uint8Array {
+function base64ToBytes(base64: string): Uint8Array {
   const clean = base64.replace(/[^A-Za-z0-9+/]/g, "");
   const output = new Uint8Array(Math.floor((clean.length * 3) / 4));
   let buffer = 0;
@@ -134,7 +134,7 @@ function compositeChannel(value: number, backdrop: number, alpha: number): numbe
   return (value * alpha + backdrop * (255 - alpha)) / 255;
 }
 
-export function pngToRgba(bytes: Uint8Array, backdrop: Backdrop) {
+function pngToRgba(bytes: Uint8Array, backdrop: Backdrop) {
   for (let index = 0; index < PNG_SIGNATURE.length; index += 1) {
     if (bytes[index] !== PNG_SIGNATURE[index]) {
       throw new Error("missing PNG signature");

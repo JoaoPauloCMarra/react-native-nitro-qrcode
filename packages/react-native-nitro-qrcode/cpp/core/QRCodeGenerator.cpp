@@ -200,7 +200,7 @@ bool hasCustomFinderColors(const GenerateOptions &options) {
   return (options.eyeSet && options.eye != NoStrokeColor) ||
          drawsEyeStroke(options) ||
          (options.eyeballSet && options.eyeball != NoStrokeColor) ||
-         options.finderInner != options.background;
+         options.resolvedFinderInner() != options.background;
 }
 
 bool paintsSolidLayer(bool isSet, const Color &color,
@@ -214,8 +214,8 @@ bool hasCustomLayerColors(const GenerateOptions &options) {
          paintsSolidLayer(options.eyeballSet, options.eyeball, options) ||
          paintsSolidLayer(options.alignmentSet, options.alignment, options) ||
          paintsSolidLayer(options.timingSet, options.timing, options) ||
-         options.quietZoneFill != options.background ||
-         options.finderInner != options.background;
+         options.resolvedQuietZoneFill() != options.background ||
+         options.resolvedFinderInner() != options.background;
 }
 
 Color foregroundFillAt(const GenerateOptions &options, int imageSize, int x,
@@ -271,9 +271,9 @@ Color rawColorForLayer(uint8_t layer, const GenerateOptions &options,
     return layerFillAt(options.timingSet, options.timing, options, imageSize,
                        x, y);
   case FinderInnerLayer:
-    return options.finderInner;
+    return options.resolvedFinderInner();
   case QuietZoneLayer:
-    return options.quietZoneFill;
+    return options.resolvedQuietZoneFill();
   case BodyLayer:
     return foregroundFillAt(options, imageSize, x, y);
   case TransparentLayer:
@@ -327,16 +327,24 @@ std::string svgColor(const Color &color) {
   return output.str();
 }
 
-std::string formatPercent(double value, bool clampToUnit = true) {
+std::string formatPercent(double value) {
   std::ostringstream output;
   output.setf(std::ios::fixed);
   output.precision(2);
-  output << ((clampToUnit ? std::clamp(value, 0.0, 1.0) : value) * 100.0)
-         << "%";
+  output << (std::clamp(value, 0.0, 1.0) * 100.0) << "%";
   return output.str();
 }
 
-std::string createSvgGradient(const GenerateOptions &options) {
+std::string formatUserSpace(double value, int totalSize,
+                            bool clampToUnit = true) {
+  std::ostringstream output;
+  output.setf(std::ios::fixed);
+  output.precision(2);
+  output << ((clampToUnit ? std::clamp(value, 0.0, 1.0) : value) * totalSize);
+  return output.str();
+}
+
+std::string createSvgGradient(const GenerateOptions &options, int totalSize) {
   if (!hasGradient(options)) {
     return "";
   }
@@ -348,16 +356,18 @@ std::string createSvgGradient(const GenerateOptions &options) {
         std::max(std::hypot(options.gradient.endX - options.gradient.startX,
                             options.gradient.endY - options.gradient.startY),
                  0.01);
-    defs << "<radialGradient id=\"nitro-qrcode-gradient\" cx=\""
-         << formatPercent(options.gradient.startX) << "\" cy=\""
-         << formatPercent(options.gradient.startY) << "\" r=\""
-         << formatPercent(radius, false) << "\">";
+    defs << "<radialGradient id=\"nitro-qrcode-gradient\" "
+            "gradientUnits=\"userSpaceOnUse\" cx=\""
+         << formatUserSpace(options.gradient.startX, totalSize) << "\" cy=\""
+         << formatUserSpace(options.gradient.startY, totalSize) << "\" r=\""
+         << formatUserSpace(radius, totalSize, false) << "\">";
   } else {
-    defs << "<linearGradient id=\"nitro-qrcode-gradient\" x1=\""
-         << formatPercent(options.gradient.startX) << "\" y1=\""
-         << formatPercent(options.gradient.startY) << "\" x2=\""
-         << formatPercent(options.gradient.endX) << "\" y2=\""
-         << formatPercent(options.gradient.endY) << "\">";
+    defs << "<linearGradient id=\"nitro-qrcode-gradient\" "
+            "gradientUnits=\"userSpaceOnUse\" x1=\""
+         << formatUserSpace(options.gradient.startX, totalSize) << "\" y1=\""
+         << formatUserSpace(options.gradient.startY, totalSize) << "\" x2=\""
+         << formatUserSpace(options.gradient.endX, totalSize) << "\" y2=\""
+         << formatUserSpace(options.gradient.endY, totalSize) << "\">";
   }
 
   for (size_t index = 0; index < options.gradient.colors.size(); index++) {
@@ -577,22 +587,30 @@ void fillRect(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
   }
 }
 
+template <typename Inside>
+void fillWhere(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
+               int x1, int y1, uint8_t value, const Inside &inside) {
+  for (int y = y0; y < y1; y++) {
+    for (int x = x0; x < x1; x++) {
+      if (inside(x, y)) {
+        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
+                static_cast<size_t>(x)] = value;
+      }
+    }
+  }
+}
+
 void fillCircle(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
                 int x1, int y1, uint8_t value) {
   const double radiusX = static_cast<double>(x1 - x0) / 2.0;
   const double radiusY = static_cast<double>(y1 - y0) / 2.0;
   const double centerX = static_cast<double>(x0 + x1 - 1) / 2.0;
   const double centerY = static_cast<double>(y0 + y1 - 1) / 2.0;
-  for (int y = y0; y < y1; y++) {
-    for (int x = x0; x < x1; x++) {
-      const double dx = (static_cast<double>(x) - centerX) / radiusX;
-      const double dy = (static_cast<double>(y) - centerY) / radiusY;
-      if (dx * dx + dy * dy <= 1.0) {
-        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
-                static_cast<size_t>(x)] = value;
-      }
-    }
-  }
+  fillWhere(indices, imageSize, x0, y0, x1, y1, value, [&](int x, int y) {
+    const double dx = (static_cast<double>(x) - centerX) / radiusX;
+    const double dy = (static_cast<double>(y) - centerY) / radiusY;
+    return dx * dx + dy * dy <= 1.0;
+  });
 }
 
 void fillRoundedRect(std::vector<uint8_t> &indices, int imageSize, int x0,
@@ -612,18 +630,11 @@ void fillRoundedRect(std::vector<uint8_t> &indices, int imageSize, int x0,
   const int topArc = y0 + cornerRadius;
   const int bottomArc = y1 - cornerRadius - 1;
   const int radiusSquared = cornerRadius * cornerRadius;
-  for (int y = y0; y < y1; y++) {
-    const int closestY = std::clamp(y, topArc, bottomArc);
-    for (int x = x0; x < x1; x++) {
-      const int closestX = std::clamp(x, leftArc, rightArc);
-      const int dx = x - closestX;
-      const int dy = y - closestY;
-      if (dx * dx + dy * dy <= radiusSquared) {
-        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
-                static_cast<size_t>(x)] = value;
-      }
-    }
-  }
+  fillWhere(indices, imageSize, x0, y0, x1, y1, value, [&](int x, int y) {
+    const int dx = x - std::clamp(x, leftArc, rightArc);
+    const int dy = y - std::clamp(y, topArc, bottomArc);
+    return dx * dx + dy * dy <= radiusSquared;
+  });
 }
 
 void fillDiamond(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
@@ -632,16 +643,11 @@ void fillDiamond(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
   const double radiusY = static_cast<double>(y1 - y0) / 2.0;
   const double centerX = static_cast<double>(x0 + x1 - 1) / 2.0;
   const double centerY = static_cast<double>(y0 + y1 - 1) / 2.0;
-  for (int y = y0; y < y1; y++) {
-    for (int x = x0; x < x1; x++) {
-      const double dx = std::abs(static_cast<double>(x) - centerX) / radiusX;
-      const double dy = std::abs(static_cast<double>(y) - centerY) / radiusY;
-      if (dx + dy <= 1.0) {
-        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
-                static_cast<size_t>(x)] = value;
-      }
-    }
-  }
+  fillWhere(indices, imageSize, x0, y0, x1, y1, value, [&](int x, int y) {
+    const double dx = std::abs(static_cast<double>(x) - centerX) / radiusX;
+    const double dy = std::abs(static_cast<double>(y) - centerY) / radiusY;
+    return dx + dy <= 1.0;
+  });
 }
 
 void fillSquircle(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
@@ -671,35 +677,49 @@ void fillClassy(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
   const int topArc = y0 + cornerRadius;
   const int bottomArc = y1 - cornerRadius - 1;
   const int radiusSquared = cornerRadius * cornerRadius;
-  for (int y = y0; y < y1; y++) {
-    for (int x = x0; x < x1; x++) {
-      const bool inTL = x < leftArc && y < topArc;
-      const bool inTR = x > rightArc && y < topArc;
-      const bool inBR = x > rightArc && y > bottomArc;
-      const bool inBL = x < leftArc && y > bottomArc;
-      bool inside = true;
-      if (inTL && roundTL) {
-        const int dx = x - leftArc;
-        const int dy = y - topArc;
-        inside = dx * dx + dy * dy <= radiusSquared;
-      } else if (inTR && roundTR) {
-        const int dx = x - rightArc;
-        const int dy = y - topArc;
-        inside = dx * dx + dy * dy <= radiusSquared;
-      } else if (inBR && roundBR) {
-        const int dx = x - rightArc;
-        const int dy = y - bottomArc;
-        inside = dx * dx + dy * dy <= radiusSquared;
-      } else if (inBL && roundBL) {
-        const int dx = x - leftArc;
-        const int dy = y - bottomArc;
-        inside = dx * dx + dy * dy <= radiusSquared;
-      }
-      if (inside) {
-        indices[static_cast<size_t>(y) * static_cast<size_t>(imageSize) +
-                static_cast<size_t>(x)] = value;
-      }
+  const auto withinArc = [radiusSquared](int dx, int dy) {
+    return dx * dx + dy * dy <= radiusSquared;
+  };
+  fillWhere(indices, imageSize, x0, y0, x1, y1, value, [&](int x, int y) {
+    const bool inTL = x < leftArc && y < topArc;
+    const bool inTR = x > rightArc && y < topArc;
+    const bool inBR = x > rightArc && y > bottomArc;
+    const bool inBL = x < leftArc && y > bottomArc;
+    if (inTL && roundTL) {
+      return withinArc(x - leftArc, y - topArc);
     }
+    if (inTR && roundTR) {
+      return withinArc(x - rightArc, y - topArc);
+    }
+    if (inBR && roundBR) {
+      return withinArc(x - rightArc, y - bottomArc);
+    }
+    if (inBL && roundBL) {
+      return withinArc(x - leftArc, y - bottomArc);
+    }
+    return true;
+  });
+}
+
+void fillShape(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
+               int x1, int y1, ModuleShape shape, int cornerRadius,
+               int defaultRadius, const ModuleNeighbors *neighbors,
+               uint8_t value) {
+  const int roundedRadius = cornerRadius < 0 ? defaultRadius : cornerRadius;
+  if (shape == ModuleShape::Circle) {
+    fillCircle(indices, imageSize, x0, y0, x1, y1, value);
+  } else if (shape == ModuleShape::Diamond) {
+    fillDiamond(indices, imageSize, x0, y0, x1, y1, value);
+  } else if (shape == ModuleShape::Squircle) {
+    fillSquircle(indices, imageSize, x0, y0, x1, y1, value);
+  } else if (shape == ModuleShape::Classy && neighbors != nullptr) {
+    fillClassy(indices, imageSize, x0, y0, x1, y1, roundedRadius, *neighbors,
+               value);
+  } else if (shape == ModuleShape::Classy || shape == ModuleShape::Rounded ||
+             cornerRadius >= 0) {
+    fillRoundedRect(indices, imageSize, x0, y0, x1, y1, roundedRadius, value);
+  } else {
+    fillRect(indices, imageSize, x0, y0, x1, y1, value);
   }
 }
 
@@ -712,41 +732,12 @@ void drawModule(std::vector<uint8_t> &indices, int imageSize, int x0, int y0,
   y0 += inset;
   x1 -= inset;
   y1 -= inset;
-
-  if (shape == ModuleShape::Circle) {
-    fillCircle(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Diamond) {
-    fillDiamond(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Squircle) {
-    fillSquircle(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Classy) {
-    const int resolvedRadius =
-        cornerRadius < 0 ? std::min(x1 - x0, y1 - y0) / 3 : cornerRadius;
-    fillClassy(indices, imageSize, x0, y0, x1, y1, resolvedRadius, neighbors,
-               value);
-    return;
-  }
-  if (shape == ModuleShape::Rounded) {
-    const int resolvedRadius =
-        cornerRadius < 0 ? std::min(x1 - x0, y1 - y0) / 3 : cornerRadius;
-    fillRoundedRect(indices, imageSize, x0, y0, x1, y1, resolvedRadius, value);
-    return;
-  }
-  if (shape == ModuleShape::Square && cornerRadius >= 0) {
-    fillRoundedRect(indices, imageSize, x0, y0, x1, y1, cornerRadius, value);
-    return;
-  }
-  fillRect(indices, imageSize, x0, y0, x1, y1, value);
+  fillShape(indices, imageSize, x0, y0, x1, y1, shape, cornerRadius,
+            std::min(x1 - x0, y1 - y0) / 3, &neighbors, value);
 }
 
-int resolveBodyGap(const GenerateOptions &options, int width, int height) {
-  const BodyDensity density = parseBodyDensity(options.bodyDensity);
+int resolveBodyGap(const GenerateOptions &options, BodyDensity density,
+                   int width, int height) {
   if (density == BodyDensity::Dense) {
     return options.gap;
   }
@@ -759,27 +750,8 @@ int resolveBodyGap(const GenerateOptions &options, int width, int height) {
 void fillFinderShape(std::vector<uint8_t> &indices, int imageSize, int x0,
                      int y0, int x1, int y1, ModuleShape shape,
                      int cornerRadius, uint8_t value) {
-  if (shape == ModuleShape::Circle) {
-    fillCircle(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Diamond) {
-    fillDiamond(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Squircle) {
-    fillSquircle(indices, imageSize, x0, y0, x1, y1, value);
-    return;
-  }
-  if (shape == ModuleShape::Classy || shape == ModuleShape::Rounded ||
-      cornerRadius >= 0) {
-    fillRoundedRect(indices, imageSize, x0, y0, x1, y1,
-                    cornerRadius >= 0 ? cornerRadius
-                                      : std::max(1, (x1 - x0) / 5),
-                    value);
-    return;
-  }
-  fillRect(indices, imageSize, x0, y0, x1, y1, value);
+  fillShape(indices, imageSize, x0, y0, x1, y1, shape, cornerRadius,
+            std::max(1, (x1 - x0) / 5), nullptr, value);
 }
 
 void drawGroupedFinder(std::vector<uint8_t> &indices, int imageSize,
@@ -950,6 +922,36 @@ void appendChunk(std::vector<uint8_t> &png, const char *type,
   appendChunk(png, type, data.data(), data.size());
 }
 
+std::vector<uint8_t> beginPng(int width, int height, uint8_t bitDepth,
+                              uint8_t colorType) {
+  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
+  std::vector<uint8_t> ihdr;
+  writeU32(ihdr, static_cast<uint32_t>(width));
+  writeU32(ihdr, static_cast<uint32_t>(height));
+  ihdr.push_back(bitDepth);
+  ihdr.push_back(colorType);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  ihdr.push_back(0);
+  appendChunk(png, "IHDR", ihdr);
+  return png;
+}
+
+void appendPalette(std::vector<uint8_t> &png, const std::vector<Color> &palette) {
+  std::vector<uint8_t> plte;
+  std::vector<uint8_t> trns;
+  plte.reserve(palette.size() * 3);
+  trns.reserve(palette.size());
+  for (const Color &color : palette) {
+    plte.push_back(color.r);
+    plte.push_back(color.g);
+    plte.push_back(color.b);
+    trns.push_back(color.a);
+  }
+  appendChunk(png, "PLTE", plte);
+  appendChunk(png, "tRNS", trns);
+}
+
 class DeflateStream {
 public:
   DeflateStream() {
@@ -973,16 +975,7 @@ std::vector<uint8_t> encodePngRgbaStreamed(const std::vector<uint8_t> &indices,
   std::vector<uint8_t> filtered(rowBytes + 1);
   std::vector<uint8_t> chunk(IdatChunkBytes);
 
-  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
-  std::vector<uint8_t> ihdr;
-  writeU32(ihdr, static_cast<uint32_t>(imageSize));
-  writeU32(ihdr, static_cast<uint32_t>(imageSize));
-  ihdr.push_back(8);
-  ihdr.push_back(6);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  appendChunk(png, "IHDR", ihdr);
+  std::vector<uint8_t> png = beginPng(imageSize, imageSize, 8, 6);
 
   DeflateStream deflater;
   z_stream &stream = deflater.stream();
@@ -1021,7 +1014,8 @@ std::vector<uint8_t> encodePngRgbaStreamed(const std::vector<uint8_t> &indices,
   stream.avail_in = 0;
   pump(Z_FINISH);
   appendChunk(png, "IEND", {});
-  return std::vector<uint8_t>(png.begin(), png.end());
+  png.shrink_to_fit();
+  return png;
 }
 
 std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {
@@ -1035,94 +1029,33 @@ std::vector<uint8_t> zlibCompress(const std::vector<uint8_t> &data) {
   return output;
 }
 
-std::vector<uint8_t> encodePngIndexed1(int width, int height,
-                                       std::vector<uint8_t> indices,
-                                       const Color &foreground,
-                                       const Color &background) {
-  const size_t rowBytes = (static_cast<size_t>(width) + 7) / 8;
-  std::vector<uint8_t> raw;
-  raw.reserve((rowBytes + 1) * static_cast<size_t>(height));
-
-  for (int y = 0; y < height; y++) {
-    raw.push_back(0);
-    const size_t rowOutputStart = raw.size();
-    raw.resize(raw.size() + rowBytes, 0);
-    const size_t rowStart = static_cast<size_t>(y) * static_cast<size_t>(width);
-    for (int x = 0; x < width; x++) {
-      if (indices[rowStart + static_cast<size_t>(x)] != 0) {
-        const size_t byteIndex = rowOutputStart + static_cast<size_t>(x / 8);
-        raw[byteIndex] = static_cast<uint8_t>(
-            raw[byteIndex] | (1U << (7U - (static_cast<unsigned>(x) % 8U))));
-      }
-    }
-  }
-  std::vector<uint8_t>().swap(indices);
-
-  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
-  std::vector<uint8_t> ihdr;
-  writeU32(ihdr, static_cast<uint32_t>(width));
-  writeU32(ihdr, static_cast<uint32_t>(height));
-  ihdr.push_back(1);
-  ihdr.push_back(3);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  appendChunk(png, "IHDR", ihdr);
-
-  const std::vector<uint8_t> palette = {
-      background.r, background.g, background.b,
-      foreground.r, foreground.g, foreground.b,
-  };
-  appendChunk(png, "PLTE", palette);
-  appendChunk(png, "tRNS", {background.a, foreground.a});
-  appendChunk(png, "IDAT", zlibCompress(raw));
-  appendChunk(png, "IEND", {});
-  return png;
-}
-
 std::vector<uint8_t> encodePngPalette(int width, int height,
                                       std::vector<uint8_t> indices,
-                                      const std::vector<Color> &palette) {
-  constexpr unsigned bitDepth = 4;
+                                      const std::vector<Color> &palette,
+                                      unsigned bitDepth) {
+  const size_t pixelsPerByte = 8 / bitDepth;
   const size_t rowBytes =
-      (static_cast<size_t>(width) * bitDepth + 7) / 8;
+      (static_cast<size_t>(width) + pixelsPerByte - 1) / pixelsPerByte;
   std::vector<uint8_t> raw((rowBytes + 1) * static_cast<size_t>(height), 0);
   for (int y = 0; y < height; y++) {
     const size_t rowOutputStart =
         static_cast<size_t>(y) * (rowBytes + 1) + 1;
     const size_t rowStart = static_cast<size_t>(y) * static_cast<size_t>(width);
     for (int x = 0; x < width; x++) {
-      const uint8_t entry = indices[rowStart + static_cast<size_t>(x)];
-      const size_t byteIndex = rowOutputStart + static_cast<size_t>(x) / 2;
-      raw[byteIndex] = static_cast<uint8_t>(
-          raw[byteIndex] | ((x % 2 == 0) ? (entry << 4) : entry));
+      const uint8_t sample = indices[rowStart + static_cast<size_t>(x)];
+      const unsigned entry = bitDepth == 1 ? (sample != 0 ? 1U : 0U) : sample;
+      const size_t byteIndex =
+          rowOutputStart + static_cast<size_t>(x) / pixelsPerByte;
+      const unsigned shift =
+          8U - bitDepth * (static_cast<unsigned>(x) % pixelsPerByte + 1U);
+      raw[byteIndex] = static_cast<uint8_t>(raw[byteIndex] | (entry << shift));
     }
   }
   std::vector<uint8_t>().swap(indices);
 
-  std::vector<uint8_t> png = {137, 80, 78, 71, 13, 10, 26, 10};
-  std::vector<uint8_t> ihdr;
-  writeU32(ihdr, static_cast<uint32_t>(width));
-  writeU32(ihdr, static_cast<uint32_t>(height));
-  ihdr.push_back(static_cast<uint8_t>(bitDepth));
-  ihdr.push_back(3);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  ihdr.push_back(0);
-  appendChunk(png, "IHDR", ihdr);
-
-  std::vector<uint8_t> plte;
-  std::vector<uint8_t> trns;
-  plte.reserve(palette.size() * 3);
-  trns.reserve(palette.size());
-  for (const Color &color : palette) {
-    plte.push_back(color.r);
-    plte.push_back(color.g);
-    plte.push_back(color.b);
-    trns.push_back(color.a);
-  }
-  appendChunk(png, "PLTE", plte);
-  appendChunk(png, "tRNS", trns);
+  std::vector<uint8_t> png =
+      beginPng(width, height, static_cast<uint8_t>(bitDepth), 3);
+  appendPalette(png, palette);
   appendChunk(png, "IDAT", zlibCompress(raw));
   appendChunk(png, "IEND", {});
   return png;
@@ -1143,6 +1076,7 @@ struct ModuleShapes {
   ModuleShape eyeball;
   ModuleShape alignment;
   ModuleShape timing;
+  BodyDensity bodyDensity;
 };
 
 struct ModuleStyle {
@@ -1172,7 +1106,8 @@ ModuleStyle classifyModule(int moduleX, int moduleY, int matrixSize,
   style.gap = eyeModule ? options.eyePatternGap
               : alignmentModule || timingModule
                   ? 0
-                  : resolveBodyGap(options, pixelWidth, pixelHeight);
+                  : resolveBodyGap(options, shapes.bodyDensity, pixelWidth,
+                                   pixelHeight);
   style.radius =
       eyeModule ? options.eyePatternCornerRadius : options.cornerRadius;
   style.layer = BodyLayer;
@@ -1206,14 +1141,15 @@ std::vector<uint8_t> rasterizeLayers(const Matrix &matrix,
       parseEyePatternShape(options.eyePatternShape),
       parseEyeballShape(options.eyeballShape),
       parseShape(options.alignmentShape, "alignmentShape"),
-      parseShape(options.timingShape, "timingShape")};
+      parseShape(options.timingShape, "timingShape"),
+      parseBodyDensity(options.bodyDensity)};
   const std::vector<int> alignmentPositions =
       alignmentPatternPositions(matrix.size);
   const bool useCustomFinderColors = hasCustomFinderColors(options);
   const bool drawGroupedFinderEyes =
       shapes.eyePattern != ModuleShape::Square ||
       shapes.eyeball != ModuleShape::Square || useCustomFinderColors;
-  if (options.quietZoneFill != options.background) {
+  if (options.resolvedQuietZoneFill() != options.background) {
     std::fill(indices.begin(), indices.end(), QuietZoneLayer);
     const int inner0 = (options.quietZone * imageSize) / totalModules;
     const int inner1 =
@@ -1226,10 +1162,7 @@ std::vector<uint8_t> rasterizeLayers(const Matrix &matrix,
     const int y1 =
         ((moduleY + options.quietZone + 1) * imageSize) / totalModules;
     for (int moduleX = 0; moduleX < matrix.size; moduleX++) {
-      const bool dark = matrix.modules[static_cast<size_t>(moduleY) *
-                                           static_cast<size_t>(matrix.size) +
-                                       static_cast<size_t>(moduleX)] == 1;
-      if (!dark) {
+      if (!isDark(moduleX, moduleY)) {
         continue;
       }
       const bool eyeModule = isEyeModule(moduleX, moduleY, matrix.size);
@@ -1267,7 +1200,7 @@ std::vector<uint8_t> rasterizeLayers(const Matrix &matrix,
                        totalModules, shapes.eyePattern, shapes.eyeball,
                        options.eyePatternCornerRadius,
                        drawsEyeStroke(options),
-                       options.finderInner == options.background
+                       options.resolvedFinderInner() == options.background
                            ? 0
                            : FinderInnerLayer);
   }
@@ -1292,11 +1225,13 @@ std::vector<uint8_t> encodeLayeredPng(std::vector<uint8_t> indices,
   }
   if (hasCustomLayerColors(options) || options.logoAreaSize > 0) {
     return encodePngPalette(imageSize, imageSize, std::move(indices),
-                            layerPalette(options));
+                            layerPalette(options), 4);
   }
-  return encodePngIndexed1(imageSize, imageSize, std::move(indices),
-                           compositeOver(options.foreground, options.background),
-                           options.background);
+  return encodePngPalette(
+      imageSize, imageSize, std::move(indices),
+      {options.background,
+       compositeOver(options.foreground, options.background)},
+      1);
 }
 
 } // namespace
@@ -1367,12 +1302,18 @@ std::vector<uint8_t> encodePngRgba(int width, int height,
   if (!fpng::fpng_encode_image_to_memory(
           rgba.data(), static_cast<uint32_t>(width),
           static_cast<uint32_t>(height), 4, png, fpng::FPNG_ENCODE_SLOWER)) throw std::runtime_error("PNG compression failed.");
-  return std::vector<uint8_t>(png.begin(), png.end());
+  png.shrink_to_fit();
+  return png;
 }
 
 Matrix QRCodeGenerator::createMatrix(const std::string &value,
                                      const GenerateOptions &options) const {
   validateOptions(value, options);
+  return encodeMatrix(value, options);
+}
+
+Matrix QRCodeGenerator::encodeMatrix(const std::string &value,
+                                     const GenerateOptions &options) const {
   const auto segments = value.find('\0') == std::string::npos
       ? qrcodegen::QrSegment::makeSegments(value.c_str())
       : std::vector<qrcodegen::QrSegment>{qrcodegen::QrSegment::makeBytes(
@@ -1411,8 +1352,9 @@ QRCodeGenerator::renderPngBytes(const std::string &value,
   std::vector<uint8_t> png = encodeLayeredPng(
       rasterizeLayers(matrix, options, imageSize), imageSize, options,
       streamedRgbaMinSize_);
-  storeCacheEntry(key, request,
-                  std::string(png.begin(), png.end()));
+  if (outputCache_.accepts(key.size() + request.size() + png.size())) {
+    storeCacheEntry(key, request, std::string(png.begin(), png.end()));
+  }
   return png;
 }
 
@@ -1443,7 +1385,7 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
     return *cached;
   }
 
-  const Matrix matrix = createMatrix(value, options);
+  const Matrix matrix = encodeMatrix(value, options);
   const int totalSize = matrix.size + options.quietZone * 2;
   std::ostringstream path;
   for (int y = 0; y < matrix.size; y++) {
@@ -1460,7 +1402,7 @@ std::string QRCodeGenerator::generateSvgString(const std::string &value,
   std::ostringstream svg;
   svg << "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " << totalSize
       << " " << totalSize << "\" shape-rendering=\"crispEdges\">";
-  svg << createSvgGradient(options);
+  svg << createSvgGradient(options, totalSize);
   svg << "<path fill=\"" << options.backgroundColor << "\" d=\"M0,0h"
       << totalSize << "v" << totalSize << "H0z\"/>";
   svg << "<path fill=\""
@@ -1589,8 +1531,8 @@ std::string QRCodeGenerator::cacheRequest(const std::string &value,
   appendColor(options.eyeball);
   appendColor(options.alignment);
   appendColor(options.timing);
-  appendColor(options.quietZoneFill);
-  appendColor(options.finderInner);
+  appendColor(options.resolvedQuietZoneFill());
+  appendColor(options.resolvedFinderInner());
   appendCachePart(request, options.moduleShape);
   appendCachePart(request, options.eyePatternShape);
   appendCachePart(request, options.eyeballShape);

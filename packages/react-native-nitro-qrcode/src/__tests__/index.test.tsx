@@ -1869,18 +1869,26 @@ describe("web QRCode API", () => {
 
   it("yields between async web PNG render bands and matches sync output", async () => {
     const canvas = installCanvas();
-    const setTimeoutSpy = jest.spyOn(globalThis, "setTimeout");
     const syncUri = Web.toPngDataUri({ value: "banded", size: 96 });
     Web.clearQRCodeCache();
-    const syncCalls = setTimeoutSpy.mock.calls.length;
 
+    let now = 0;
+    const nowSpy = jest.spyOn(performance, "now").mockImplementation(() => {
+      now += 10;
+      return now;
+    });
+    const yieldSpy = jest.fn(async () => {});
+    Object.defineProperty(globalThis, "scheduler", {
+      configurable: true,
+      value: { yield: yieldSpy },
+    });
     const asyncUri = await Web.toPngDataUriAsync({ value: "banded", size: 96 });
-    const asyncCalls = setTimeoutSpy.mock.calls.length;
+    Reflect.deleteProperty(globalThis, "scheduler");
+    nowSpy.mockRestore();
 
     expect(asyncUri).toBe(syncUri);
     expect(canvas.toDataURL).toHaveBeenCalledTimes(2);
-    expect(asyncCalls).toBeGreaterThan(syncCalls);
-    setTimeoutSpy.mockRestore();
+    expect(yieldSpy).toHaveBeenCalled();
   });
 
   it("verifies cached web requests after an FNV key collision", () => {

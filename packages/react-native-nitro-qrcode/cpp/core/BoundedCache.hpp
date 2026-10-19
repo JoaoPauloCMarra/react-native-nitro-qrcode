@@ -75,6 +75,8 @@ public:
     bytes_ = 0;
   }
 
+  bool accepts(size_t bytes) const { return bytes <= maxBytes_; }
+
   size_t size() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return entries_.size();

@@ -2,7 +2,14 @@ const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { resolveLlvmTool } = require("./llvm-tools.js");
-const { prepareNitroHeaders, sharedIncludeArgs } = require("./cpp-includes.js");
+const {
+  compileQuircObjects,
+  platformLinkArgs,
+  prepareNitroHeaders,
+  runCommand,
+  sharedIncludeArgs,
+  testSources,
+} = require("./cpp-includes.js");
 
 const packageDir = path.join(
   __dirname,
@@ -15,13 +22,6 @@ const buildDir = path.join(cppDir, "build");
 const outputFile = path.join(buildDir, "qrcode_generator_test");
 const profileRawFile = path.join(buildDir, "qrcode_generator.profraw");
 const profileDataFile = path.join(buildDir, "qrcode_generator.profdata");
-
-function runCommand(command, args, options = {}) {
-  execFileSync(command, args, {
-    stdio: "inherit",
-    ...options,
-  });
-}
 
 fs.rmSync(buildDir, { recursive: true, force: true });
 fs.mkdirSync(buildDir, { recursive: true });
@@ -36,46 +36,15 @@ if (!fs.existsSync(matrixObjectHeader)) {
   );
 }
 
-const quircDir = path.join(cppDir, "tests", "quirc");
-const quircObjects = [
-  "quirc.c",
-  "decode.c",
-  "identify.c",
-  "version_db.c",
-].map((file) => {
-  const objectFile = path.join(buildDir, `${file}.o`);
-  runCommand(resolveLlvmTool("clang"), [
-    "-std=c11",
-    "-DQUIRC_MAX_REGIONS=65534",
-    "-O0",
-    "-g",
-    "-fprofile-instr-generate",
-    "-fcoverage-mapping",
-    `-I${quircDir}`,
-    "-c",
-    path.join(quircDir, file),
-    "-o",
-    objectFile,
-  ]);
-  return objectFile;
+const quircObjects = compileQuircObjects({
+  clang: resolveLlvmTool("clang"),
+  quircDir: path.join(cppDir, "tests", "quirc"),
+  buildDir,
+  suffix: "",
+  flags: ["-O0", "-g", "-fprofile-instr-generate", "-fcoverage-mapping"],
 });
 
-const sources = [
-  path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
-  path.join(cppDir, "core", "parity-corpus.cpp"),
-  path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
-  path.join(cppDir, "tests", "QRCodeScanTest.cpp"),
-  path.join(cppDir, "tests", "QRCodeHardeningTest.cpp"),
-  path.join(cppDir, "tests", "HybridQRCodeHardeningTest.cpp"),
-  path.join(cppDir, "tests", "QRCodeMemoryTest.cpp"),
-  path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
-  path.join(cppDir, "bindings", "HybridQRCodeTest.cpp"),
-  path.join(cppDir, "bindings", "HybridQRCode.cpp"),
-  path.join(generatedDir, "HybridQRCodeSpec.cpp"),
-  path.join(cppDir, "core", "QRCodeGenerator.cpp"),
-  path.join(cppDir, "vendor", "fpng", "fpng_unity.cpp"),
-  path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
-];
+const sources = testSources(packageDir, { includeMemory: true });
 
 const compileArgs = [
   "-std=c++20",
@@ -94,8 +63,7 @@ const compileArgs = [
   ...quircObjects,
   "-o",
   outputFile,
-  "-lz",
-  process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread",
+  ...platformLinkArgs(),
 ];
 
 console.log("Compiling C++ QRCode tests...");

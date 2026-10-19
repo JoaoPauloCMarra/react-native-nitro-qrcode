@@ -15,7 +15,7 @@ import {
   type QRCodePreset,
   type QRCodeRef,
 } from "react-native-nitro-qrcode";
-import { PRESETS } from "./generation-matrix";
+import { PRESETS } from "./presets";
 
 const LAB_VALUE = "https://example.com/nitro-qrcode-e2e";
 type LabResult = {
@@ -86,6 +86,13 @@ export function QrcodeE2eLab() {
 
   const liveValue = forceEmpty ? "" : LAB_VALUE;
 
+  const report = (key: keyof LabResult, text: string) => {
+    setResults((current) => ({ ...current, [key]: text }));
+  };
+  const reportProbe = (key: keyof ProbeResult, text: string) => {
+    setProbe((current) => ({ ...current, [key]: text }));
+  };
+
   const runAudit = async () => {
     try {
       clearQRCodeCache();
@@ -115,9 +122,9 @@ export function QrcodeE2eLab() {
         throw new Error(`async request accounting differs: ${JSON.stringify(metrics)}`);
       const uri = toPngDataUri({ value: "before\0after", size: 256, errorCorrectionLevel: "H" });
       setAuditUri(uri);
-      setResults((current) => ({ ...current, audit: "ok:bounds:boost:metrics:nul-image-ready" }));
+      report("audit", "ok:bounds:boost:metrics:nul-image-ready");
     } catch (error) {
-      setResults((current) => ({ ...current, audit: `fail:${error instanceof Error ? error.message : "audit"}` }));
+      report("audit", `fail:${error instanceof Error ? error.message : "audit"}`);
     }
   };
 
@@ -128,11 +135,11 @@ export function QrcodeE2eLab() {
     const bytes = toPngArrayBuffer(options);
     const svg = NitroQRCode.toSvgString(options);
     const matrix = NitroQRCode.getMatrix(options);
-    setResults((current) => ({
-      ...current,
-      helpers: png.startsWith("data:image/png;base64,iVBOR") && base64.startsWith("iVBOR") && new Uint8Array(bytes)[0] === 137 && bytes.byteLength > 8 && svg.includes("<svg") && matrix.size >= 21
+    report(
+      "helpers",
+      png.startsWith("data:image/png;base64,iVBOR") && base64.startsWith("iVBOR") && new Uint8Array(bytes)[0] === 137 && bytes.byteLength > 8 && svg.includes("<svg") && matrix.size >= 21
         ? `ok:png=${png.length}:b64=${base64.length}:bytes=${bytes.byteLength}:svg=${svg.length}:matrix=${matrix.size}` : "fail:invalid-export-shape",
-    }));
+    );
   };
 
   const runNamespace = async () => {
@@ -145,12 +152,12 @@ export function QrcodeE2eLab() {
       ]);
       const valid = uri.startsWith("data:image/png;base64,iVBOR") &&
         b64.startsWith("iVBOR") && new Uint8Array(bytes)[0] === 137;
-      setResults((current) => ({
-        ...current,
-        namespace: valid ? `ok:nitro:uri=${uri.length}:b64=${b64.length}` : "fail:invalid-async-export",
-      }));
+      report(
+        "namespace",
+        valid ? `ok:nitro:uri=${uri.length}:b64=${b64.length}` : "fail:invalid-async-export",
+      );
     } catch (error) {
-      setResults((current) => ({ ...current, namespace: `fail:${error instanceof Error ? error.message : "async export"}` }));
+      report("namespace", `fail:${error instanceof Error ? error.message : "async export"}`);
     }
   };
 
@@ -161,12 +168,12 @@ export function QrcodeE2eLab() {
     const after = getQRCodeCacheSize();
     const bytes = getQRCodeCacheBytes();
     const cleared = before > 0 && after === 0 && bytes === 0;
-    setResults((current) => ({
-      ...current,
-      cache: cleared
+    report(
+      "cache",
+      cleared
         ? `ok:cleared:${before}->${after}:bytes=${bytes}`
         : `fail:cache-not-cleared:${before}->${after}:bytes=${bytes}`,
-    }));
+    );
   };
 
   const runMetrics = () => {
@@ -185,12 +192,12 @@ export function QrcodeE2eLab() {
       reset.requests === 0 &&
       reset.asyncRequests === 0 &&
       reset.failedRequests === 0;
-    setResults((current) => ({
-      ...current,
-      metrics: resetCorrectly
+    report(
+      "metrics",
+      resetCorrectly
         ? `ok:requests=${snapshot.requests}:reset=${reset.requests}`
         : `fail:metrics:requests=${snapshot.requests}:reset=${reset.requests}`,
-    }));
+    );
   };
 
   const runValidation = () => {
@@ -200,10 +207,10 @@ export function QrcodeE2eLab() {
       size: 128,
       scanSafe: scanSafeStrict ? "strict" : true,
     });
-    setResults((current) => ({
-      ...current,
-      validation: valid.valid && !invalid.valid && invalid.errors.length > 0 ? `ok:valid=${valid.valid}:invalid=${invalid.valid}:code=${invalid.errors[0]?.code ?? "none"}` : "fail:validation",
-    }));
+    report(
+      "validation",
+      valid.valid && !invalid.valid && invalid.errors.length > 0 ? `ok:valid=${valid.valid}:invalid=${invalid.valid}:code=${invalid.errors[0]?.code ?? "none"}` : "fail:validation",
+    );
   };
 
   const runStress = () => {
@@ -218,10 +225,10 @@ export function QrcodeE2eLab() {
     }
     const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - started;
     const snapshot = getQRCodeMetrics();
-    setResults((current) => ({
-      ...current,
-      stress: snapshot.requests === STRESS_COUNT && snapshot.failedRequests === 0 ? `ok:count=${STRESS_COUNT}:ms=${elapsed.toFixed(1)}:avg=${(elapsed / STRESS_COUNT).toFixed(2)}:requests=${snapshot.requests}` : "fail:stress-request-count",
-    }));
+    report(
+      "stress",
+      snapshot.requests === STRESS_COUNT && snapshot.failedRequests === 0 ? `ok:count=${STRESS_COUNT}:ms=${elapsed.toFixed(1)}:avg=${(elapsed / STRESS_COUNT).toFixed(2)}:requests=${snapshot.requests}` : "fail:stress-request-count",
+    );
   };
 
   const runWarnings = () => {
@@ -234,10 +241,10 @@ export function QrcodeE2eLab() {
       errorCorrectionLevel: "L",
     });
     const codes = [...new Set(result.warnings.map((warning) => warning.code))].sort();
-    setProbe((current) => ({
-      ...current,
-      warnings: result.errors.length === 0 ? `warnings=${codes.join(",")};` : `warnings=fail:${result.errors[0]?.code ?? "none"};`,
-    }));
+    reportProbe(
+      "warnings",
+      result.errors.length === 0 ? `warnings=${codes.join(",")};` : `warnings=fail:${result.errors[0]?.code ?? "none"};`,
+    );
   };
 
   const exportBase64 = () => {
@@ -247,10 +254,10 @@ export function QrcodeE2eLab() {
     } catch {
       base64 = undefined;
     }
-    setProbe((current) => ({
-      ...current,
-      refBase64: base64?.startsWith("iVBOR") ? `ok:b64=${base64.length};` : "fail:b64-unavailable;",
-    }));
+    reportProbe(
+      "refBase64",
+      base64?.startsWith("iVBOR") ? `ok:b64=${base64.length};` : "fail:b64-unavailable;",
+    );
   };
 
   const runMetricsOff = () => {
@@ -271,12 +278,12 @@ export function QrcodeE2eLab() {
       disabled.cacheHits === 0 &&
       disabled.cacheMisses === 0 &&
       resumed.requests === 1;
-    setProbe((current) => ({
-      ...current,
-      metricsOff: silentCorrectly
+    reportProbe(
+      "metricsOff",
+      silentCorrectly
         ? `ok:metrics-off:requests=${disabled.requests}:resumed=${resumed.requests};`
         : `fail:metrics-off:requests=${disabled.requests}:resumed=${resumed.requests};`,
-    }));
+    );
   };
 
   const probeLabel = [
@@ -293,11 +300,10 @@ export function QrcodeE2eLab() {
 
   const exportUri = () => {
     const uri = qrRef.current?.toPngDataUri();
-    setResults((current) => ({
-      ...current,
-      exportUri:
-        uri?.startsWith("data:image/png;base64,iVBOR") ? `ok:uri=${uri.length}` : "fail:export-unavailable",
-    }));
+    report(
+      "exportUri",
+      uri?.startsWith("data:image/png;base64,iVBOR") ? `ok:uri=${uri.length}` : "fail:export-unavailable",
+    );
   };
 
   return (
@@ -317,18 +323,15 @@ export function QrcodeE2eLab() {
         keepPreviousImage={keepPrevious}
         scanSafe={scanSafeStrict ? "strict" : true}
         onReady={() => {
-          setResults((current) => ({
-            ...current,
-            error: "ok:ready",
-          }));
+          report("error", "ok:ready");
         }}
         onError={(error) => {
-          setResults((current) => ({
-            ...current,
-            error: forceEmpty && error.message.includes("value must not be empty")
+          report(
+            "error",
+            forceEmpty && error.message.includes("value must not be empty")
               ? "ok:error:empty"
               : `fail:error:${error.message.slice(0, 48)}`,
-          }));
+          );
         }}
       />
 
@@ -410,20 +413,20 @@ export function QrcodeE2eLab() {
         <View style={styles.row}>
           <LabErrorBoundary
             onCaught={(error) => {
-              setProbe((current) => ({
-                ...current,
-                boundaryEmpty: error.message.includes("QRCode value must not be empty.") ? "ok" : "fail",
-              }));
+              reportProbe(
+                "boundaryEmpty",
+                error.message.includes("QRCode value must not be empty.") ? "ok" : "fail",
+              );
             }}
           >
             <QRCode testID="e2e-boundary-empty" value="" size={48} />
           </LabErrorBoundary>
           <LabErrorBoundary
             onCaught={(error) => {
-              setProbe((current) => ({
-                ...current,
-                boundarySize: error.message.includes("integer between 1 and 2048") ? "ok" : "fail",
-              }));
+              reportProbe(
+                "boundarySize",
+                error.message.includes("integer between 1 and 2048") ? "ok" : "fail",
+              );
             }}
           >
             <QRCode testID="e2e-boundary-size" value={LAB_VALUE} size={0} />

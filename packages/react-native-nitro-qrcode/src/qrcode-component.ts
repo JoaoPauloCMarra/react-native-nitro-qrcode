@@ -73,7 +73,6 @@ function generatingAccessibilityLabel(): string {
 
 function validateComponentSize(size: number): void {
   if (
-    !Number.isFinite(size) ||
     !Number.isInteger(size) ||
     size < 1 ||
     size > MAX_COMPONENT_SIZE

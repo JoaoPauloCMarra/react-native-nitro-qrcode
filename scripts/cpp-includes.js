@@ -1,3 +1,4 @@
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -127,4 +128,57 @@ function prepareNitroHeaders(rootDir, buildDir) {
   return includeRoot;
 }
 
-module.exports = { prepareNitroHeaders, sharedIncludeArgs };
+function runCommand(command, args, options = {}) {
+  execFileSync(command, args, { stdio: "inherit", ...options });
+}
+
+function platformLinkArgs() {
+  return ["-lz", process.platform === "darwin" ? "-stdlib=libc++" : "-lpthread"];
+}
+
+function testSources(packageDir, { includeMemory }) {
+  const cppDir = path.join(packageDir, "cpp");
+  const generatedDir = path.join(packageDir, "nitrogen", "generated", "shared", "c++");
+  return [
+    path.join(cppDir, "core", "QRCodeGeneratorTest.cpp"),
+    path.join(cppDir, "core", "parity-corpus.cpp"),
+    path.join(cppDir, "tests", "QRCodeBridgeOptionsTest.cpp"),
+    path.join(cppDir, "tests", "QRCodeScanTest.cpp"),
+    path.join(cppDir, "tests", "QRCodeHardeningTest.cpp"),
+    path.join(cppDir, "tests", "HybridQRCodeHardeningTest.cpp"),
+    ...(includeMemory ? [path.join(cppDir, "tests", "QRCodeMemoryTest.cpp")] : []),
+    path.join(cppDir, "bindings", "QRCodeBridgeOptions.cpp"),
+    path.join(cppDir, "bindings", "HybridQRCodeTest.cpp"),
+    path.join(cppDir, "bindings", "HybridQRCode.cpp"),
+    path.join(generatedDir, "HybridQRCodeSpec.cpp"),
+    path.join(cppDir, "core", "QRCodeGenerator.cpp"),
+    path.join(cppDir, "vendor", "fpng", "fpng_unity.cpp"),
+    path.join(cppDir, "qrcodegen", "qrcodegen.cpp"),
+  ];
+}
+
+function compileQuircObjects({ clang, quircDir, buildDir, suffix, flags }) {
+  return ["quirc.c", "decode.c", "identify.c", "version_db.c"].map((file) => {
+    const objectFile = path.join(buildDir, suffix ? `${file}.${suffix}.o` : `${file}.o`);
+    runCommand(clang, [
+      "-std=c11",
+      "-DQUIRC_MAX_REGIONS=65534",
+      ...flags,
+      `-I${quircDir}`,
+      "-c",
+      path.join(quircDir, file),
+      "-o",
+      objectFile,
+    ]);
+    return objectFile;
+  });
+}
+
+module.exports = {
+  compileQuircObjects,
+  platformLinkArgs,
+  prepareNitroHeaders,
+  runCommand,
+  sharedIncludeArgs,
+  testSources,
+};

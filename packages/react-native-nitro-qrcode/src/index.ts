@@ -1,7 +1,7 @@
 import {
   measuredAsync,
   measuredSync,
-  getQRCodeMetrics as readQRCodeMetrics,
+  getQRCodeMetricsWithCacheBytes,
   resetQRCodeMetrics,
   setQRCodeMetricsEnabled,
 } from "./metrics";
@@ -13,7 +13,6 @@ import {
   type QRCodeMatrix,
   type QRCodeOptions,
 } from "./validation";
-import { Platform } from "react-native";
 import { NitroModules } from "react-native-nitro-modules";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import type {
@@ -211,11 +210,7 @@ export function getQRCodeCacheBytes(): number {
 }
 
 export function getQRCodeMetrics() {
-  const snapshot = readQRCodeMetrics();
-  if (!snapshot.enabled) {
-    return snapshot;
-  }
-  return { ...snapshot, cacheBytes: NativeQRCode.getCacheBytes() };
+  return getQRCodeMetricsWithCacheBytes(() => NativeQRCode.getCacheBytes());
 }
 
 export const QRCode: ForwardRefExoticComponent<
@@ -224,7 +219,7 @@ export const QRCode: ForwardRefExoticComponent<
   toPngDataUri,
   toPngBase64,
   toPngDataUriAsync,
-  accessibilityIgnoresInvertColors: Platform.OS !== "web",
+  accessibilityIgnoresInvertColors: true,
 });
 
 export const NitroQRCode: NitroQRCodeApi = {

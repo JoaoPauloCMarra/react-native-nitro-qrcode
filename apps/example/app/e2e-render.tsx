@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { QRCode, type QRCodePreset } from "react-native-nitro-qrcode";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { E2eScreen, e2eStyles } from "../components/e2e-screen";
 import { formatReadyWall, useReadyWall } from "../components/ready-wall";
 
 type Specimen = {
@@ -33,7 +33,6 @@ const SPECIMENS: readonly Specimen[] = [
 ];
 
 export default function QrcodeE2eRenderScreen() {
-  const insets = useSafeAreaInsets();
   const [generation, setGeneration] = useState(0);
   const wall = useReadyWall(SPECIMENS.length);
   const status = formatReadyWall(
@@ -43,27 +42,17 @@ export default function QrcodeE2eRenderScreen() {
   );
 
   return (
-    <ScrollView
-      testID="e2e-render-screen"
-      accessibilityLabel="E2E render wall"
-      style={styles.screen}
-      contentContainerStyle={{
-        paddingTop: insets.top + 20,
-        paddingBottom: insets.bottom + 32,
-        paddingHorizontal: 16,
-        gap: 16,
-      }}
-    >
-      <Text testID="e2e-ready" style={styles.ready}>
+    <E2eScreen testID="e2e-render-screen" label="E2E render wall">
+      <Text testID="e2e-ready" style={e2eStyles.ready}>
         e2e-ready
       </Text>
       <Text testID="e2e-render-generation">generation={generation}</Text>
-      <Text style={styles.title}>Render wall</Text>
-      <Text style={styles.subtitle}>
+      <Text style={e2eStyles.title}>Render wall</Text>
+      <Text style={e2eStyles.subtitle}>
         Consumer-shaped QR variants: presets, shapes, sizes, unicode, and long
         payloads.
       </Text>
-      <Text testID="e2e-render-ready-count" style={styles.metric}>
+      <Text testID="e2e-render-ready-count" style={e2eStyles.metric}>
         {status}
       </Text>
       <Pressable
@@ -74,11 +63,11 @@ export default function QrcodeE2eRenderScreen() {
           wall.reset();
           setGeneration((value) => value + 1);
         }}
-        style={styles.button}
+        style={e2eStyles.button}
       >
-        <Text style={styles.buttonText}>Remount all</Text>
+        <Text style={e2eStyles.buttonText}>Remount all</Text>
       </Pressable>
-      <View testID="e2e-render-grid" style={styles.grid}>
+      <View testID="e2e-render-grid" style={e2eStyles.grid}>
         {SPECIMENS.map((specimen) => (
           <View
             key={`${specimen.id}-${generation}`}
@@ -105,50 +94,11 @@ export default function QrcodeE2eRenderScreen() {
           </View>
         ))}
       </View>
-    </ScrollView>
+    </E2eScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#101112",
-  },
-  ready: {
-    color: "#86EFAC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#CBD5E1",
-    fontSize: 14,
-  },
-  metric: {
-    color: "#F8FAFC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  button: {
-    alignSelf: "flex-start",
-    backgroundColor: "#1E293B",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  buttonText: {
-    color: "#F8FAFC",
-    fontWeight: "600",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
   cell: {
     alignItems: "center",
     backgroundColor: "#1A1C1E",

@@ -149,11 +149,8 @@ function collectDirectoryFiles(root, relativeDirectory, kind) {
       const relative = path.relative(root, absolute).split(path.sep).join("/");
       if (isSecretPath(relative)) continue;
       const extension = path.extname(entry.name).toLowerCase();
-      if (
-        kind === "asset" ||
-        (kind === "example" && assetExtensions.has(extension))
-      ) {
-        if (assetExtensions.has(extension)) files.push(relative);
+      if (kind === "example" && assetExtensions.has(extension)) {
+        files.push(relative);
         continue;
       }
       if (!sourceExtensions.has(extension)) continue;

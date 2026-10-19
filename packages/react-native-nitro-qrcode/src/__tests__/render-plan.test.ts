@@ -20,7 +20,7 @@ describe("render plan color identity", () => {
 
     expect(plan.drawGroupedFinders).toBe(false);
     expect(
-      plan.rows.flatMap((row) => row.modules).some((module) => module.stroke),
+      plan.rows.flatMap((row) => row.modules).some((module) => module.strokeGap !== undefined),
     ).toBe(false);
   });
 
@@ -40,7 +40,7 @@ describe("render plan color identity", () => {
 
     expect(plan.drawGroupedFinders).toBe(true);
     expect(
-      plan.rows.flatMap((row) => row.modules).some((module) => module.stroke),
+      plan.rows.flatMap((row) => row.modules).some((module) => module.strokeGap !== undefined),
     ).toBe(true);
   });
 

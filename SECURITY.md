@@ -8,7 +8,7 @@ release to receive security fixes.
 
 | Version | Supported |
 | --- | --- |
-| `0.11.x` (latest) | Yes |
+| `0.12.x` (latest) | Yes |
 | All earlier `0.x` lines | No |
 
 ## Vendored And Runtime Dependencies

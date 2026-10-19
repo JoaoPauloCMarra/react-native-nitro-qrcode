@@ -227,6 +227,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     gradientEndY: number,
   ): string;
 
+  /** @deprecated Use getMatrixObject instead. */
   getMatrixPackedBase64(
     value: string,
     errorCorrectionLevel: string,
@@ -236,6 +237,7 @@ export interface QRCode extends HybridObject<{ ios: "c++"; android: "c++" }> {
     boostEcl: boolean,
   ): string;
 
+  /** @deprecated Use getMatrixObject instead. */
   getMatrixSize(
     value: string,
     errorCorrectionLevel: string,

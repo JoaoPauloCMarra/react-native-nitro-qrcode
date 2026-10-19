@@ -27,10 +27,6 @@ namespace margelo::nitro::NitroQRCode {
   options.errorCorrectionLevel = errorCorrectionLevel;
   options.foregroundColor = foregroundColor;
   options.backgroundColor = backgroundColor;
-  options.strokeColor = strokeColor;
-  options.eyeColor = eyeColor;
-  options.eyeStrokeColor = eyeStrokeColor;
-  options.eyeballColor = eyeballColor;
   options.foreground = ::NitroQRCode::parseColor(foregroundColor);
   options.background = ::NitroQRCode::parseColor(backgroundColor);
   options.stroke = ::NitroQRCode::parseColor(strokeColor);
@@ -45,8 +41,6 @@ namespace margelo::nitro::NitroQRCode {
   options.eyeballSet = options.eyeball != legacyUnset;
   options.alignment = options.foreground;
   options.timing = options.foreground;
-  options.quietZoneFill = options.background;
-  options.finderInner = options.background;
   options.minVersion = toBridgeInt(minVersion, "minVersion");
   options.maxVersion = toBridgeInt(maxVersion, "maxVersion");
   options.mask = toBridgeInt(mask, "mask");

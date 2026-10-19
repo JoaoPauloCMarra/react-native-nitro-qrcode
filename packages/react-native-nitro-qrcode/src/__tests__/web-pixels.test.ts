@@ -2,7 +2,7 @@ import jsQR from "jsqr";
 
 import { PRESET_SHAPE_OPTIONS } from "../defaults";
 import * as Web from "../index.web";
-import { installRecordingCanvas } from "./helpers/canvas";
+import { installCanvas, installRecordingCanvas } from "./helpers/canvas";
 import { installRasterCanvas } from "./helpers/raster-canvas";
 
 afterEach(() => {
@@ -229,5 +229,93 @@ describe("translucent backgrounds and opaque-path painting on web", () => {
     expect(fills).toContain("#FF7F7F");
     expect(fills).not.toContain("#FF000080");
     expect(calls.some((call) => call.op === "save")).toBe(false);
+  });
+});
+
+describe("async png yielding", () => {
+  const options = { value: "https://example.com/yield-budget", size: 400 };
+
+  function bandCount(): number {
+    return Math.ceil(Web.getMatrix(options).size / 8);
+  }
+
+  function installClock(step: number) {
+    let now = 0;
+    return jest.spyOn(performance, "now").mockImplementation(() => {
+      now += step;
+      return now;
+    });
+  }
+
+  function installScheduler() {
+    const yieldSpy = jest.fn(async () => {});
+    Object.defineProperty(globalThis, "scheduler", {
+      configurable: true,
+      value: { yield: yieldSpy },
+    });
+    return yieldSpy;
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, "scheduler");
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it("async png yields at most once per time budget", async () => {
+    installCanvas();
+    installClock(5);
+    const yieldSpy = installScheduler();
+    await Web.toPngDataUriAsync(options);
+    const bands = bandCount();
+    expect(bands).toBeGreaterThan(3);
+    expect(yieldSpy.mock.calls.length).toBeGreaterThan(0);
+    expect(yieldSpy.mock.calls.length).toBeLessThan(bands - 1);
+  });
+
+  it("does not yield while the render stays inside the time budget", async () => {
+    installCanvas();
+    installClock(0);
+    const yieldSpy = installScheduler();
+    await Web.toPngDataUriAsync(options);
+    expect(yieldSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not yield after the last band", async () => {
+    installCanvas();
+    installClock(100);
+    const yieldSpy = installScheduler();
+    await Web.toPngDataUriAsync(options);
+    expect(yieldSpy.mock.calls.length).toBe(bandCount() - 1);
+  });
+
+  it("yields through a message channel when scheduler.yield is missing", async () => {
+    installCanvas();
+    installClock(100);
+    const postMessageSpy = jest.spyOn(MessagePort.prototype, "postMessage");
+    await Web.toPngDataUriAsync(options);
+    expect(postMessageSpy.mock.calls.length).toBe(bandCount() - 1);
+  });
+
+  it("falls back to a zero delay timer without scheduler or message channel", async () => {
+    installCanvas();
+    jest.useFakeTimers();
+    installClock(100);
+    const channel = globalThis.MessageChannel;
+    Object.defineProperty(globalThis, "MessageChannel", {
+      configurable: true,
+      value: undefined,
+    });
+    const timeoutSpy = jest.spyOn(globalThis, "setTimeout");
+    const pending = Web.toPngDataUriAsync(options);
+    await jest.runAllTimersAsync();
+    await pending;
+    Object.defineProperty(globalThis, "MessageChannel", {
+      configurable: true,
+      value: channel,
+    });
+    expect(timeoutSpy.mock.calls.filter(([, delay]) => delay === 0).length).toBe(
+      bandCount() - 1,
+    );
   });
 });

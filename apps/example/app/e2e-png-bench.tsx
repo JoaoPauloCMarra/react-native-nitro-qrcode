@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import {
   clearQRCodeCache,
   toPngArrayBuffer,
@@ -8,7 +8,7 @@ import {
   toPngBase64Async,
   type QRCodeOptions,
 } from "react-native-nitro-qrcode";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { E2eScreen, e2eStyles } from "../components/e2e-screen";
 
 type BenchRow = {
   payload: string;
@@ -25,39 +25,47 @@ type BenchRow = {
 const LARGE_PAYLOAD = `https://example.com/nitro-qrcode/bench?${"A".repeat(240)}`;
 const WARMUP = 3;
 const ITERATIONS = 20;
-const PAYLOADS = [
-  { id: "small-text", value: "Hi", size: 128 },
+const PAYLOADS: readonly { id: string; options: QRCodeOptions }[] = [
+  { id: "small-text", options: { value: "Hi", size: 128 } },
   {
     id: "medium-url",
-    value: "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode",
-    size: 256,
+    options: {
+      value: "https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode",
+      size: 256,
+    },
   },
-  { id: "large-high-res", value: LARGE_PAYLOAD, size: 1024 },
+  { id: "large-high-res", options: { value: LARGE_PAYLOAD, size: 1024 } },
   {
     id: "classy",
-    value: "https://example.com/classy",
-    size: 256,
-    shapeOptions: { shape: "classy", eyeFrameShape: "rounded" },
+    options: {
+      value: "https://example.com/classy",
+      size: 256,
+      shapeOptions: { shape: "classy", eyeFrameShape: "rounded" },
+    },
   },
   {
     id: "mosaic-logo",
-    value: "https://example.com/mosaic-logo",
-    size: 256,
-    shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
-    logoAreaSize: 48,
-    logoAreaBorderRadius: 10,
+    options: {
+      value: "https://example.com/mosaic-logo",
+      size: 256,
+      shapeOptions: { shape: "diamond", eyeFrameShape: "rounded" },
+      logoAreaSize: 48,
+      logoAreaBorderRadius: 10,
+    },
   },
   {
     id: "fluid",
-    value: "https://example.com/fluid",
-    size: 256,
-    shapeOptions: {
-      shape: "squircle",
-      eyeFrameShape: "circle",
-      bodyDensity: "sparse",
+    options: {
+      value: "https://example.com/fluid",
+      size: 256,
+      shapeOptions: {
+        shape: "squircle",
+        eyeFrameShape: "circle",
+        bodyDensity: "sparse",
+      },
     },
   },
-] as const;
+];
 
 function nowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
@@ -114,33 +122,24 @@ async function measure(
 
 async function runBench(): Promise<BenchRow[]> {
   const rows: BenchRow[] = [];
-  for (const payload of PAYLOADS) {
-    const options: QRCodeOptions = {
-      value: payload.value,
-      size: payload.size,
-      ...("shapeOptions" in payload ? { shapeOptions: payload.shapeOptions } : {}),
-      ...("logoAreaSize" in payload ? { logoAreaSize: payload.logoAreaSize } : {}),
-      ...("logoAreaBorderRadius" in payload
-        ? { logoAreaBorderRadius: payload.logoAreaBorderRadius }
-        : {}),
-    };
+  for (const { id, options } of PAYLOADS) {
     rows.push(
-      await measure(payload.id, "sync-base64", () => {
+      await measure(id, "sync-base64", () => {
         return toPngBase64(options).length;
       }),
     );
     rows.push(
-      await measure(payload.id, "async-base64", async () => {
+      await measure(id, "async-base64", async () => {
         return (await toPngBase64Async(options)).length;
       }),
     );
     rows.push(
-      await measure(payload.id, "sync-arraybuffer", () => {
+      await measure(id, "sync-arraybuffer", () => {
         return toPngArrayBuffer(options).byteLength;
       }),
     );
     rows.push(
-      await measure(payload.id, "async-arraybuffer", async () => {
+      await measure(id, "async-arraybuffer", async () => {
         return (await toPngArrayBufferAsync(options)).byteLength;
       }),
     );
@@ -149,7 +148,6 @@ async function runBench(): Promise<BenchRow[]> {
 }
 
 export default function QrcodePngBenchScreen() {
-  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState("idle");
   const [results, setResults] = useState("[]");
 
@@ -167,24 +165,14 @@ export default function QrcodePngBenchScreen() {
   };
 
   return (
-    <ScrollView
-      testID="png-bench-screen"
-      accessibilityLabel="PNG bench"
-      style={styles.screen}
-      contentContainerStyle={{
-        paddingTop: insets.top + 20,
-        paddingBottom: insets.bottom + 32,
-        paddingHorizontal: 16,
-        gap: 12,
-      }}
-    >
-      <Text testID="png-bench-ready" style={styles.ready}>
+    <E2eScreen testID="png-bench-screen" label="PNG bench" gap={12}>
+      <Text testID="png-bench-ready" style={e2eStyles.ready}>
         png-bench-ready
       </Text>
-      <Text style={styles.title}>PNG ArrayBuffer bench</Text>
-      <Text style={styles.subtitle}>
-        Cold-cache timings on this device. Base64 always; ArrayBuffer when
-        exported.
+      <Text style={e2eStyles.title}>PNG ArrayBuffer bench</Text>
+      <Text style={e2eStyles.subtitle}>
+        Cold-cache timings on this device. Base64 and ArrayBuffer, sync and
+        async.
       </Text>
       <Pressable
         testID="png-bench-run"
@@ -193,9 +181,9 @@ export default function QrcodePngBenchScreen() {
         onPress={() => {
           void onRun();
         }}
-        style={styles.button}
+        style={[e2eStyles.button, styles.button]}
       >
-        <Text style={styles.buttonText}>Run PNG bench</Text>
+        <Text style={e2eStyles.buttonText}>Run PNG bench</Text>
       </Pressable>
       <Text testID="png-bench-status" style={styles.status}>
         {status}
@@ -203,39 +191,15 @@ export default function QrcodePngBenchScreen() {
       <Text testID="png-bench-results" selectable style={styles.results}>
         {results}
       </Text>
-    </ScrollView>
+    </E2eScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#101112",
-  },
-  ready: {
-    color: "#86EFAC",
-    fontFamily: "Menlo",
-    fontSize: 12,
-  },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtitle: {
-    color: "#CBD5E1",
-    fontSize: 14,
-  },
   button: {
+    alignSelf: "stretch",
     backgroundColor: "#1D4ED8",
-    borderRadius: 12,
-    paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  buttonText: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "600",
   },
   status: {
     color: "#FBBF24",

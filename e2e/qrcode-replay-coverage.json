@@ -161,7 +161,7 @@
       "source": "apps/example/components/e2e-lab.tsx",
       "statusId": "e2e-error-result",
       "expectedText": "ok:ready",
-      "assertion": "error: \"ok:ready\"",
+      "assertion": "report(\"error\", \"ok:ready\")",
       "controlId": "e2e-force-empty"
     },
     {

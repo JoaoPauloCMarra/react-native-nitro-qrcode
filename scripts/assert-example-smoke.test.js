@@ -252,3 +252,65 @@ test("fails physical iPhone smoke on a blank accessibility snapshot", () => {
   assert.equal(result.status, 1, result.stdout);
   assert.match(result.stdout, /ios: FAILED.*did not find/);
 });
+
+test("reports several adb devices as a skip, or a strict failure", () => {
+  const adb = [
+    'if [ "$1" = "devices" ]; then',
+    "  printf 'List of devices attached\\nemulator-5554\\tdevice\\nemulator-5556\\tdevice\\n'",
+    "  exit 0",
+    "fi",
+    "exit 0",
+  ].join("\n");
+
+  const lenient = runSmoke({ adb });
+  assert.equal(lenient.status, 0, lenient.stdout);
+  assert.match(lenient.stdout, /android: SKIPPED: Multiple adb devices/);
+
+  const strict = runSmoke({ adb, env: { QRCODE_SMOKE_STRICT: "1" } });
+  assert.equal(strict.status, 1, strict.stdout);
+  assert.match(strict.stdout, /android: FAILED: Android smoke requires a single/);
+});
+
+test("tags device selection errors with a code instead of message text", () => {
+  const { AmbiguousDeviceError } = require("./assert-example-smoke.js");
+  const error = new AmbiguousDeviceError("any wording");
+  assert.equal(error.code, "AMBIGUOUS_DEVICE");
+  assert.ok(error instanceof Error);
+});
+
+test("waitForUi retries until the screen shows the required text", () => {
+  const { waitForUi } = require("./assert-example-smoke.js");
+  const ready = "QR Builder Live output Ready nitro-qrcode-preview QR code for";
+  let attempts = 0;
+  let sleeps = 0;
+  waitForUi(
+    "iOS",
+    () => {
+      attempts += 1;
+      return attempts < 3 ? "Generating QR code" : ready;
+    },
+    () => {
+      sleeps += 1;
+    },
+  );
+  assert.equal(attempts, 3);
+  assert.equal(sleeps, 2);
+});
+
+test("waitForUi gives up after 20 attempts with the last error", () => {
+  const { waitForUi } = require("./assert-example-smoke.js");
+  let attempts = 0;
+  assert.throws(
+    () =>
+      waitForUi(
+        "Android",
+        () => {
+          attempts += 1;
+          throw new Error("dump unavailable");
+        },
+        () => {},
+      ),
+    /Android UI did not become ready: dump unavailable/,
+  );
+  assert.equal(attempts, 20);
+});
