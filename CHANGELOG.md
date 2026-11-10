@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.12.1] - 2026-11-10
+
+### Breaking changes
+
+None.
+
+### Changed
+
+- Dependency baseline updated within current majors: Expo SDK 58 (`expo` 58.0.23), React Native 0.88.1, Nitro Modules and Nitrogen 0.37.2, `react-native-safe-area-context` 5.11.1 and `react-native-screens` 4.30.1 in the example. React stays at 19.3.0. Supported peer ranges are unchanged. There are no JavaScript API or encoded PNG/SVG changes.
+- Regenerated Nitro bindings with Nitrogen 0.37.2. Only the header comment URL changed.
+
 ## [0.12.0] - 2026-10-15
 
 ### Breaking changes

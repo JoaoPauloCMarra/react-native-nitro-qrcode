@@ -23,10 +23,16 @@ function prepareNitroHeaders(rootDir, buildDir) {
   const nitroVirtualDir = path.join(includeRoot, "NitroModules");
   fs.mkdirSync(nitroVirtualDir, { recursive: true });
   const nitroDir = path.join(rootDir, "node_modules", "react-native-nitro-modules", "cpp");
-  for (const subdir of ["core", "jsi", "platform", "templates", "threading", "utils"])
-    for (const file of fs.readdirSync(path.join(nitroDir, subdir)))
+  const nitroHeaderDirs = [
+    ...["core", "entrypoint", "jsi", "platform", "prototype", "registry", "templates", "threading", "utils"].map(
+      (subdir) => path.join(nitroDir, "core", subdir),
+    ),
+    path.join(nitroDir, "threading"),
+  ];
+  for (const headerDir of nitroHeaderDirs)
+    for (const file of fs.readdirSync(headerDir))
       if (file.endsWith(".hpp"))
-        fs.copyFileSync(path.join(nitroDir, subdir, file), path.join(nitroVirtualDir, file));
+        fs.copyFileSync(path.join(headerDir, file), path.join(nitroVirtualDir, file));
 
   const writeHeader = (name, source) =>
     fs.writeFileSync(path.join(nitroVirtualDir, name), source, "utf8");

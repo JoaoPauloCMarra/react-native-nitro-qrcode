@@ -171,7 +171,7 @@ void invalidProps;
       "@types/react": "~19.2.18",
       react: "19.2.3",
       "react-native": "0.87.0",
-      "react-native-nitro-modules": "0.37.1",
+      "react-native-nitro-modules": "0.37.2",
       typescript: "6.0.3",
       [packageName]: `file:${packageTarball}`,
     };
