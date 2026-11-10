@@ -4,8 +4,8 @@
 [![npm downloads](https://img.shields.io/npm/dm/react-native-nitro-qrcode?color=22c55e&label=downloads)](https://www.npmjs.com/package/react-native-nitro-qrcode)
 [![CI](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml/badge.svg)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/react-native-nitro-qrcode?color=007ec6)](https://github.com/JoaoPauloCMarra/react-native-nitro-qrcode/blob/main/LICENSE)
-[![React Native](https://img.shields.io/badge/react--native-0.88.0-61dafb)](https://reactnative.dev/docs/0.88/getting-started-without-a-framework)
-[![Expo](https://img.shields.io/badge/expo-SDK%2058%20%28RN%200.88.0%29-000020)](https://docs.expo.dev/versions/v58.0.0/)
+[![React Native](https://img.shields.io/badge/react--native-0.88.1-61dafb)](https://reactnative.dev/docs/0.88/getting-started-without-a-framework)
+[![Expo](https://img.shields.io/badge/expo-SDK%2058%20%28RN%200.88.1%29-000020)](https://docs.expo.dev/versions/v58.0.0/)
 [![Nitro Modules](https://img.shields.io/badge/nitro--modules-%3E%3D0.37.0%20%3C0.38.0-black)](https://nitro.margelo.com/)
 [![TypeScript](https://img.shields.io/badge/typescript-6.0-3178c6)](https://www.typescriptlang.org/)
 
@@ -51,7 +51,7 @@ bare React Native app.
 | Package          | Supported range                                                     |
 | ---------------- | ------------------------------------------------------------------- |
 | React            | `>=18.2.0 <20.0.0`                                                  |
-| React Native     | `>=0.77.0 <1.0.0` (Nitro 0.37 minimum); tested on `0.88.0`          |
+| React Native     | `>=0.77.0 <1.0.0` (Nitro 0.37 minimum); tested on `0.88.1`          |
 | Nitro Modules    | `>=0.37.0 <0.38.0`                                                  |
 | Expo             | SDK 53 and newer development builds; tested on SDK 58; Expo Go is not supported |
 | iOS              | React Native's `min_ios_version_supported` (15.1 on RN 0.77–0.88)   |
@@ -59,15 +59,15 @@ bare React Native app.
 | Node             | `>=18.0.0`                                                          |
 
 Supports React Native 0.77 or newer and Expo SDK 53 or newer (the
-`react-native-nitro-modules` 0.37 minimum); tested on React Native 0.88.0 and
+`react-native-nitro-modules` 0.37 minimum); tested on React Native 0.88.1 and
 Expo SDK 58.
 
-The current example and package gate use React Native `0.88.0` and Expo SDK 58
-(`expo@~58.0.16`).
+The current example and package gate use React Native `0.88.1` and Expo SDK 58
+(`expo@~58.0.23`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
-Strict TypeScript compatibility. Expo SDK 58 selects React Native `0.88.0`; do
+Strict TypeScript compatibility. Expo SDK 58 selects React Native `0.88.1`; do
 not override that version in the example. The baseline uses React `19.3.0` and
-Nitro Modules `0.37.1`. Versions below the tested baseline follow the declared
+Nitro Modules `0.37.2`. Versions below the tested baseline follow the declared
 peer ranges but have no automated coverage in this repository.
 
 ### Upgrade from 0.8.x
