@@ -12,7 +12,12 @@ const workflow = fs.readFileSync(
   "utf8",
 );
 
-function checkFixture(contents) {
+const ciWorkflowText = fs.readFileSync(
+  path.join(__dirname, "..", ".github", "workflows", "ci.yml"),
+  "utf8",
+);
+
+function checkFixture(contents, ciContents = ciWorkflowText) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nitro-publish-check-"));
   try {
     fs.mkdirSync(path.join(root, "scripts"));
@@ -24,6 +29,10 @@ function checkFixture(contents) {
     fs.writeFileSync(
       path.join(root, ".github", "workflows", "npm-publish.yml"),
       contents,
+    );
+    fs.writeFileSync(
+      path.join(root, ".github", "workflows", "ci.yml"),
+      ciContents,
     );
     return spawnSync(process.execPath, ["scripts/assert-publish-workflow.js"], {
       cwd: root,
@@ -118,6 +127,43 @@ for (const [name, releaseCommit, checkedOutCommit, expectedStatus] of [
     }
   });
 }
+
+test("rejects a CI job that installs without the Bun cache", () => {
+  const fixture = Bun.YAML.parse(ciWorkflowText);
+  fixture.jobs.quality.steps = fixture.jobs.quality.steps.filter(
+    (step) => !step.uses?.startsWith("actions/cache@"),
+  );
+  const result = checkFixture(workflow, Bun.YAML.stringify(fixture));
+  assert.equal(result.status, 1, result.stdout);
+});
+
+test("rejects a Bun cache key that ignores the lockfile", () => {
+  const fixture = Bun.YAML.parse(ciWorkflowText);
+  const cache = fixture.jobs.cpp.steps.find((step) =>
+    step.uses?.startsWith("actions/cache@"),
+  );
+  cache.with.key = "${{ runner.os }}-bun";
+  const result = checkFixture(workflow, Bun.YAML.stringify(fixture));
+  assert.equal(result.status, 1, result.stdout);
+});
+
+test("rejects a CI job on a non-Linux runner", () => {
+  const fixture = Bun.YAML.parse(ciWorkflowText);
+  fixture.jobs.cpp["runs-on"] = "macos-latest";
+  const result = checkFixture(workflow, Bun.YAML.stringify(fixture));
+  assert.equal(result.status, 1, result.stdout);
+});
+
+test("rejects a cache restore in the publish workflow", () => {
+  const fixture = Bun.YAML.parse(workflow);
+  fixture.jobs.publish.steps.unshift({
+    name: "Cache",
+    uses: "actions/cache@v6",
+    with: { path: "~/.bun/install/cache", key: "x" },
+  });
+  const result = checkFixture(Bun.YAML.stringify(fixture));
+  assert.equal(result.status, 1, result.stdout);
+});
 
 test("rejects an unused validate output", () => {
   const fixture = workflow.replace(

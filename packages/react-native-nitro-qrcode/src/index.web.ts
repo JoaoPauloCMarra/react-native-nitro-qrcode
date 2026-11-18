@@ -299,11 +299,14 @@ export function toSvgString(options: QRCodeOptions): string {
       }
     }
 
-    const gradientMarkup = createSvgGradient(normalized, totalSize);
+    const flatColor = flatGradientColor(normalized.gradient);
+    const gradientMarkup =
+      flatColor === undefined ? createSvgGradient(normalized, totalSize) : "";
     const foregroundFill =
-      gradientMarkup === ""
+      flatColor ??
+      (gradientMarkup === ""
         ? normalized.foregroundColor
-        : "url(#nitro-qrcode-gradient)";
+        : "url(#nitro-qrcode-gradient)");
     const output = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges">${gradientMarkup}<path fill="${normalized.backgroundColor}" d="M0,0h${totalSize}v${totalSize}H0z"/><path fill="${foregroundFill}" d="${path}"/></svg>`;
     webCache.set(key, request, output);
     return output;
@@ -605,6 +608,11 @@ function createForegroundFill(
 ): CanvasFill {
   if (options.gradient.type === "none") {
     return toSvgColor(options.foregroundColor);
+  }
+
+  const flat = flatGradientColor(options.gradient);
+  if (flat !== undefined) {
+    return flat;
   }
 
   const locations = resolveGradientLocations(options.gradient);
@@ -1191,10 +1199,7 @@ function addGradientStops(
   locations: number[],
 ): void {
   locations.forEach((location, index) => {
-    const color = colors[index];
-    if (color !== undefined) {
-      gradient.addColorStop(location, color);
-    }
+    gradient.addColorStop(location, colors[index] as string);
   });
 }
 
@@ -1205,6 +1210,18 @@ function getSvgStopMarkup(location: number, color: string): string {
       ? ` stop-opacity="${(parseInt(color.slice(7, 9), 16) / 255).toFixed(3)}"`
       : "";
   return `<stop offset="${formatPercent(location)}" stop-color="${stop}"${opacity}/>`;
+}
+
+function flatGradientColor(gradient: NormalizedGradient): string | undefined {
+  if (gradient.type === "none") {
+    return undefined;
+  }
+
+  const span = Math.hypot(
+    gradient.endX - gradient.startX,
+    gradient.endY - gradient.startY,
+  );
+  return span === 0 ? gradient.colors[0] : undefined;
 }
 
 function resolveGradientLocations(gradient: NormalizedGradient): number[] {

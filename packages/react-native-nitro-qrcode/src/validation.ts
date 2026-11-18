@@ -27,6 +27,7 @@ import {
   DEFAULT_SHAPE,
   DEFAULT_SIZE,
 } from "./defaults";
+import { payloadExceedsCapacity } from "./capacity";
 import type { QRCodeMetricsSnapshot } from "./metrics";
 import {
   scanabilityWarnings,
@@ -264,6 +265,15 @@ export function validateOptions(
 ): QRCodeValidationResult {
   try {
     const normalized = normalizeOptionsUnchecked(options);
+    if (
+      payloadExceedsCapacity(
+        normalized.value,
+        normalized.errorCorrectionLevel,
+        normalized.maxVersion,
+      )
+    ) {
+      throw new Error("QR payload exceeds maxVersion capacity.");
+    }
     const warnings = scanabilityWarnings(normalized);
     return {
       valid: normalized.scanSafe !== "strict" || warnings.length === 0,

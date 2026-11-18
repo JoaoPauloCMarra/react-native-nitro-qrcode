@@ -1,6 +1,6 @@
 "use strict";
 
-const crypto = require("node:crypto");
+const nodeCrypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -456,14 +456,14 @@ function createPackageDocLifecycle({
   }
 
   function hash(state) {
-    return crypto
+    return nodeCrypto
       .createHash("sha256")
       .update(JSON.stringify(state))
       .digest("hex");
   }
 
   function bytesHash(bytes) {
-    return crypto.createHash("sha256").update(bytes).digest("hex");
+    return nodeCrypto.createHash("sha256").update(bytes).digest("hex");
   }
 
   function reserveTemporary(parent, prefix) {
@@ -471,7 +471,7 @@ function createPackageDocLifecycle({
     for (let attempt = 0; attempt < MAX_TEMP_ATTEMPTS; attempt += 1) {
       const candidate = path.join(
         parent,
-        `${prefix}-${process.pid}-${Date.now()}-${crypto
+        `${prefix}-${process.pid}-${Date.now()}-${nodeCrypto
           .randomBytes(8)
           .toString("hex")}.tmp`,
       );
@@ -816,7 +816,7 @@ function createPackageDocLifecycle({
     const createdAt = Date.now();
     return {
       version: 1,
-      token: crypto.randomBytes(16).toString("hex"),
+      token: nodeCrypto.randomBytes(16).toString("hex"),
       pid: process.pid,
       parentPid: process.ppid,
       hostname: os.hostname(),
@@ -1156,7 +1156,7 @@ function createPackageDocLifecycle({
     for (let attempt = 0; attempt < MAX_TEMP_ATTEMPTS; attempt += 1) {
       const candidate = path.join(
         path.dirname(target),
-        `.${path.basename(target)}.pack-docs-displaced-${process.pid}-${crypto
+        `.${path.basename(target)}.pack-docs-displaced-${process.pid}-${nodeCrypto
           .randomBytes(8)
           .toString("hex")}`,
       );

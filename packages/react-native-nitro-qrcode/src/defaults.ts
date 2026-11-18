@@ -130,6 +130,12 @@ export function mergePresetShapeOptions(
   options: QRCodeShapeOptions | undefined,
   preset: QRCodePreset | undefined,
 ): QRCodeShapeOptions {
+  const presetName = preset ?? "default";
+  if (!Object.prototype.hasOwnProperty.call(PRESET_SHAPE_OPTIONS, presetName)) {
+    throw new Error(
+      "preset must be default, rounded, dots, branded, classy, mosaic, or fluid.",
+    );
+  }
   const definedOptions = options === undefined
     ? undefined
     : Object.fromEntries(
@@ -140,5 +146,5 @@ export function mergePresetShapeOptions(
     definedOptions.eyeFrameShape === undefined
       ? { ...definedOptions, eyeFrameShape: definedOptions.eyePatternShape }
       : definedOptions;
-  return { ...PRESET_SHAPE_OPTIONS[preset ?? "default"], ...aliasedOptions };
+  return { ...PRESET_SHAPE_OPTIONS[presetName], ...aliasedOptions };
 }

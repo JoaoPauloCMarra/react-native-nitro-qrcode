@@ -63,7 +63,7 @@ Supports React Native 0.77 or newer and Expo SDK 53 or newer (the
 Expo SDK 58.
 
 The current example and package gate use React Native `0.88.1` and Expo SDK 58
-(`expo@~58.0.23`).
+(`expo@~58.0.26`).
 `check:ci` also compiles the public source against React Native `0.87.0` for
 Strict TypeScript compatibility. Expo SDK 58 selects React Native `0.88.1`; do
 not override that version in the example. The baseline uses React `19.3.0` and
@@ -350,7 +350,7 @@ Generation input bounds:
 | Gradient locations         | Same count as colors, finite values from 0 through 1 in non-decreasing order                                                                   |
 | Gradient points            | Finite `x` and `y` values from 0 through 1                                                                                                     |
 
-Undefined component props do not erase preset defaults. Explicit values, including zero radii, override the preset. Native gradients use the first or last stop color outside the declared stop range.
+Undefined component props do not erase preset defaults. Explicit values, including zero radii, override the preset. Native gradients use the first or last stop color outside the declared stop range. A gradient whose `start` equals `end` (zero length or zero radius) paints the first stop color as a flat fill on native, web PNG and web SVG.
 
 `PRESET_SHAPE_OPTIONS` exports the read-only shape table behind each `preset` name (a frozen `Record<QRCodePreset, QRCodeShapeOptions>`). Use it to seed a builder UI or to spread a preset into `shapeOptions` for the imperative helpers, which take no `preset` option: `shapeOptions: { ...PRESET_SHAPE_OPTIONS.dots, gap: 0 }`.
 
@@ -488,7 +488,7 @@ warnings.
 
 | Code                | Kind    | Meaning                                                              |
 | ------------------- | ------- | -------------------------------------------------------------------- |
-| `invalid`           | Error   | An option is out of range, malformed, or the payload does not fit.   |
+| `invalid`           | Error   | An option is out of range, malformed, or the payload cannot fit `maxVersion` at the chosen `errorCorrectionLevel`. |
 | `too-small-size`    | Warning | The rendered size is too small for the module count to scan reliably. |
 | `bad-quiet-zone`    | Warning | The quiet zone is narrower than two modules or wider than twelve.   |
 | `logo-too-large`    | Warning | The logo area covers too much of the symbol.                         |
@@ -548,7 +548,7 @@ Main exports:
 | `value`                | Non-empty QR payload string. Required.                                                                                               |
 | `size`                 | Positive component layout size up to 2048 points; default `180`. Rasterized internally at at least 96 pixels and at least 2x (up to 4096 pixels). Export helpers default to `512` pixels. |
 | `quietZone`            | Quiet-zone width in QR modules; integer 0 through 32; default `4`.                                                                   |
-| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases; default `M` (`H` when `scanSafe` reserves a logo area).                               |
+| `errorCorrectionLevel` | `L`, `M`, `Q`, `H`, or their long-form aliases; default `M` (`H` whenever `logoAreaSize` is greater than `0`).                               |
 | `minVersion` / `maxVersion` | QR version bounds from `1` through `40`, with the minimum no larger than the maximum.                                         |
 | `mask`                 | `-1` for automatic mask selection, or a fixed mask from `0` through `7`.                                                            |
 | `boostEcl`             | Raises error correction within the selected version when the payload fits; default `true`.                                          |

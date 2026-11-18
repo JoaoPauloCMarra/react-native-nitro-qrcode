@@ -40,7 +40,7 @@ module.exports = {
       [
         "expo-build-properties",
         {
-          ios: { enableSceneSupport: true, ccacheEnabled: ccacheAvailable },
+          ios: { ccacheEnabled: ccacheAvailable },
           android: androidAbis ? { buildArchs: androidAbis } : {},
         },
       ],
