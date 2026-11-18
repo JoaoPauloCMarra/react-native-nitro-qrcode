@@ -29,10 +29,8 @@ export function createBoundedCache<V>(
   function evictIfNeeded(): void {
     while (entries.size > maxEntries || totalBytes > maxBytes) {
       const oldestKey = entries.keys().next().value as string;
-      const removed = entries.get(oldestKey);
-      if (removed !== undefined) {
-        totalBytes -= removed.bytes;
-      }
+      const removed = entries.get(oldestKey) as BoundedCacheEntry<V>;
+      totalBytes -= removed.bytes;
       entries.delete(oldestKey);
     }
   }

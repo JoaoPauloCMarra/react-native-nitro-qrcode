@@ -1,17 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-const { createLlvmToolResolver } = require("./llvm-tools.js") as {
-  createLlvmToolResolver: (options?: {
-    env?: Record<string, string | undefined>;
-    platform?: string;
-    execSync?: (command: string, options: { encoding: string }) => string;
-    execFileSync?: (
-      command: string,
-      args: string[],
-      options: { encoding: string },
-    ) => string;
-  }) => (name: string) => string;
-};
+import { createLlvmToolResolver } from "./llvm-tools.js";
 
 describe("LLVM executable discovery", () => {
   it("prefers the configured pinned version on PATH", () => {

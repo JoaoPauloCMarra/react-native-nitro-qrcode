@@ -79,6 +79,48 @@ assert.ok(
   "source verification must finish before publication",
 );
 
+for (const [name, job] of Object.entries(workflow.jobs)) {
+  for (const step of job.steps) {
+    assert.ok(
+      !step.uses?.startsWith("actions/cache"),
+      `${name} must not restore caches in the publish workflow`,
+    );
+  }
+}
+
+const ciWorkflow = Bun.YAML.parse(
+  fs.readFileSync(path.join(path.dirname(workflowPath), "ci.yml"), "utf8"),
+);
+assert.notEqual(ciWorkflow.permissions, "write-all");
+assert.equal(ciWorkflow.permissions?.["id-token"], undefined);
+for (const [name, job] of Object.entries(ciWorkflow.jobs)) {
+  assert.equal(job["runs-on"], "ubuntu-26.04", `${name} must run on Linux`);
+  assert.notEqual(job.permissions, "write-all", `${name} must not grant OIDC`);
+  assert.equal(job.permissions?.["id-token"], undefined, `${name} OIDC`);
+  const cacheIndex = job.steps.findIndex((step) =>
+    step.uses?.startsWith("actions/cache@v6"),
+  );
+  const installIndex = job.steps.findIndex((step) =>
+    step.run?.startsWith("bun install"),
+  );
+  assert.notEqual(installIndex, -1, `${name} must install dependencies`);
+  assert.ok(
+    cacheIndex !== -1 && cacheIndex < installIndex,
+    `${name} must restore the Bun package cache before installing`,
+  );
+  assert.equal(job.steps[cacheIndex].with.path, "~/.bun/install/cache");
+  assert.equal(
+    job.steps[cacheIndex].with.key,
+    "${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}",
+    `${name} cache key must follow the lockfile`,
+  );
+  for (const step of job.steps) {
+    if (step.uses?.startsWith("actions/checkout@")) {
+      assert.equal(step.with?.["persist-credentials"], false);
+    }
+  }
+}
+
 console.log(
   "Publish workflow validates source identity and publishes only on GitHub Release events.",
 );

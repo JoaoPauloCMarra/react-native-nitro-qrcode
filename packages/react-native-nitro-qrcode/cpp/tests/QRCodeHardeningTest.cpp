@@ -84,6 +84,36 @@ void testVersionWindowTooSmallForPayload() {
   assert(startsWith(message, "Data length = "));
 }
 
+struct FixedVersionCapacityCase {
+  const char *ecc;
+  int version;
+  char symbol;
+  int capacity;
+};
+
+void testFixedVersionCapacityMatchesScriptRule() {
+  const std::array<FixedVersionCapacityCase, 3> cases = {{
+      {"L", 1, 'a', 17},
+      {"M", 10, 'A', 311},
+      {"H", 40, '7', 3057},
+  }};
+  QRCodeGenerator generator;
+  for (const auto &entry : cases) {
+    GenerateOptions options;
+    options.errorCorrectionLevel = entry.ecc;
+    options.boostEcl = false;
+    options.minVersion = entry.version;
+    options.maxVersion = entry.version;
+    const std::string atCapacity(static_cast<size_t>(entry.capacity),
+                                 entry.symbol);
+    assert(generator.getMatrixSize(atCapacity, options) ==
+           entry.version * 4 + 17);
+    expectThrow<std::length_error>([&]() {
+      generator.getMatrixSize(atCapacity + entry.symbol, options);
+    });
+  }
+}
+
 void testBoostEclKeepsCapacityBoundary() {
   QRCodeGenerator generator;
   GenerateOptions options;
@@ -996,6 +1026,7 @@ void runQRCodeHardeningTests() {
   testBase64OutputLengthIsExact();
   testVersion40CapacityBoundaries();
   testVersionWindowTooSmallForPayload();
+  testFixedVersionCapacityMatchesScriptRule();
   testBoostEclKeepsCapacityBoundary();
   testHostilePayloads();
   testSizeAndQuietZoneExtremes();

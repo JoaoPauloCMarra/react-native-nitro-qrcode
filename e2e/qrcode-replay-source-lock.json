@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeSourceSha256": "e9abe82e3e97db371f5ac280c006d2b1f397edd5479c0401adeecd688cce6d0d",
+  "runtimeSourceSha256": "42bedb7c45675df7f6c21fc97a8b054c6176251a429547a71c395c11d7f40e42",
   "runtimeSourceFiles": [
     "apps/example/app.config.js",
     "apps/example/app/_layout.tsx",
@@ -68,6 +68,7 @@
     "packages/react-native-nitro-qrcode/react-native-nitro-qrcode.podspec",
     "packages/react-native-nitro-qrcode/src/QRCode.nitro.ts",
     "packages/react-native-nitro-qrcode/src/cache.ts",
+    "packages/react-native-nitro-qrcode/src/capacity.ts",
     "packages/react-native-nitro-qrcode/src/colors.ts",
     "packages/react-native-nitro-qrcode/src/defaults.ts",
     "packages/react-native-nitro-qrcode/src/index.ts",

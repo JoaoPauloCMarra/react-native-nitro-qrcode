@@ -16,7 +16,6 @@ Pod::Spec.new do |s|
   s.module_name  = "NitroQRCode"
 
   s.source_files = [
-    "ios/**/*.{h,m,mm,swift}",
     "cpp/bindings/*.{h,hpp,c,cpp}",
     "cpp/core/BoundedCache.hpp",
     "cpp/core/QRCodeGenerator.{h,hpp,c,cpp}",

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes are always listed first in each release section.
 
+## [0.13.0] - 2026-11-18
+
+### Breaking changes
+
+No API removals. Two behavior changes affect invalid input only:
+
+- An unknown `preset` value used to fall back to the default look without an error. It now throws `preset must be default, rounded, dots, branded, classy, mosaic, or fluid.` Migration: fix or remove the invalid `preset` string.
+- `validateOptions` now returns `invalid` for a payload that cannot fit `maxVersion` at the chosen `errorCorrectionLevel`. Before, it returned valid and `toPng*` and `toSvg*` then rejected the value. Migration: treat this `invalid` result as the payload-too-large case that `toPng*` and `toSvg*` already rejected.
+
+### Fixed
+
+- An unknown `preset` is rejected instead of silently using the default look, like the other shape options.
+- The published package no longer lists a missing `ios/` folder in its `files` and podspec sources. Package contents are unchanged.
+- README: the default error-correction level is `H` whenever `logoAreaSize` is greater than `0`, as the code does.
+- A linear gradient whose `start` equals `end`, and a radial gradient with zero radius, now paint the first stop color as a flat fill on web PNG and web SVG, like native. Web PNG used to draw a blank code for equal linear points, and web SVG painted the last stop.
+- `validateOptions` now returns an `invalid` error when the payload cannot fit `maxVersion` at the chosen `errorCorrectionLevel`. Capacity uses the numeric, alphanumeric or byte mode that the encoders pick for the whole value. A value that no encoder can fit is the only case rejected. The rule matches the real encoder at every version (1 to 40), error-correction level and mode, and native matches at the boundary.
+
+### Changed
+
+- Example app updated to the Expo SDK 58.0.26 patch set (`expo` ~58.0.26, `expo-router` ~58.0.32, `expo-linking` ~58.0.17, `expo-status-bar` ~58.0.5). React 19.3.0 and React Native 0.88.1 are unchanged. Supported peer ranges are unchanged.
+- Development tooling: Jest 30.5.2, `react-native-builder-bob` 0.44.1 and Bun 1.4.4. Contributors need Node 22.22.2, 24.15.0 or newer to build the package. Consumers of the published package are not affected.
+
 ## [0.12.1] - 2026-11-10
 
 ### Breaking changes

@@ -2266,6 +2266,37 @@ describe("web QRCode API", () => {
     );
   });
 
+  it.each<[string, NonNullable<Parameters<typeof Web.toSvgString>[0]["gradient"]>]>([
+    [
+      "linear with equal start and end",
+      {
+        colors: ["#4AA8FF", "#28D17C"],
+        start: { x: 0.4, y: 0.4 },
+        end: { x: 0.4, y: 0.4 },
+      },
+    ],
+    [
+      "radial with equal start and end",
+      {
+        type: "radial",
+        colors: ["#4AA8FF", "#28D17C"],
+        start: { x: 0.5, y: 0.5 },
+        end: { x: 0.5, y: 0.5 },
+      },
+    ],
+  ])("paints the first stop flat for a degenerate %s gradient", (_name, gradient) => {
+    const context = createMockContext();
+    installCanvas(() => context);
+    Web.toPngDataUri({ value: "Degenerate", size: 64, gradient });
+    expect(context.createLinearGradient).not.toHaveBeenCalled();
+    expect(context.createRadialGradient).not.toHaveBeenCalled();
+    expect(context.fillStyle).toBe("#4AA8FF");
+
+    const svg = Web.toSvgString({ value: "Degenerate", gradient });
+    expect(svg).not.toContain("Gradient");
+    expect(svg).toContain('<path fill="#4AA8FF" d="M');
+  });
+
   it("renders the web Image-backed QR component", async () => {
     installCanvas();
     let tree: TestRenderer.ReactTestRenderer | undefined;
@@ -2692,6 +2723,23 @@ describe("preset shape options", () => {
         "rounded",
       ),
     ).toEqual({ ...PRESET_SHAPE_OPTIONS.rounded, gap: 0 });
+  });
+
+  it.each(["unknown", "", "constructor", "__proto__", "toString"])(
+    "rejects the unknown preset %j instead of using the default look",
+    (preset) => {
+      expect(() =>
+        mergePresetShapeOptions(undefined, preset as never),
+      ).toThrow(
+        "preset must be default, rounded, dots, branded, classy, mosaic, or fluid.",
+      );
+    },
+  );
+
+  it("treats an omitted preset as the default look", () => {
+    expect(mergePresetShapeOptions(undefined, undefined)).toEqual(
+      PRESET_SHAPE_OPTIONS.default,
+    );
   });
 
   it.each([
